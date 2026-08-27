@@ -1,0 +1,35 @@
+# SPDX-License-Identifier: Apache-2.0
+
+name: Feature proposal
+description: Propose a scoped capability within the active milestone.
+title: "[Proposal]: "
+labels: [proposal]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem and user outcome
+      description: Which inspectable problem should this solve?
+    validations:
+      required: true
+  - type: dropdown
+    id: milestone
+    attributes:
+      label: Earliest roadmap milestone
+      options: [P1, P2, P3, P4, P5, P6, P7, P8]
+    validations:
+      required: true
+  - type: textarea
+    id: boundaries
+    attributes:
+      label: Authority, privacy, and claim boundaries
+      description: What must remain forbidden or explicitly unclaimed?
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Repeatable acceptance evidence
+      description: Which command and artifact would establish completion?
+    validations:
+      required: true

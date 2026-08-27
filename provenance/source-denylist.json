@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "policy_version": "p0-v1",
+  "source_label": "digital-colleague-runtime-research",
+  "source_revision": "dea9a9accc82fbedd35deb7117dcb5173223cf44",
+  "rules": [
+    {"match_kind": "exact", "source_path": ".env.local", "classification": "secret_or_local_config", "reason": "Local configuration and credential risk."},
+    {"match_kind": "prefix", "source_path": ".dcr/", "classification": "local_runtime_state", "reason": "Local colleague state is private and non-portable."},
+    {"match_kind": "prefix", "source_path": ".demo/", "classification": "local_demo_state", "reason": "Local demo databases, receipts, and logs are not public fixtures."},
+    {"match_kind": "prefix", "source_path": "evidence/", "classification": "raw_evidence", "reason": "Raw research evidence may contain private or acceptance data."},
+    {"match_kind": "prefix", "source_path": "docs/operator/", "classification": "internal_operations", "reason": "Internal operator and live-acceptance procedures require clean public rewriting."},
+    {"match_kind": "prefix", "source_path": ".agents/", "classification": "internal_agent_configuration", "reason": "Internal agent skills and persistent state are outside the public product."},
+    {"match_kind": "prefix", "source_path": "spikes/", "classification": "research_spike", "reason": "Framework and vendor spikes are not supported product code."},
+    {"match_kind": "prefix", "source_path": "src/digital_colleague/evaluation/", "classification": "research_evaluation", "reason": "Research evaluation machinery and personal ratings are not v0.1 product scope."},
+    {"match_kind": "prefix", "source_path": "src/digital_colleague/scenarios/", "classification": "research_scenario", "reason": "Scenario harnesses require separate synthetic-fixture review."},
+    {"match_kind": "prefix", "source_path": "scripts/collect_", "classification": "milestone_collector", "reason": "Private milestone evidence collectors are not public product tools."},
+    {"match_kind": "prefix", "source_path": "scripts/attest_", "classification": "milestone_attestation", "reason": "Private milestone attestations cannot become public release claims."},
+    {"match_kind": "prefix", "source_path": "artifacts/", "classification": "generated_or_live_artifact", "reason": "Generated artifacts require per-file public review."}
+  ]
+}

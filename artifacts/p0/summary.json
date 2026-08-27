@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "gate": "p0_planning_public_boundary",
+  "status": "passed",
+  "completed_date": "2026-08-27",
+  "revalidated_date": "2026-08-28",
+  "claim_scope": "Planning and public-boundary gate only.",
+  "source_label": "digital-colleague-runtime-research",
+  "source_revision": "dea9a9accc82fbedd35deb7117dcb5173223cf44",
+  "results": {
+    "p0_tests": {"passed": 28, "failed": 0},
+    "public_boundary": {"files_scanned": 33, "findings": 0, "exceptions_applied": 0, "policy_version": "p0-v1"},
+    "source_allowlist": {"verified_entries": 33, "manifest_digest": "sha256:17165aad94cfdb86057125d1b340c3d461ea6d2d6d05b7a25bb73d29e0a38c83"},
+    "source_fingerprint": {"before_after_match": true, "scope": "parent_source_excluding_authorized_target_subtree", "status_entry_count": 50, "untracked_entry_count": 0, "ignored_entry_count": 9365, "content_state_included": true}
+  },
+  "boundaries": {
+    "git_initialized": false,
+    "remote_created": false,
+    "published": false,
+    "product_code_migrated": false,
+    "formal_license_created": false,
+    "formal_notice_created": false,
+    "p1_started": false,
+    "unresolved_rights_count": 0
+  },
+  "entry_hardening": {
+    "root_git_metadata_only_exclusion": true,
+    "actual_exception_count_reported": true,
+    "untracked_ignored_content_state_included": true,
+    "fingerprint_schema_version": 2
+  },
+  "not_evidence_for": [
+    "product completion",
+    "security effectiveness",
+    "privacy effectiveness",
+    "production readiness",
+    "production tenancy isolation",
+    "enterprise identity and access management",
+    "compliance",
+    "live provider acceptance",
+    "human pilot acceptance"
+  ],
+  "verification_commands": [
+    "python3 -B -m unittest discover -s tests/p0 -v",
+    "python3 -B scripts/check_public_boundary.py .",
+    "python3 -B scripts/verify_source_allowlist.py --source SOURCE_CHECKOUT --revision dea9a9accc82fbedd35deb7117dcb5173223cf44",
+    "python3 -B scripts/fingerprint_source_tree.py --source SOURCE_CHECKOUT --revision dea9a9accc82fbedd35deb7117dcb5173223cf44 --exclude-relative digital-colleagues"
+  ]
+}

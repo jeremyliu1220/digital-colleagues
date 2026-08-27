@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "record_type": "source_rights_confirmation",
+  "source_label": "digital-colleague-runtime-research",
+  "source_revision": "dea9a9accc82fbedd35deb7117dcb5173223cf44",
+  "intended_outbound_license": "Apache-2.0",
+  "confirmation_basis": "project_owner_instruction",
+  "authorized_scope": "Allowlist-selected, transformed, and de-identified source results, only to the extent of rights held by the confirming project owner.",
+  "conditions": [
+    "The source file is individually allowlisted.",
+    "The fixed-revision content matches the recorded SHA-256 digest.",
+    "The required transform and de-identification are completed before introduction.",
+    "Applicable third-party notices and license terms are preserved.",
+    "Any uncertainty about ownership, public distribution, or relicensing blocks that file."
+  ],
+  "p0_authorizes_source_migration": false,
+  "formal_license_documents_deferred_to": "P1",
+  "unresolved": []
+}

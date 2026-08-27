@@ -1,0 +1,93 @@
+{
+  "claim_scope": "Clean-room public repository scaffold only.",
+  "completed_date": "2026-08-28",
+  "gate": "p1_public_repository_scaffold",
+  "mechanically_verified_boundaries": {
+    "git_initialized": false,
+    "p2_product_paths_present": 0,
+    "public_boundary_exceptions_applied": 0,
+    "public_boundary_findings": 0,
+    "python_runtime_dependency_count": 0,
+    "root_git_administrative_entry_present": false
+  },
+  "non_mechanical_claims": {
+    "committed": "not_evaluated_by_automated_evidence",
+    "live_provider_evidence_used": "not_evaluated_by_automated_evidence",
+    "parent_worktree_content_used": "not_evaluated_by_automated_evidence",
+    "personal_data_used": "not_evaluated_by_automated_evidence",
+    "product_code_migrated": "not_evaluated_by_automated_evidence",
+    "published": "not_evaluated_by_automated_evidence",
+    "remote_created": "not_evaluated_by_automated_evidence"
+  },
+  "not_evidence_for": [
+    "P2 core primitives",
+    "a runnable product Golden Path",
+    "security effectiveness",
+    "privacy effectiveness",
+    "production readiness",
+    "production tenancy isolation",
+    "enterprise identity and access management",
+    "compliance",
+    "live provider acceptance",
+    "human pilot acceptance"
+  ],
+  "results": {
+    "licensing": {
+      "license_digest": "sha256:cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "license_text_mechanically_verified": true,
+      "notice_review": "operator_review_record_present",
+      "outbound_license": "Apache-2.0"
+    },
+    "public_boundary": {
+      "exceptions_applied": 0,
+      "files_scanned": 81,
+      "findings": 0,
+      "policy_version": "p0-v1"
+    },
+    "python": {
+      "mypy_strict": "passed",
+      "requires_python": ">=3.12",
+      "ruff_format": "passed",
+      "ruff_lint": "passed",
+      "runtime_dependency_count": 0
+    },
+    "scaffold_contract": {
+      "gate": "p1_scaffold_contract_clean",
+      "license_digest": "sha256:cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "notice_operator_review_record_present": true,
+      "p2_product_paths_present": 0,
+      "python_package_file_count": 2,
+      "required_file_count": 43,
+      "requires_python": ">=3.12",
+      "runtime_dependency_count": 0,
+      "schema_version": 1,
+      "studio_source_file_count": 5
+    },
+    "studio": {
+      "eslint": "passed",
+      "npm_lock_install": "passed",
+      "prettier": "passed",
+      "typescript": "passed",
+      "vite_build": "passed",
+      "vitest": "passed"
+    },
+    "unittest": {
+      "errors": 0,
+      "expected_failures": 0,
+      "failures": 0,
+      "gate_passed": true,
+      "skipped": 0,
+      "tests_run": 48,
+      "unexpected_successes": 0
+    }
+  },
+  "schema_version": 2,
+  "status": "passed",
+  "verification_commands": [
+    "make check",
+    "make evidence-p1",
+    "python3 -B scripts/check_public_boundary.py .",
+    "python3 -B scripts/check_p1_scaffold.py .",
+    "python3 -B scripts/run_unittest_suite.py --start-directory tests --top-level-directory ."
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "policy_version": "p0-v1",
+  "rules": [
+    {"id": "LOCAL_PATH", "category": "local_location", "action": "reject"},
+    {"id": "EMAIL_ADDRESS", "category": "personal_contact", "action": "reject"},
+    {"id": "PERSONAL_IDENTIFIER", "category": "personal_identity", "action": "reject"},
+    {"id": "PROVIDER_IDENTIFIER", "category": "live_provider", "action": "reject"},
+    {"id": "CREDENTIAL_PATTERN", "category": "credential", "action": "reject"},
+    {"id": "PRIVATE_KEY", "category": "credential", "action": "reject"},
+    {"id": "LIVE_RECEIPT", "category": "live_provider", "action": "reject"},
+    {"id": "PERSONAL_ACCEPTANCE", "category": "human_subject_data", "action": "reject"},
+    {"id": "UNDECODABLE_FILE", "category": "unreviewed_binary", "action": "reject"}
+  ],
+  "structured_personal_keys": [
+    "colleague_id",
+    "human_principal_id",
+    "personal_colleague_id"
+  ],
+  "structured_provider_keys": [
+    "provider_id",
+    "provider_message_id",
+    "workspace_id",
+    "channel_id",
+    "conversation_id"
+  ],
+  "structured_live_receipt_keys": [
+    "live_receipt",
+    "external_receipt",
+    "provider_receipt"
+  ],
+  "structured_acceptance_keys": [
+    "human_acceptance",
+    "personal_acceptance",
+    "acceptance_confirmation",
+    "participant_rating"
+  ],
+  "known_private_marker_digests": []
+}

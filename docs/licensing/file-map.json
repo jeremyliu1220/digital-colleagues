@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "policy_version": "p1-v1",
+  "default_project_license": "Apache-2.0",
+  "comment_capable_file_policy": "SPDX-License-Identifier: Apache-2.0",
+  "special_files": [
+    {"path": "LICENSE", "classification": "official_license_text", "license": "Apache-2.0"},
+    {"path": "NOTICE", "classification": "project_notice", "license": "Apache-2.0"},
+    {"path": ".nvmrc", "classification": "tool_version_data", "license": "Apache-2.0"},
+    {"path": ".python-version", "classification": "tool_version_data", "license": "Apache-2.0"},
+    {"path": "src/digital_colleagues/py.typed", "classification": "typing_marker", "license": "Apache-2.0"},
+    {"path": "studio/package.json", "classification": "package_metadata", "license": "Apache-2.0"},
+    {"path": "studio/package-lock.json", "classification": "generated_dependency_lock", "license": "Apache-2.0"}
+  ],
+  "third_party_material_vendored": false,
+  "generated_distribution_review_required": true
+}
