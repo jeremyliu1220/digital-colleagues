@@ -1,0 +1,133 @@
+{
+  "claim_scope": "P2 framework-independent core primitives only.",
+  "completed_date": "2026-08-28",
+  "evaluated_tree": {
+    "branch": "codex/p2-core-primitives",
+    "head_commit_before_evidence": "bd6953b3dceeebd33a53f52b03ce94534ff5624b",
+    "merge_base": "bd6953b3dceeebd33a53f52b03ce94534ff5624b",
+    "public_tree_digest_excluding_summary": "sha256:783e36ff93ab665f2ea041c06ac7c9046c9feb49b475a5247fbe60cba795603b",
+    "remote_count": 0
+  },
+  "gate": "p2_core_primitives",
+  "migration": {
+    "new_implementation_count": 14,
+    "new_implementation_digest": "sha256:537fec282a2893b9e5400dbf2dfebf5ca747a551cdeb2a3d6aa3530d2ab6af8b",
+    "receipt_digest": "sha256:e2f87a71185f4f40d7c6fc6c4828df05d4eb242ae78c81fb8c08b3f04868f5ac",
+    "transformed_migration_count": 0
+  },
+  "milestone": "P2",
+  "non_mechanical_claims": {
+    "parent_worktree_content_used": "not_evaluated",
+    "parent_worktree_unchanged": "not_evaluated",
+    "personal_data_used": "not_evaluated",
+    "published": "not_evaluated",
+    "rights_review_beyond_receipt_shape": "not_evaluated"
+  },
+  "not_evidence_for": [
+    "P3 application orchestration",
+    "database persistence or restart recovery",
+    "authentication implementation",
+    "effect execution",
+    "a runnable product Golden Path",
+    "security effectiveness",
+    "privacy effectiveness",
+    "production readiness",
+    "live provider acceptance"
+  ],
+  "p1_baseline_commit": "bd6953b3dceeebd33a53f52b03ce94534ff5624b",
+  "results": {
+    "architecture": {
+      "dependency_violations": 0,
+      "files_checked": 14,
+      "forbidden_imports": 0,
+      "forbidden_io_imports": 0,
+      "gate": "p2_architecture_clean",
+      "nondeterministic_calls": 0,
+      "p3_paths_present": 0,
+      "schema_version": 1
+    },
+    "authority_approval": {
+      "status": "passed"
+    },
+    "core_contracts": {
+      "authority_approval": "passed",
+      "effect_payload_redacted": true,
+      "enum_count": 15,
+      "frozen_dataclass_count": 25,
+      "gate": "p2_core_contracts_clean",
+      "immutability": "passed",
+      "namespace": "passed",
+      "principal_separation": "passed",
+      "protocol_count": 3,
+      "record_shape_count": 13,
+      "schema_version": 1,
+      "serialization": "passed"
+    },
+    "immutability": {
+      "status": "passed"
+    },
+    "namespace": {
+      "status": "passed"
+    },
+    "principal_separation": {
+      "status": "passed"
+    },
+    "public_boundary": {
+      "exceptions_applied": 0,
+      "files_scanned": 117,
+      "findings": 0,
+      "policy_version": "p0-v1",
+      "status": "passed"
+    },
+    "python": {
+      "mypy_strict": "passed",
+      "requires_python": ">=3.12",
+      "ruff_format": "passed",
+      "ruff_lint": "passed",
+      "runtime_dependency_count": 0
+    },
+    "repository": {
+      "gate": "p2_repository_clean",
+      "license_digest": "sha256:cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "p1_historical_gate_preserved": true,
+      "p1_summary_digest": "sha256:1b2650cbf90c8e50b05dc193906bed1d6c8fac37aa6b669b88605b572c05ecaa",
+      "p3_paths_present": 0,
+      "required_file_count": 24,
+      "requires_python": ">=3.12",
+      "runtime_dependency_count": 0,
+      "schema_version": 1
+    },
+    "serialization": {
+      "status": "passed"
+    },
+    "studio": {
+      "eslint": "passed",
+      "npm_lock_install": "passed",
+      "prettier": "passed",
+      "runtime_orchestration": "not_implemented_p3",
+      "typescript": "passed",
+      "vite_build": "passed",
+      "vitest": "passed"
+    },
+    "unittest": {
+      "errors": 0,
+      "expected_failures": 0,
+      "failures": 0,
+      "gate_passed": true,
+      "skipped": 0,
+      "tests_run": 99,
+      "unexpected_successes": 0
+    }
+  },
+  "schema_version": 1,
+  "source_revision": "dea9a9accc82fbedd35deb7117dcb5173223cf44",
+  "status": "passed",
+  "verification_commands": [
+    "make check",
+    "make evidence-p2",
+    "python3 -B -m unittest discover -s tests -v",
+    "python3 -B scripts/check_public_boundary.py .",
+    "python3 -B scripts/check_p2_architecture.py .",
+    "PYTHONPATH=src python3 -B scripts/check_p2_core_contracts.py ."
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "milestone": "P2",
+  "source_label": "digital-colleague-runtime-research",
+  "fixed_source_revision": "dea9a9accc82fbedd35deb7117dcb5173223cf44",
+  "transformed_entries": [],
+  "new_implementations": [
+    {"destination": "src/digital_colleagues/core/__init__.py", "classification": "new_implementation", "implementation_basis": "public_architecture_documents", "gate_result": "not_a_source_migration"},
+    {"destination": "src/digital_colleagues/core/audit.py", "classification": "new_implementation", "implementation_basis": "public_architecture_documents", "gate_result": "not_a_source_migration"},
+    {"destination": "src/digital_colleagues/core/authority.py", "classification": "new_implementation", "implementation_basis": "public_architecture_documents", "gate_result": "not_a_source_migration"},
+    {"destination": "src/digital_colleagues/core/common.py", "classification": "new_implementation", "implementation_basis": "public_architecture_documents", "gate_result": "not_a_source_migration"},
+    {"destination": "src/digital_colleagues/core/effects.py", "classification": "new_implementation", "implementation_basis": "public_architecture_documents", "gate_result": "not_a_source_migration"},
+    {"destination": "src/digital_colleagues/core/errors.py", "classification": "new_implementation", "implementation_basis": "public_architecture_documents", "gate_result": "not_a_source_migration"},
+    {"destination": "src/digital_colleagues/core/namespace.py", "classification": "new_implementation", "implementation_basis": "public_architecture_documents", "gate_result": "not_a_source_migration"},
+    {"destination": "src/digital_colleagues/core/ports.py", "classification": "new_implementation", "implementation_basis": "public_architecture_documents", "gate_result": "not_a_source_migration"},
+    {"destination": "src/digital_colleagues/core/principals.py", "classification": "new_implementation", "implementation_basis": "public_architecture_documents", "gate_result": "not_a_source_migration"},
+    {"destination": "src/digital_colleagues/core/runtime.py", "classification": "new_implementation", "implementation_basis": "public_architecture_documents", "gate_result": "not_a_source_migration"},
+    {"destination": "src/digital_colleagues/core/serialization.py", "classification": "new_implementation", "implementation_basis": "public_architecture_documents", "gate_result": "not_a_source_migration"},
+    {"destination": "src/digital_colleagues/core/work.py", "classification": "new_implementation", "implementation_basis": "public_architecture_documents", "gate_result": "not_a_source_migration"},
+    {"destination": "src/digital_colleagues/governance/__init__.py", "classification": "new_implementation", "implementation_basis": "public_architecture_documents", "gate_result": "not_a_source_migration"},
+    {"destination": "src/digital_colleagues/governance/approvals.py", "classification": "new_implementation", "implementation_basis": "public_architecture_documents", "gate_result": "not_a_source_migration"}
+  ]
+}

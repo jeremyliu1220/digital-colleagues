@@ -35,9 +35,16 @@ source location is returned, including in errors. Matching before and after valu
 pre-existing parent-source state changed. The full parent status is expected to contain
 the untracked target subtree.
 
-## Future migration receipt
+## P2 migration receipt
 
-A later migration receipt may contain only the allowed source fields plus transformation
-tool version, destination digest, reviewer role, and gate result. It must not contain
-source checkout locations, author contact data, live provider values, personal acceptance,
-or raw command output.
+`provenance/p2-migration-receipt.json` records zero transformed entries. Every P2 core and
+governance product file is labeled `new_implementation` with
+`public_architecture_documents` as its basis; no parent source bytes were read or
+transformed for implementation. `scripts/check_p2_provenance.py` verifies that the receipt
+covers the complete P2 product tree and emits counts plus aggregate digests without local
+source locations.
+
+Any future transformed entry may contain only the allowed source fields plus
+transformation tool version, destination digest, reviewer role, and gate result. It must
+not contain source checkout locations, author contact data, live provider values, personal
+acceptance, or raw command output.

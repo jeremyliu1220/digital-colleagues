@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
-"""Package boundary for the Digital Colleagues reference stack.
+"""Digital Colleagues framework-independent core package.
 
-P1 intentionally contains no domain, application, adapter, or runtime behavior.
+P2 exposes immutable core primitives only. Runtime orchestration remains deferred to P3.
 """
 
 __all__ = ["__version__"]

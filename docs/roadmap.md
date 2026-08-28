@@ -4,8 +4,9 @@
 
 Each milestone stops at its gate. A later milestone must not begin automatically.
 
-Current checkpoint: the P1 clean-room scaffold gate passed on 2026-08-28. Git
-initialization, publication, and P2 product work remain separately gated and unstarted.
+Current checkpoint: the P2 core-primitives gate passed on 2026-08-28. The accepted P1
+evidence remains unchanged. P3 application, persistence, API, worker, adapter, and runtime
+work is separately gated and has not started.
 
 ## P0 — Public planning and boundary gate
 
@@ -34,6 +35,12 @@ proposals, human principals, and exact approval decisions. Correct the research 
 coupling between colleague identity and human approver identity.
 
 Exit: architecture, immutability, authority, and principal-separation tests pass.
+
+Actual: P2 uses new implementations derived from public architecture documents and records
+zero transformed source files. Frozen contracts and pure governance policies now cover
+complete namespace, durable principals, Profile versus Mandate authority, finite work and
+obligations, event/agenda/wake state, exact effect revisions, human-only approval, replay
+refusal, and the minimum causal audit chain. No orchestration or persistence was added.
 
 ## P3 — Headless deterministic slice
 

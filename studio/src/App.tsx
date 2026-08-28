@@ -22,7 +22,7 @@ export function App() {
           </span>
           <span>Digital Colleagues</span>
         </a>
-        <span className="milestone-tag">P1 · Scaffold</span>
+        <span className="milestone-tag">P2 · Core primitives</span>
       </header>
 
       <main id="top">
@@ -43,7 +43,8 @@ export function App() {
               aria-label="Milestone boundary"
             >
               <span className="boundary-pulse" aria-hidden="true" />
-              Studio tooling is ready. Runtime behavior begins after P1.
+              Immutable core contracts are ready. Runtime orchestration begins
+              in P3.
             </div>
           </div>
 
@@ -53,7 +54,7 @@ export function App() {
           >
             <div className="frame-heading">
               <span>Reference control plane</span>
-              <span className="frame-state">Design target</span>
+              <span className="frame-state">Core contract</span>
             </div>
             <ol className="primitive-list">
               {primitives.map((primitive, index) => (

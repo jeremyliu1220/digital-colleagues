@@ -29,6 +29,19 @@ The core is implemented with frozen standard-library dataclasses, Enums, and Pro
 It does not import FastAPI, Pydantic, provider or channel SDKs, database implementations,
 ORMs, or orchestration frameworks. Adapters translate their values into stable contracts.
 
+## P2 actual boundary
+
+P2 implements `core/` and `governance/` only. Namespace uses explicit tenant scope plus an
+explicit colleague or principal scope. Principal kinds are disjoint durable values. The
+core contains frozen, slotted standard-library dataclasses, Enums, immutable nested JSON
+values, UTC validation, deterministic public serialization, lifecycle contracts, and
+causal records. Governance contains pure functions that authorize an exact effect against
+one Mandate revision and bind one durable human decision to one immutable proposal digest.
+
+Architecture checks parse every core and governance module and reject framework, database,
+provider, application, adapter, API, worker, wall-clock, environment, randomness, process,
+and network dependencies. No P3 product directory exists.
+
 ## Future repository topology
 
 P1 and later may introduce this layout; P0 does not create it:
@@ -85,7 +98,7 @@ exact immutable proposal revision and is authorized against a durable human prin
 Approval is not a generic permission to let the model fill in missing parameters. Stale,
 expired, cross-namespace, replayed, or insufficient-role decisions fail closed.
 
-## Application edge
+## Future application edge (P3 and later)
 
 FastAPI is the application edge. Pydantic request and response models translate to and from
 core contracts; Pydantic types never enter core. Mutation requests include an idempotency
@@ -95,7 +108,7 @@ principal, and roles from its session, never from caller-supplied authority fiel
 Studio uses React, TypeScript, and Vite. It displays server-derived authorization and
 revision data. UI hiding is not an authorization boundary.
 
-## Local persistence topology
+## Future local persistence topology (P3)
 
 v0.1 uses one `state.sqlite` through standard-library `sqlite3` with:
 
@@ -109,14 +122,14 @@ This is a local reference topology. It provides no claim of PostgreSQL compatibi
 distributed execution, high availability, production tenant isolation, or multi-region
 operation. A future store must implement the same ports and earn separate evidence.
 
-## Reference adapters
+## Future reference adapters (P3)
 
 The deterministic provider maps fixed inputs to inspectable reasoning outputs without
 network access. The reference channel accepts typed effects and returns typed ActionResult
 records without contacting a live provider. They define the required release path; vendor
 adapters are optional and later.
 
-## Deployment topology
+## Future deployment topology (P4)
 
 Docker Compose will eventually run API, worker, and Studio locally with a durable volume
 for `state.sqlite`. API and Studio bind to `127.0.0.1` by default. Loopback binding reduces

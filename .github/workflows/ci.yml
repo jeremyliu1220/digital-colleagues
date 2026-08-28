@@ -72,7 +72,7 @@ jobs:
         working-directory: studio
 
   public-boundary:
-    name: Public boundary
+    name: P2 boundaries
     runs-on: ubuntu-latest
     steps:
       - name: Check out source
@@ -81,7 +81,15 @@ jobs:
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.12"
-      - name: Verify P1 scaffold
-        run: python -B scripts/check_p1_scaffold.py .
+      - name: Verify P2 repository and provenance
+        run: |
+          python -B scripts/check_p2_repository.py .
+          python -B scripts/check_p2_provenance.py .
+      - name: Verify P2 architecture and contracts
+        env:
+          PYTHONPATH: src
+        run: |
+          python -B scripts/check_p2_architecture.py .
+          python -B scripts/check_p2_core_contracts.py .
       - name: Scan public tree
         run: python -B scripts/check_public_boundary.py .

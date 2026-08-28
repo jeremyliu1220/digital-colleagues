@@ -48,8 +48,15 @@ milestone collectors, legacy demos, and the current working tree.
 Reference or synthetic receipts cannot substitute for live provider evidence, and neither
 class is imported in P0.
 
+## P2 selection outcome
+
+P2 selected no allowlisted source file for transformation and read no source content. The
+14 product files under `core/` and `governance/` are new implementations based on the
+public product, architecture, security, and ADR documents. The machine-readable receipt
+therefore has zero transformed entries and does not fabricate source digests or transforms.
+
 ## Unresolved rights
 
-No source content is introduced in P0, so no copied file is awaiting a notice decision.
-Any later file with unclear authorship, third-party content, or relicensing scope must be
-added to the unresolved section of the rights record and remain unmigrated.
+No source content was introduced through P2, so no copied file is awaiting a notice
+decision. Any later file with unclear authorship, third-party content, or relicensing scope
+must be added to the unresolved section of the rights record and remain unmigrated.

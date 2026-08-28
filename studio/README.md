@@ -2,9 +2,11 @@
 
 # Studio scaffold
 
-This directory is the P1 React, TypeScript, and Vite shell. It deliberately contains no
-API client, authentication flow, colleague builder, work surface, approval UI, or audit
-viewer. Those capabilities begin only at their documented milestones.
+This directory remains the React, TypeScript, and Vite shell. P2 updates its milestone
+copy to reflect the immutable core contracts, but it deliberately contains no API client,
+authentication flow, colleague builder, work surface, approval UI, or audit viewer.
+Runtime orchestration begins in P3; product workflows begin only at their documented later
+milestones.
 
 From the repository root:
 

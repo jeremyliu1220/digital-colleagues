@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "milestone": "P1",
+  "python_package_files": [
+    "src/digital_colleagues/__init__.py",
+    "src/digital_colleagues/py.typed"
+  ],
+  "absent_product_paths": [
+    "compose.yaml",
+    "docker-compose.yml",
+    "migrations",
+    "src/digital_colleagues/adapters",
+    "src/digital_colleagues/api",
+    "src/digital_colleagues/application",
+    "src/digital_colleagues/core",
+    "src/digital_colleagues/governance",
+    "src/digital_colleagues/worker"
+  ],
+  "studio_required_phrases": [
+    "P1 · Scaffold",
+    "Runtime behavior begins after P1"
+  ],
+  "historical_summary": "artifacts/p1/summary.json"
+}

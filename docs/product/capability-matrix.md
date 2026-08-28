@@ -2,24 +2,24 @@
 
 # v0.1 Capability Matrix
 
-| Capability | v0.1 target | Boundary |
-| --- | --- | --- |
-| Colleague registry | Yes | Namespaced local reference |
-| Profile and Mandate | Yes | Profile is descriptive; Mandate is authoritative |
-| Responsibilities and finite work | Yes | Persisted and revisioned |
-| Event, Agenda, and WakeCycle | Yes | Deterministic reference behavior first |
-| Human roles | Yes | `tenant_admin`, `colleague_user`, `auditor` |
-| Human/model/service principal separation | Yes | Durable types; no conversion to human |
-| Exact-effect human approval | Yes | Revision, expiry, replay, role, and namespace checks |
-| Reference channel and ActionResult | Yes | No external provider needed |
-| Audit causality | Yes | Input through result, with stable identifiers |
-| Single `state.sqlite` | Yes | Local topology only; complete namespace on every record |
-| Semantic memory | Partial | Explicit experimental boundary; not a release claim |
-| Real model providers | No | Adapter work after the deterministic path |
-| Live chat or email providers | No | Later adapter milestone and separate acceptance |
-| PostgreSQL or distributed stores | No | Port seam only |
-| High availability | No | Not designed or claimed in v0.1 |
-| Production tenant isolation | No | Local reference topology only |
-| OIDC, SSO, or SCIM | No | Explicit production gap |
-| Encryption at rest | No | Explicit local deployment risk |
-| Compliance certification | No | Not claimed |
+| Capability | v0.1 target | Current status | Boundary |
+| --- | --- | --- | --- |
+| Colleague registry | Yes | Contract only | Namespaced persistence begins in P3 |
+| Profile and Mandate | Yes | P2 complete | Profile is descriptive; Mandate is authoritative |
+| Responsibilities and finite work | Yes | P2 contracts complete | Persistence begins in P3 |
+| Event, Agenda, and WakeCycle | Yes | P2 contracts complete | No worker or event loop |
+| Human roles | Yes | P2 complete | `tenant_admin`, `colleague_user`, `auditor` only |
+| Human/model/service principal separation | Yes | P2 complete | Durable disjoint kinds; no conversion to human |
+| Exact-effect human approval | Yes | P2 pure policy complete | Exact revision, digest, expiry, replay, role, and namespace checks |
+| Reference channel and ActionResult | Yes | Result contract only | Channel execution begins in P3 |
+| Audit causality | Yes | P2 contract chain complete | Persistence and inspection begin later |
+| Single `state.sqlite` | Yes | Not implemented | P3 local topology only |
+| Semantic memory | Partial | Not implemented | Explicit experimental boundary; not a release claim |
+| Real model providers | No | Not implemented | Adapter work after the deterministic path |
+| Live chat or email providers | No | Not implemented | Later adapter milestone and separate acceptance |
+| PostgreSQL or distributed stores | No | Not implemented | Port seam only |
+| High availability | No | Not claimed | Not designed or claimed in v0.1 |
+| Production tenant isolation | No | Not claimed | Local reference topology only |
+| OIDC, SSO, or SCIM | No | Not implemented | Explicit production gap |
+| Encryption at rest | No | Not implemented | Explicit local deployment risk |
+| Compliance certification | No | Not claimed | Not claimed |

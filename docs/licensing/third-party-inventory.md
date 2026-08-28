@@ -2,12 +2,13 @@
 
 # Third-Party Dependency and Notice Inventory
 
-## P1 distribution boundary
+## P2 distribution boundary
 
-P1 copies or vendors no third-party source, binary, container image, font, icon, or media
+P2 copies or vendors no third-party source, binary, container image, font, icon, or media
 asset. Package managers download development and build dependencies into ignored local
 directories. The generated Studio bundle is verification output, is ignored, and is not
-published by P1.
+published by P2. P2 adds no Python runtime dependency and does not change the Studio
+lockfile or any direct tool version reviewed in P1.
 
 This inventory records declared metadata review; it is not legal advice or a substitute
 for the release-level transitive and artifact review required by P8.
@@ -20,7 +21,7 @@ for the release-level transitive and artifact review required by P8.
 | Ruff | 0.16.4 | Development lint and format | MIT | Optional development dependency |
 | mypy | 2.3.1 | Development type checking | MIT | Optional development dependency |
 
-The Python package has no runtime dependency in P1.
+The Python package has no runtime dependency through P2.
 
 ## Studio direct packages
 
@@ -58,6 +59,6 @@ external operator tools.
 ## NOTICE decision
 
 The direct-package review found no external attribution that must be copied into the P1
-source scaffold's NOTICE. The decision and its distribution limit are recorded in
+source tree's NOTICE. The decision and its distribution limit are recorded in
 `docs/licensing/notice-review.md`. Any copied material, generated distributable bundle,
 container, optional adapter, or release archive triggers a fresh review.

@@ -1,10 +1,10 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 
-# P1 NOTICE Review
+# P1-P2 NOTICE Review
 
 ## Hypothesis
 
-A concise root `NOTICE` can accurately cover the P1 source scaffold if no copied or
+A concise root `NOTICE` can accurately cover the source tree through P2 if no copied or
 vendored dependency material adds a mandatory attribution notice.
 
 ## Experiment
@@ -27,7 +27,10 @@ collective copyright statement only.
 
 ## Decision and consequence
 
-Accept the P1 `NOTICE` as reviewed for the source scaffold. Generated Studio bundles and
+Accept the `NOTICE` as reviewed through the P2 source tree. P2 introduced only
+project-authored new implementations based on public architecture documents, migrated no
+parent source bytes, added no dependency, and left the Studio lockfile unchanged.
+Generated Studio bundles and
 future container or release distributions require a fresh transitive license and
-attribution review before publication. P1 does not claim that a later distribution can
+attribution review before publication. P2 does not claim that a later distribution can
 reuse this conclusion unchanged.

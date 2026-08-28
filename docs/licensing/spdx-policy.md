@@ -37,7 +37,8 @@ and `docs/licensing/file-map.json`. Do not make a data file invalid to insert a 
 
 ## Milestone boundary
 
-P0 applied headers as a policy preview. P1 adds the formal `LICENSE`, `NOTICE`,
-contributor-facing guidance, and repository-wide file map. Later milestones must update
-the map and notice review when they add a new format, dependency, copied material, or
-distribution artifact.
+P0 applied headers as a policy preview. P1 added the formal `LICENSE`, `NOTICE`,
+contributor-facing guidance, and repository-wide file map. P2 keeps SPDX headers on all
+new Python and Markdown files and records its commentless JSON receipt, evidence, and
+historical fixture in the file map. Later milestones must update the map and notice review
+when they add a new format, dependency, copied material, or distribution artifact.

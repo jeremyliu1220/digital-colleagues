@@ -8,9 +8,12 @@ import tomllib
 import unittest
 from pathlib import Path
 
-from scripts.check_p1_scaffold import LICENSE_DIGEST, REQUIRED_FILES, check_scaffold
+from scripts.check_p1_scaffold import LICENSE_DIGEST, REQUIRED_FILES
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+P1_FIXTURE = json.loads(
+    (PROJECT_ROOT / "tests/p1/fixtures/p1-stage-boundary.json").read_text(encoding="utf-8")
+)
 
 
 class RepositoryScaffoldTests(unittest.TestCase):
@@ -29,16 +32,14 @@ class RepositoryScaffoldTests(unittest.TestCase):
         self.assertIn("No reviewed direct package", review)
         self.assertIn("future container or release distributions require a fresh", review)
 
-    def test_python_scaffold_has_no_runtime_dependency_or_product_module(self) -> None:
+    def test_python_metadata_keeps_no_runtime_dependencies(self) -> None:
         metadata = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
         self.assertEqual(metadata["project"]["requires-python"], ">=3.12")
         self.assertEqual(metadata["project"]["dependencies"], [])
+
+    def test_p1_empty_package_boundary_is_historical_fixture_data(self) -> None:
         self.assertEqual(
-            sorted(
-                path.relative_to(PROJECT_ROOT).as_posix()
-                for path in (PROJECT_ROOT / "src/digital_colleagues").rglob("*")
-                if path.is_file()
-            ),
+            P1_FIXTURE["python_package_files"],
             ["src/digital_colleagues/__init__.py", "src/digital_colleagues/py.typed"],
         )
 
@@ -54,13 +55,18 @@ class RepositoryScaffoldTests(unittest.TestCase):
             )
         )
 
-    def test_studio_shell_states_that_runtime_is_deferred(self) -> None:
+    def test_studio_shell_states_that_runtime_remains_deferred(self) -> None:
         app = (PROJECT_ROOT / "studio/src/App.tsx").read_text(encoding="utf-8")
-        self.assertIn("Runtime behavior begins after P1", app)
+        self.assertIn("Runtime orchestration begins", app)
+        self.assertIn("in P3", app)
         self.assertNotIn("fetch(", app)
         self.assertNotIn("WebSocket", app)
 
-    def test_ci_contains_every_p1_gate_and_read_only_permissions(self) -> None:
+    def test_p1_studio_copy_is_preserved_as_historical_fixture_data(self) -> None:
+        self.assertIn("P1 · Scaffold", P1_FIXTURE["studio_required_phrases"])
+        self.assertIn("Runtime behavior begins after P1", P1_FIXTURE["studio_required_phrases"])
+
+    def test_ci_contains_every_current_gate_and_read_only_permissions(self) -> None:
         workflow = (PROJECT_ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
         self.assertIn("contents: read", workflow)
         self.assertIn("ruff check src scripts tests", workflow)
@@ -68,6 +74,8 @@ class RepositoryScaffoldTests(unittest.TestCase):
         self.assertIn("npm run typecheck", workflow)
         self.assertIn("npm run build", workflow)
         self.assertIn("scripts/check_public_boundary.py", workflow)
+        self.assertIn("scripts/check_p2_architecture.py", workflow)
+        self.assertIn("scripts/check_p2_core_contracts.py", workflow)
         self.assertIn("scripts/run_unittest_suite.py", workflow)
 
     def test_comment_capable_p1_files_have_spdx_headers(self) -> None:
@@ -80,11 +88,9 @@ class RepositoryScaffoldTests(unittest.TestCase):
                 first_line = document.read_text(encoding="utf-8").splitlines()[0]
                 self.assertIn("SPDX-License-Identifier: Apache-2.0", first_line, document)
 
-    def test_scaffold_contract_reports_no_p2_paths(self) -> None:
-        result = check_scaffold(PROJECT_ROOT)
-        self.assertEqual(result["gate"], "p1_scaffold_contract_clean")
-        self.assertEqual(result["p2_product_paths_present"], 0)
-        self.assertEqual(result["license_digest"], "sha256:" + LICENSE_DIGEST)
+    def test_p1_stage_absence_assertions_are_not_current_tree_assertions(self) -> None:
+        self.assertIn("src/digital_colleagues/core", P1_FIXTURE["absent_product_paths"])
+        self.assertTrue((PROJECT_ROOT / "src/digital_colleagues/core").is_dir())
 
     def test_evidence_summary_claim_and_boundaries_are_narrow(self) -> None:
         summary = json.loads(

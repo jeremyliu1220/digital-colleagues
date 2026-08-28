@@ -42,20 +42,17 @@ class PlanningContractTests(unittest.TestCase):
         missing = sorted(item for item in required if not (PROJECT_ROOT / item).is_file())
         self.assertEqual(missing, [])
 
-    def test_p1_does_not_create_p2_product_artifacts(self) -> None:
-        forbidden = {
-            "migrations",
-            "compose.yaml",
-            "docker-compose.yml",
-            "src/digital_colleagues/core",
-            "src/digital_colleagues/governance",
-            "src/digital_colleagues/application",
-            "src/digital_colleagues/adapters",
-            "src/digital_colleagues/api",
-            "src/digital_colleagues/worker",
-        }
-        present = sorted(item for item in forbidden if (PROJECT_ROOT / item).exists())
-        self.assertEqual(present, [])
+    def test_p1_product_absence_is_preserved_as_a_historical_fixture(self) -> None:
+        fixture = json.loads(
+            (PROJECT_ROOT / "tests/p1/fixtures/p1-stage-boundary.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(fixture["milestone"], "P1")
+        self.assertIn("src/digital_colleagues/core", fixture["absent_product_paths"])
+        self.assertIn("src/digital_colleagues/governance", fixture["absent_product_paths"])
+        summary = json.loads(
+            (PROJECT_ROOT / fixture["historical_summary"]).read_text(encoding="utf-8")
+        )
+        self.assertEqual(summary["mechanically_verified_boundaries"]["p2_product_paths_present"], 0)
 
     def test_authentication_adr_contains_normative_invariants(self) -> None:
         text = (
