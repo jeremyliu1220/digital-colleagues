@@ -3,15 +3,15 @@
   "completed_date": "2026-08-28",
   "evaluated_tree": {
     "branch": "codex/p2-core-primitives",
-    "head_commit_before_evidence": "bd6953b3dceeebd33a53f52b03ce94534ff5624b",
+    "head_commit_before_evidence": "3cc8def2249b7db34ebbe1cf4a387edc02642105",
     "merge_base": "bd6953b3dceeebd33a53f52b03ce94534ff5624b",
-    "public_tree_digest_excluding_summary": "sha256:783e36ff93ab665f2ea041c06ac7c9046c9feb49b475a5247fbe60cba795603b",
+    "public_tree_digest_excluding_summary": "sha256:4aed0b4e9025c51c82140c167651d30ef5e02ae2fc379d6ea44db99bd00b4f86",
     "remote_count": 0
   },
   "gate": "p2_core_primitives",
   "migration": {
     "new_implementation_count": 14,
-    "new_implementation_digest": "sha256:537fec282a2893b9e5400dbf2dfebf5ca747a551cdeb2a3d6aa3530d2ab6af8b",
+    "new_implementation_digest": "sha256:a398eb77a143f901244c068add84bac0c7625a9885167ad3da0bcf84628394e7",
     "receipt_digest": "sha256:e2f87a71185f4f40d7c6fc6c4828df05d4eb242ae78c81fb8c08b3f04868f5ac",
     "transformed_migration_count": 0
   },
@@ -49,19 +49,43 @@
     "authority_approval": {
       "status": "passed"
     },
+    "complete_effect_binding": {
+      "authoritative_field_mutations_checked": 17,
+      "digest_exposed_without_payload": true,
+      "status": "passed"
+    },
+    "constraint_enforcement": {
+      "human_approval_requirement": "passed",
+      "negative_cases_checked": 7,
+      "status": "passed"
+    },
     "core_contracts": {
+      "authoritative_effect_field_mutations_checked": 17,
       "authority_approval": "passed",
+      "complete_effect_binding": "passed",
+      "complete_effect_digest_exposed": true,
+      "constraint_enforcement": "passed",
+      "constraint_negative_cases_checked": 7,
+      "direct_construction_invariants": "passed",
       "effect_payload_redacted": true,
       "enum_count": 15,
-      "frozen_dataclass_count": 25,
+      "frozen_dataclass_count": 26,
       "gate": "p2_core_contracts_clean",
+      "human_approval_requirement": "passed",
       "immutability": "passed",
+      "mutable_input_probe_count": 29,
       "namespace": "passed",
       "principal_separation": "passed",
       "protocol_count": 3,
+      "public_dataclass_count": 26,
       "record_shape_count": 13,
-      "schema_version": 1,
+      "schema_version": 2,
       "serialization": "passed"
+    },
+    "direct_construction_invariants": {
+      "mutable_input_probe_count": 29,
+      "public_dataclass_count": 26,
+      "status": "passed"
     },
     "immutability": {
       "status": "passed"
@@ -115,13 +139,13 @@
       "failures": 0,
       "gate_passed": true,
       "skipped": 0,
-      "tests_run": 99,
+      "tests_run": 108,
       "unexpected_successes": 0
     }
   },
-  "schema_version": 1,
+  "schema_version": 2,
   "source_revision": "dea9a9accc82fbedd35deb7117dcb5173223cf44",
-  "status": "review_required",
+  "status": "passed",
   "verification_commands": [
     "make check",
     "make evidence-p2",
