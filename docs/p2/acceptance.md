@@ -43,7 +43,24 @@ namespace checks, disjoint principal kinds, canonical server-controlled human ro
 Profile versus Mandate authority, revisioned authority diffs, finite-work dependencies,
 responsibilities and obligations, causal event/agenda/wake records, fully specified exact
 effects, human-only approval, revision and namespace binding, stale/wrong proposal refusal,
-and replayed-decision refusal.
+replayed-decision refusal, complete-proposal digest binding, typed boundary-constraint
+enforcement, and direct-construction invariants for every exported dataclass.
+
+`EffectProposal.proposal_digest` is a SHA-256 digest over a versioned canonical JSON
+envelope. The envelope includes the contract schema version, complete namespace, proposal
+ID and revision, decision ID, effect kind, destination kind and target, action, payload
+digest, safe projection, boundary ID, effect idempotency key, validity limit, maximum
+attempts, typed constraint parameters, proposal state, complete actor identity, correlation
+and causation IDs, and occurrence time. The digest never contains itself. The independent
+`payload_digest` remains available without exposing payload bytes. Both
+`HumanApprovalDecision` and `ApprovalAuthorization` carry and validate both digests.
+
+P2 boundary constraints use a deliberately minimal typed schema. `network` is the only
+recognized constraint and its value must be an actual boolean. A proposal's constraint
+keys, types, and values must exactly match the authoritative boundary. Empty, missing,
+extra, unknown, wrong-type, or conflicting constraints fail closed. A boundary requiring
+human approval accepts only `pending_approval`; a boundary that does not require it accepts
+only `approved`, so `human_approval_required` always changes the policy outcome.
 
 Architecture tests must reject forbidden imports, reverse dependencies, wall-clock reads,
 randomness, environment access, and filesystem, database, or network I/O in deterministic
@@ -72,10 +89,12 @@ must not be run or used to rewrite the accepted P1 artifact.
 
 Mechanical results are populated only from validated command results. Repository policy,
 core architecture, contract shape, immutability, namespace, principal separation,
-authority and approval, serialization, Studio scaffold, and unittest counts may be marked
-passed only after their gates succeed. Human review, parent-worktree non-use, publication,
-production security, privacy effectiveness, and production readiness remain explicit
-`not_evaluated` claims.
+complete-effect binding, constraint enforcement, direct-construction invariants, authority
+and approval, serialization, Studio scaffold, and unittest counts may be marked passed
+only after their gates succeed. The core checker must perform negative mutation, replay,
+namespace, role, constraint, and constructor probes before returning those results. Human
+review, parent-worktree non-use, publication, production security, privacy effectiveness,
+and production readiness remain explicit `not_evaluated` claims.
 
 ## Stop condition
 

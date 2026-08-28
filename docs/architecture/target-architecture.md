@@ -94,9 +94,13 @@ injected. Restart must preserve enough state to resume without guessing.
 ### Effect and approval
 
 The runtime proposes a typed, fully specified effect. HumanApprovalDecision references the
-exact immutable proposal revision and is authorized against a durable human principal.
-Approval is not a generic permission to let the model fill in missing parameters. Stale,
-expired, cross-namespace, replayed, or insufficient-role decisions fail closed.
+exact immutable proposal revision and a complete canonical proposal digest covering the
+namespace, destination, action, payload integrity, safe projection, boundary and attempt
+constraints, actor, causality, and time. It is authorized against a durable human
+principal. Approval is not a generic permission to let the model fill in missing
+parameters. Mandate boundary constraints use typed, exact comparison and unknown or
+indeterminate constraints fail closed. Stale, expired, cross-namespace, replayed,
+insufficient-role, or partially rebound decisions fail closed.
 
 ## Future application edge (P3 and later)
 

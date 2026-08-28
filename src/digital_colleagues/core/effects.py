@@ -35,13 +35,40 @@ def _json_data(value: object) -> object:
 
 
 def _payload_digest(payload: FrozenJsonObject) -> str:
+    return _canonical_digest(_json_data(payload))
+
+
+def _canonical_digest(value: object) -> str:
     encoded = json.dumps(
-        _json_data(payload),
+        value,
         ensure_ascii=False,
         separators=(",", ":"),
         sort_keys=True,
     ).encode("utf-8")
     return "sha256:" + hashlib.sha256(encoded).hexdigest()
+
+
+def _datetime_to_canonical_z(value: datetime) -> str:
+    return value.isoformat(timespec="microseconds").removesuffix("+00:00") + "Z"
+
+
+def _namespace_envelope(namespace: Namespace) -> dict[str, object]:
+    return {
+        "scope": namespace.scope.value,
+        "scope_id": namespace.scope_id,
+        "tenant_id": namespace.tenant_id,
+    }
+
+
+def _principal_envelope(principal: Principal) -> dict[str, object]:
+    return {
+        "kind": principal.kind.value,
+        "namespace": _namespace_envelope(principal.namespace),
+        "principal_id": principal.principal_id,
+        "revision": principal.revision,
+        "roles": sorted(role.value for role in principal.roles),
+        "schema_version": principal.schema_version,
+    }
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,6 +129,7 @@ class EffectProposal:
     revision: int
     schema_version: int = SCHEMA_VERSION
     payload_digest: str = field(init=False)
+    proposal_digest: str = field(init=False)
 
     def __post_init__(self) -> None:
         require_stable_id(self.proposal_id, "proposal_id")
@@ -132,7 +160,37 @@ class EffectProposal:
             raise CoreInvariantError("effect proposal causation must name its decision")
         if self.constraints.valid_until <= self.occurred_at:
             raise CoreInvariantError("effect proposal must expire after it is proposed")
-        object.__setattr__(self, "payload_digest", _payload_digest(self.payload))
+        payload_digest = _payload_digest(self.payload)
+        object.__setattr__(self, "payload_digest", payload_digest)
+        envelope = {
+            "action": self.action,
+            "actor": _principal_envelope(self.actor),
+            "causation_id": self.causation_id,
+            "constraints": {
+                "boundary_id": self.constraints.boundary_id,
+                "idempotency_key": self.constraints.idempotency_key,
+                "maximum_attempts": self.constraints.maximum_attempts,
+                "parameters": _json_data(self.constraints.parameters),
+                "valid_until": _datetime_to_canonical_z(self.constraints.valid_until),
+            },
+            "correlation_id": self.correlation_id,
+            "decision_id": self.decision_id,
+            "destination": {
+                "kind": self.destination.kind,
+                "target": self.destination.target,
+            },
+            "digest_schema_version": 1,
+            "effect_kind": self.effect_kind.value,
+            "namespace": _namespace_envelope(self.namespace),
+            "occurred_at": _datetime_to_canonical_z(self.occurred_at),
+            "payload_digest": payload_digest,
+            "proposal_id": self.proposal_id,
+            "proposal_revision": self.revision,
+            "safe_projection": _json_data(self.safe_projection),
+            "schema_version": self.schema_version,
+            "state": self.state.value,
+        }
+        object.__setattr__(self, "proposal_digest", _canonical_digest(envelope))
 
 
 class ApprovalChoice(StrEnum):
@@ -147,6 +205,7 @@ class HumanApprovalDecision:
     proposal_id: str
     proposal_revision: int
     proposal_payload_digest: str
+    proposal_digest: str
     choice: ApprovalChoice
     author: Principal
     idempotency_key: str
@@ -162,6 +221,7 @@ class HumanApprovalDecision:
         require_stable_id(self.proposal_id, "proposal_id")
         require_revision(self.proposal_revision, "proposal_revision")
         require_digest(self.proposal_payload_digest, "proposal_payload_digest")
+        require_digest(self.proposal_digest, "proposal_digest")
         if not isinstance(self.choice, ApprovalChoice):
             raise CoreInvariantError("approval choice must be explicit")
         if self.author.kind is not PrincipalKind.HUMAN:

@@ -38,9 +38,9 @@ distributed isolation, and high availability remain gaps.
 | Human identity simulated by service identity | Durable disjoint principal kinds; no kind conversion |
 | Prompt injection expands authority | Mandate and policy checks after model output; typed exact effects |
 | Insecure direct object reference | Namespace every record and every repository query |
-| Stale approval or draft | Expected revision and immutable proposal revision checks |
+| Stale or partially rebound approval | Expected revision plus complete canonical proposal-digest checks |
 | Duplicate mutation or approval | Idempotency key, one-time consumption, and replay ledger |
-| Ambiguous effect | Fail closed until destination, action, payload, and constraints are exact |
+| Ambiguous effect | Fail closed until destination, action, payload, and typed Mandate constraints are exact |
 | Session theft or fixation | Server-generated session ID, digest-safe storage, expiry, strict cookie policy |
 | Cross-site mutation | Origin validation and CSRF defense on every mutation |
 | Bootstrap credential disclosure | Strong random value, one display, digest-only storage, short expiry, one use |

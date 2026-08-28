@@ -248,6 +248,7 @@ def approval_decision(
         proposal_id=proposal_id or bound.proposal_id,
         proposal_revision=proposal_revision or bound.revision,
         proposal_payload_digest=bound.payload_digest,
+        proposal_digest=bound.proposal_digest,
         choice=ApprovalChoice.APPROVE,
         author=author or human_user(),
         idempotency_key="approval-key-001",

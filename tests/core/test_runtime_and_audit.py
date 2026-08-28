@@ -104,6 +104,23 @@ class RuntimeAndAuditTests(unittest.TestCase):
                 action_result(),
             )
 
+    def test_full_chain_rejects_approval_without_complete_proposal_binding(self) -> None:
+        approval = dataclasses.replace(
+            approval_decision(),
+            proposal_digest="sha256:" + ("f" * 64),
+        )
+        with self.assertRaises(CoreInvariantError):
+            validate_causal_audit_chain(
+                input_event(),
+                wake_cycle(),
+                agenda_item(),
+                decision(),
+                effect_proposal(),
+                approval,
+                effect_attempt(),
+                action_result(),
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

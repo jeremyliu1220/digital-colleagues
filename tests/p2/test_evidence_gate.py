@@ -61,8 +61,17 @@ def valid_results() -> dict[str, dict[str, object]]:
             "namespace": "passed",
             "principal_separation": "passed",
             "authority_approval": "passed",
+            "complete_effect_binding": "passed",
+            "constraint_enforcement": "passed",
+            "direct_construction_invariants": "passed",
+            "human_approval_requirement": "passed",
             "serialization": "passed",
             "effect_payload_redacted": True,
+            "complete_effect_digest_exposed": True,
+            "public_dataclass_count": 26,
+            "mutable_input_probe_count": 29,
+            "authoritative_effect_field_mutations_checked": 17,
+            "constraint_negative_cases_checked": 7,
         },
     }
 
@@ -95,9 +104,18 @@ class P2EvidenceGateTests(unittest.TestCase):
             write_valid(evidence)
             summary = json.loads(evidence.read_text(encoding="utf-8"))
         self.assertEqual(summary["milestone"], "P2")
+        self.assertEqual(summary["schema_version"], 2)
         self.assertEqual(summary["status"], "passed")
         self.assertEqual(summary["results"]["unittest"]["skipped"], 0)
         self.assertEqual(summary["migration"]["transformed_migration_count"], 0)
+        self.assertEqual(
+            summary["results"]["complete_effect_binding"]["authoritative_field_mutations_checked"],
+            17,
+        )
+        self.assertEqual(
+            summary["results"]["direct_construction_invariants"]["public_dataclass_count"],
+            26,
+        )
         self.assertEqual(
             summary["non_mechanical_claims"]["parent_worktree_unchanged"],
             "not_evaluated",
@@ -132,6 +150,17 @@ class P2EvidenceGateTests(unittest.TestCase):
                 write_valid(evidence, merge_base="e" * 40)
             with self.assertRaisesRegex(EvidenceError, "no configured Git remotes"):
                 write_valid(evidence, remote_count=1)
+
+    def test_incomplete_corrected_core_gate_does_not_overwrite(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            evidence = Path(temporary) / "summary.json"
+            original = b'{"status":"review_required","sentinel":true}\n'
+            evidence.write_bytes(original)
+            results = valid_results()
+            results["core_contracts"]["complete_effect_binding"] = "review_required"
+            with self.assertRaisesRegex(EvidenceError, "core-contract result is incomplete"):
+                write_valid(evidence, core_contracts=results["core_contracts"])
+            self.assertEqual(evidence.read_bytes(), original)
 
 
 if __name__ == "__main__":

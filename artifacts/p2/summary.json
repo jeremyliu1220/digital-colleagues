@@ -121,7 +121,7 @@
   },
   "schema_version": 1,
   "source_revision": "dea9a9accc82fbedd35deb7117dcb5173223cf44",
-  "status": "passed",
+  "status": "review_required",
   "verification_commands": [
     "make check",
     "make evidence-p2",

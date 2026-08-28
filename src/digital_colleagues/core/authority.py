@@ -223,6 +223,37 @@ class IdentityCard:
     capability_summaries: tuple[str, ...]
     schema_version: int = SCHEMA_VERSION
 
+    def __post_init__(self) -> None:
+        require_schema_version(self.schema_version)
+        if not isinstance(self.namespace, Namespace):
+            raise CoreInvariantError("identity card namespace must be explicit")
+        self.namespace.require_colleague()
+        require_stable_id(self.profile_id, "profile_id")
+        require_revision(self.profile_revision, "profile_revision")
+        object.__setattr__(self, "display_name", require_text(self.display_name, "display_name"))
+        object.__setattr__(self, "description", require_text(self.description, "description"))
+        require_stable_id(self.mandate_id, "mandate_id")
+        require_revision(self.mandate_revision, "mandate_revision")
+        object.__setattr__(self, "mission", require_text(self.mission, "mission"))
+        object.__setattr__(
+            self,
+            "responsibility_summaries",
+            freeze_strings(
+                self.responsibility_summaries,
+                "responsibility_summaries",
+                allow_empty=False,
+            ),
+        )
+        object.__setattr__(
+            self,
+            "capability_summaries",
+            freeze_strings(
+                self.capability_summaries,
+                "capability_summaries",
+                allow_empty=False,
+            ),
+        )
+
 
 def project_identity_card(profile: Profile, mandate: Mandate) -> IdentityCard:
     profile.namespace.require_exact(mandate.namespace)
@@ -262,6 +293,42 @@ class MandateAuthorityDiff:
     removed_effect_boundary_ids: tuple[str, ...]
     changed_effect_boundary_ids: tuple[str, ...]
     schema_version: int = SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        require_schema_version(self.schema_version)
+        if not isinstance(self.namespace, Namespace):
+            raise CoreInvariantError("authority diff namespace must be explicit")
+        self.namespace.require_colleague()
+        require_stable_id(self.mandate_id, "mandate_id")
+        require_revision(self.from_revision, "from_revision")
+        require_revision(self.to_revision, "to_revision")
+        if self.to_revision <= self.from_revision:
+            raise CoreInvariantError("authority diff requires an increasing revision")
+        for field_name in (
+            "mission_changed",
+            "service_relationship_changed",
+            "working_context_changed",
+        ):
+            if type(getattr(self, field_name)) is not bool:
+                raise CoreInvariantError(f"{field_name} must be boolean")
+        for prefix in ("responsibility", "capability", "constraint", "effect_boundary"):
+            groups: list[tuple[str, ...]] = []
+            for operation in ("added", "removed", "changed"):
+                field_name = f"{operation}_{prefix}_ids"
+                identifiers = freeze_strings(getattr(self, field_name), field_name)
+                for identifier in identifiers:
+                    require_stable_id(identifier, field_name)
+                object.__setattr__(self, field_name, identifiers)
+                groups.append(identifiers)
+            if any(
+                set(left) & set(right)
+                for left, right in (
+                    (groups[0], groups[1]),
+                    (groups[0], groups[2]),
+                    (groups[1], groups[2]),
+                )
+            ):
+                raise CoreInvariantError(f"{prefix} diff categories must be disjoint")
 
 
 def _record_diff(

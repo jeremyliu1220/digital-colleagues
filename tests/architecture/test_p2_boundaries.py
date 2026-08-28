@@ -22,6 +22,13 @@ class P2BoundaryTests(unittest.TestCase):
         self.assertEqual(architecture["forbidden_imports"], 0)
         self.assertEqual(architecture["nondeterministic_calls"], 0)
         self.assertEqual(contracts["gate"], "p2_core_contracts_clean")
+        self.assertEqual(contracts["complete_effect_binding"], "passed")
+        self.assertEqual(contracts["constraint_enforcement"], "passed")
+        self.assertEqual(contracts["direct_construction_invariants"], "passed")
+        mutation_count = contracts["authoritative_effect_field_mutations_checked"]
+        self.assertIsInstance(mutation_count, int)
+        assert isinstance(mutation_count, int)
+        self.assertGreaterEqual(mutation_count, 17)
         self.assertEqual(contracts["immutability"], "passed")
 
     def test_current_repository_and_provenance_gates_pass(self) -> None:

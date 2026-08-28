@@ -50,6 +50,8 @@ def validate_causal_audit_chain(
         raise CoreInvariantError("approval does not cite the proposal revision")
     if approval.proposal_payload_digest != proposal.payload_digest:
         raise CoreInvariantError("approval does not cite the immutable proposal payload")
+    if approval.proposal_digest != proposal.proposal_digest:
+        raise CoreInvariantError("approval does not cite the complete immutable proposal")
     if attempt.proposal_id != proposal.proposal_id:
         raise CoreInvariantError("effect attempt does not cite the proposal")
     if attempt.proposal_revision != proposal.revision:

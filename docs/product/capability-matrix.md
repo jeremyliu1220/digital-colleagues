@@ -10,7 +10,7 @@
 | Event, Agenda, and WakeCycle | Yes | P2 contracts complete | No worker or event loop |
 | Human roles | Yes | P2 complete | `tenant_admin`, `colleague_user`, `auditor` only |
 | Human/model/service principal separation | Yes | P2 complete | Durable disjoint kinds; no conversion to human |
-| Exact-effect human approval | Yes | P2 pure policy complete | Exact revision, digest, expiry, replay, role, and namespace checks |
+| Exact-effect human approval | Yes | P2 pure policy complete | Complete canonical proposal digest, exact typed constraints, expiry, replay, role, and namespace checks |
 | Reference channel and ActionResult | Yes | Result contract only | Channel execution begins in P3 |
 | Audit causality | Yes | P2 contract chain complete | Persistence and inspection begin later |
 | Single `state.sqlite` | Yes | Not implemented | P3 local topology only |

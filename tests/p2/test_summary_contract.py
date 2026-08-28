@@ -19,8 +19,12 @@ class P2SummaryContractTests(unittest.TestCase):
         self.assertEqual(summary["claim_scope"], "P2 framework-independent core primitives only.")
         if summary["status"] == "review_required":
             return
+        self.assertEqual(summary["schema_version"], 2)
         self.assertEqual(summary["results"]["unittest"]["skipped"], 0)
         self.assertEqual(summary["migration"]["transformed_migration_count"], 0)
+        self.assertEqual(summary["results"]["complete_effect_binding"]["status"], "passed")
+        self.assertEqual(summary["results"]["constraint_enforcement"]["status"], "passed")
+        self.assertEqual(summary["results"]["direct_construction_invariants"]["status"], "passed")
         self.assertIn("P3 application orchestration", summary["not_evidence_for"])
 
 

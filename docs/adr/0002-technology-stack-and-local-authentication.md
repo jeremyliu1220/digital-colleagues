@@ -65,8 +65,12 @@ The local bootstrap, enrollment, session, and recovery design is normative:
 
 - Session state is server-side and maps to one durable principal.
 - Mandate and effect authorization remain separate from UI affordances.
-- Human approval binds to an exact immutable effect revision, namespace, expiry, and
-  authorized human principal.
+- Human approval binds to an exact immutable effect revision and a versioned canonical
+  proposal digest covering all authoritative effect fields, plus namespace, expiry, and an
+  authorized human principal. The payload retains a separate redaction-safe integrity
+  digest.
+- P2 Mandate boundary constraint parameters are typed and exact-match; unknown, missing,
+  extra, conflicting, or wrong-type values fail closed.
 - Idempotency and replay ledgers are persisted transactionally with mutations.
 - Recovery actions produce audit records but do not weaken principal-kind invariants.
 

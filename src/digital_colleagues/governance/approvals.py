@@ -8,8 +8,17 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from digital_colleagues.core.authority import Mandate
-from digital_colleagues.core.common import SCHEMA_VERSION, require_schema_version, require_utc
+from digital_colleagues.core.common import (
+    SCHEMA_VERSION,
+    FrozenJsonObject,
+    require_digest,
+    require_revision,
+    require_schema_version,
+    require_stable_id,
+    require_utc,
+)
 from digital_colleagues.core.effects import (
+    ApprovalChoice,
     EffectProposal,
     EffectProposalState,
     HumanApprovalDecision,
@@ -71,6 +80,46 @@ def authorize_effect_proposal(
         raise AuthorizationError("effect destination is outside the authoritative boundary")
     if proposal.action not in boundary.allowed_actions:
         raise AuthorizationError("effect action is outside the authoritative boundary")
+    _authorize_constraint_parameters(proposal.constraints.parameters, boundary.constraints)
+    required_state = (
+        EffectProposalState.PENDING_APPROVAL
+        if boundary.human_approval_required
+        else EffectProposalState.APPROVED
+    )
+    if proposal.state is not required_state:
+        raise AuthorizationError("effect state does not satisfy the human approval policy")
+
+
+_SUPPORTED_CONSTRAINT_TYPES: dict[str, type[object]] = {"network": bool}
+
+
+def _typed_constraint_values(values: FrozenJsonObject) -> dict[str, object]:
+    if len(values) == 0:
+        raise AuthorizationError("effect constraints must be explicit")
+    typed: dict[str, object] = {}
+    for key, value in values.as_entries():
+        expected_type = _SUPPORTED_CONSTRAINT_TYPES.get(key)
+        if expected_type is None:
+            raise AuthorizationError("effect constraint is not recognized")
+        if type(value) is not expected_type:
+            raise AuthorizationError("effect constraint has the wrong value type")
+        typed[key] = value
+    return typed
+
+
+def _authorize_constraint_parameters(
+    proposal: FrozenJsonObject, authoritative: FrozenJsonObject
+) -> None:
+    proposed_values = _typed_constraint_values(proposal)
+    authoritative_values = _typed_constraint_values(authoritative)
+    if proposed_values.keys() != authoritative_values.keys():
+        raise AuthorizationError("effect constraint keys do not match the boundary")
+    if any(
+        type(proposed_values[key]) is not type(authoritative_values[key])
+        or proposed_values[key] != authoritative_values[key]
+        for key in authoritative_values
+    ):
+        raise AuthorizationError("effect constraints conflict with the boundary")
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,12 +128,22 @@ class ApprovalAuthorization:
     proposal_id: str
     proposal_revision: int
     proposal_payload_digest: str
+    proposal_digest: str
     approval_decision_id: str
     author_principal_id: str
     schema_version: int = SCHEMA_VERSION
 
     def __post_init__(self) -> None:
         require_schema_version(self.schema_version)
+        if not isinstance(self.namespace, Namespace):
+            raise CoreInvariantError("approval authorization namespace must be explicit")
+        self.namespace.require_colleague()
+        require_stable_id(self.proposal_id, "proposal_id")
+        require_revision(self.proposal_revision, "proposal_revision")
+        require_digest(self.proposal_payload_digest, "proposal_payload_digest")
+        require_digest(self.proposal_digest, "proposal_digest")
+        require_stable_id(self.approval_decision_id, "approval_decision_id")
+        require_stable_id(self.author_principal_id, "author_principal_id")
 
 
 def authorize_human_approval(
@@ -111,12 +170,16 @@ def authorize_human_approval(
     )
     if proposal.state is not EffectProposalState.PENDING_APPROVAL:
         raise AuthorizationError("proposal is not awaiting approval")
+    if decision.choice is not ApprovalChoice.APPROVE:
+        raise AuthorizationError("a rejected proposal cannot be authorized")
     if decision.proposal_id != proposal.proposal_id:
         raise CoreInvariantError("approval references the wrong proposal")
     if decision.proposal_revision != proposal.revision:
         raise RevisionMismatchError("approval references a stale proposal revision")
     if decision.proposal_payload_digest != proposal.payload_digest:
         raise RevisionMismatchError("approval payload binding does not match the proposal")
+    if decision.proposal_digest != proposal.proposal_digest:
+        raise RevisionMismatchError("approval binding does not match the complete proposal")
     if decision.correlation_id != proposal.correlation_id:
         raise CoreInvariantError("approval correlation does not match the proposal")
     if decision.occurred_at < proposal.occurred_at:
@@ -135,6 +198,7 @@ def authorize_human_approval(
         proposal_id=proposal.proposal_id,
         proposal_revision=proposal.revision,
         proposal_payload_digest=proposal.payload_digest,
+        proposal_digest=proposal.proposal_digest,
         approval_decision_id=decision.approval_decision_id,
         author_principal_id=decision.author.principal_id,
     )

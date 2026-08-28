@@ -113,12 +113,26 @@ def write_p2_evidence(
         "namespace",
         "principal_separation",
         "authority_approval",
+        "complete_effect_binding",
+        "constraint_enforcement",
+        "direct_construction_invariants",
+        "human_approval_requirement",
         "serialization",
     ):
         if core_contracts.get(field) != "passed":
             raise EvidenceError("P2 core-contract result is incomplete")
     if core_contracts.get("effect_payload_redacted") is not True:
         raise EvidenceError("P2 public effect serialization was not proven redacted")
+    if core_contracts.get("complete_effect_digest_exposed") is not True:
+        raise EvidenceError("P2 complete effect digest was not proven serializable")
+    for field in (
+        "public_dataclass_count",
+        "mutable_input_probe_count",
+        "authoritative_effect_field_mutations_checked",
+        "constraint_negative_cases_checked",
+    ):
+        if type(core_contracts.get(field)) is not int or core_contracts[field] < 1:
+            raise EvidenceError("P2 core-contract mechanical counts are incomplete")
     if not evaluated_branch.startswith("codex/"):
         raise EvidenceError("P2 evidence requires a codex task branch")
     if merge_base != P1_BASELINE_COMMIT:
@@ -131,7 +145,7 @@ def write_p2_evidence(
         raise EvidenceError("P2 evidence requires no configured Git remotes")
 
     summary = {
-        "schema_version": 1,
+        "schema_version": 2,
         "milestone": "P2",
         "gate": "p2_core_primitives",
         "status": "passed",
@@ -166,6 +180,23 @@ def write_p2_evidence(
             "namespace": {"status": core_contracts["namespace"]},
             "principal_separation": {"status": core_contracts["principal_separation"]},
             "authority_approval": {"status": core_contracts["authority_approval"]},
+            "complete_effect_binding": {
+                "status": core_contracts["complete_effect_binding"],
+                "authoritative_field_mutations_checked": core_contracts[
+                    "authoritative_effect_field_mutations_checked"
+                ],
+                "digest_exposed_without_payload": core_contracts["complete_effect_digest_exposed"],
+            },
+            "constraint_enforcement": {
+                "status": core_contracts["constraint_enforcement"],
+                "negative_cases_checked": core_contracts["constraint_negative_cases_checked"],
+                "human_approval_requirement": core_contracts["human_approval_requirement"],
+            },
+            "direct_construction_invariants": {
+                "status": core_contracts["direct_construction_invariants"],
+                "public_dataclass_count": core_contracts["public_dataclass_count"],
+                "mutable_input_probe_count": core_contracts["mutable_input_probe_count"],
+            },
             "serialization": {"status": core_contracts["serialization"]},
             "repository": repository,
             "python": {
