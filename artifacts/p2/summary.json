@@ -1,11 +1,11 @@
 {
   "claim_scope": "P2 framework-independent core primitives only.",
-  "completed_date": "2026-08-28",
+  "completed_date": "2026-08-30",
   "evaluated_tree": {
     "branch": "codex/p2-core-primitives",
-    "head_commit_before_evidence": "3cc8def2249b7db34ebbe1cf4a387edc02642105",
+    "head_commit_before_evidence": "a80bd0a3a5ce50178f67fe81d2eaefe4e59a5466",
     "merge_base": "bd6953b3dceeebd33a53f52b03ce94534ff5624b",
-    "public_tree_digest_excluding_summary": "sha256:4aed0b4e9025c51c82140c167651d30ef5e02ae2fc379d6ea44db99bd00b4f86",
+    "public_tree_digest_excluding_summary": "sha256:1f7b9d5a17ee7861e50e57a924d57dd1db40dc0ec8bf1ae59fdba3ed0ece84ed",
     "remote_count": 0
   },
   "gate": "p2_core_primitives",
@@ -17,8 +17,9 @@
   },
   "milestone": "P2",
   "non_mechanical_claims": {
+    "historical_p1_to_prior_p2_parent_worktree_unchanged": "not_evaluated",
     "parent_worktree_content_used": "not_evaluated",
-    "parent_worktree_unchanged": "not_evaluated",
+    "parent_worktree_unchanged": "verified_only_for_adjacent_p2_reverification_fix_cycle",
     "personal_data_used": "not_evaluated",
     "published": "not_evaluated",
     "rights_review_beyond_receipt_shape": "not_evaluated"
@@ -32,11 +33,14 @@
     "security effectiveness",
     "privacy effectiveness",
     "production readiness",
-    "live provider acceptance"
+    "live provider acceptance",
+    "historical parent worktree stability from P1 through prior P2 commits"
   ],
   "p1_baseline_commit": "bd6953b3dceeebd33a53f52b03ce94534ff5624b",
   "results": {
     "architecture": {
+      "alias_resolved_unsafe_calls": 0,
+      "allowed_stdlib_import_root_count": 10,
       "dependency_violations": 0,
       "files_checked": 14,
       "forbidden_imports": 0,
@@ -44,7 +48,9 @@
       "gate": "p2_architecture_clean",
       "nondeterministic_calls": 0,
       "p3_paths_present": 0,
-      "schema_version": 1
+      "policy_version": "p2-stdlib-internal-allowlist-v1",
+      "schema_version": 2,
+      "unapproved_imports": 0
     },
     "authority_approval": {
       "status": "passed"
@@ -93,12 +99,22 @@
     "namespace": {
       "status": "passed"
     },
+    "parent_worktree": {
+      "after_fingerprint_digest": "sha256:f297792a4894948ad3b0bdbc91782f30a19f168326c68c07eb0cb46522f79517",
+      "before_fingerprint_digest": "sha256:f297792a4894948ad3b0bdbc91782f30a19f168326c68c07eb0cb46522f79517",
+      "fingerprint_schema_version": 2,
+      "historical_p1_to_prior_p2_interval": "not_evaluated_no_contemporaneous_pair",
+      "matching_field_count": 14,
+      "scope": "adjacent_p2_reverification_fix_cycle_only",
+      "source_revision": "dea9a9accc82fbedd35deb7117dcb5173223cf44",
+      "status": "passed"
+    },
     "principal_separation": {
       "status": "passed"
     },
     "public_boundary": {
       "exceptions_applied": 0,
-      "files_scanned": 117,
+      "files_scanned": 119,
       "findings": 0,
       "policy_version": "p0-v1",
       "status": "passed"
@@ -116,7 +132,8 @@
       "p1_historical_gate_preserved": true,
       "p1_summary_digest": "sha256:1b2650cbf90c8e50b05dc193906bed1d6c8fac37aa6b669b88605b572c05ecaa",
       "p3_paths_present": 0,
-      "required_file_count": 24,
+      "parent_fingerprint_pair_validated": true,
+      "required_file_count": 26,
       "requires_python": ">=3.12",
       "runtime_dependency_count": 0,
       "schema_version": 1
@@ -139,19 +156,20 @@
       "failures": 0,
       "gate_passed": true,
       "skipped": 0,
-      "tests_run": 108,
+      "tests_run": 114,
       "unexpected_successes": 0
     }
   },
-  "schema_version": 2,
+  "schema_version": 3,
   "source_revision": "dea9a9accc82fbedd35deb7117dcb5173223cf44",
-  "status": "review_required",
+  "status": "passed",
   "verification_commands": [
     "make check",
     "make evidence-p2",
     "python3 -B -m unittest discover -s tests -v",
     "python3 -B scripts/check_public_boundary.py .",
     "python3 -B scripts/check_p2_architecture.py .",
-    "PYTHONPATH=src python3 -B scripts/check_p2_core_contracts.py ."
+    "PYTHONPATH=src python3 -B scripts/check_p2_core_contracts.py .",
+    "python3 -B scripts/fingerprint_source_tree.py --source <parent-repository> --revision dea9a9accc82fbedd35deb7117dcb5173223cf44 --exclude-relative digital-colleagues"
   ]
 }
