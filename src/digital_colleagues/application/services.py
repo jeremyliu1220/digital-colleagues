@@ -7,17 +7,26 @@ from __future__ import annotations
 from datetime import timedelta
 
 from digital_colleagues.application.contracts import (
+    ApprovalRequest,
     ChannelEffect,
     ChannelOutcomeKind,
     DispatchBundle,
     DispatchResult,
+    InputEventRequest,
     IntelligenceRequest,
     OutboxClaim,
     ReconciliationKind,
     RequestPrincipalContext,
+    SemanticDecision,
+    SemanticOutcome,
+    TimerScheduleRequest,
     WakeRunResult,
 )
-from digital_colleagues.application.errors import PermissionDeniedError, ValidationError
+from digital_colleagues.application.errors import (
+    ConflictError,
+    PermissionDeniedError,
+    ValidationError,
+)
 from digital_colleagues.application.ports import (
     CheckpointPort,
     ClockPort,
@@ -30,7 +39,14 @@ from digital_colleagues.core.authority import Mandate, Profile
 from digital_colleagues.core.effects import ApprovalChoice, HumanApprovalDecision
 from digital_colleagues.core.namespace import Namespace
 from digital_colleagues.core.principals import HumanRole, Principal, PrincipalKind
-from digital_colleagues.core.runtime import InputEvent
+from digital_colleagues.core.runtime import (
+    Decision,
+    DecisionKind,
+    InputEvent,
+    InputEventState,
+    TimerOccurrence,
+    TimerOccurrenceState,
+)
 from digital_colleagues.core.work import FiniteWork
 from digital_colleagues.governance.approvals import (
     authorize_effect_proposal,
@@ -79,26 +95,115 @@ class BootstrapService:
 
 
 class EventService:
-    def __init__(self, store: RuntimePersistencePort, identifiers: IdentifierPort) -> None:
+    def __init__(
+        self,
+        store: RuntimePersistencePort,
+        identifiers: IdentifierPort,
+        clock: ClockPort,
+    ) -> None:
         self._store = store
         self._identifiers = identifiers
+        self._clock = clock
 
     def submit(
         self,
         *,
         context: RequestPrincipalContext,
-        event: InputEvent,
+        request: InputEventRequest,
         idempotency_key: str,
     ) -> tuple[InputEvent, bool]:
-        context.namespace.require_exact(event.namespace)
-        if event.actor != context.principal:
-            raise PermissionDeniedError("event actor does not match request authority")
-        trigger_id = self._identifiers.derive("trigger", event.event_id, idempotency_key)
+        if not idempotency_key:
+            raise ValidationError("event idempotency identity is required")
+        event = InputEvent(
+            namespace=context.namespace,
+            event_id=request.event_id,
+            event_type=request.event_type,
+            state=InputEventState.ACCEPTED,
+            safe_projection=request.safe_projection,
+            payload_digest=request.payload_digest,
+            actor=context.principal,
+            correlation_id=request.correlation_id,
+            causation_id=request.causation_id,
+            occurred_at=self._clock.now(),
+            revision=1,
+        )
+        trigger_id = self._identifiers.derive("trigger", request.event_id, idempotency_key)
         return self._store.ingest_event(
             event,
             idempotency_key=idempotency_key,
             trigger_id=trigger_id,
         )
+
+
+class TimerService:
+    def __init__(
+        self,
+        store: RuntimePersistencePort,
+        identifiers: IdentifierPort,
+        clock: ClockPort,
+        service_principal: Principal,
+    ) -> None:
+        if service_principal.kind is not PrincipalKind.SERVICE:
+            raise ValidationError("timer scheduler must be a service principal")
+        self._store = store
+        self._identifiers = identifiers
+        self._clock = clock
+        self._service_principal = service_principal
+
+    def schedule(
+        self,
+        *,
+        namespace: Namespace,
+        request: TimerScheduleRequest,
+    ) -> tuple[TimerOccurrence, bool]:
+        namespace.require_same_tenant(self._service_principal.namespace)
+        occurred_at = self._clock.now()
+        occurrence = TimerOccurrence(
+            namespace=namespace,
+            timer_id=request.timer_id,
+            occurrence_id=request.occurrence_id,
+            state=TimerOccurrenceState.SCHEDULED,
+            due_at=request.due_at,
+            safe_projection=request.safe_projection,
+            actor=self._service_principal,
+            correlation_id=request.correlation_id,
+            causation_id=request.causation_id,
+            occurred_at=occurred_at,
+            revision=1,
+        )
+        trigger_id = self._identifiers.derive(
+            "timer-trigger",
+            request.timer_id,
+            request.occurrence_id,
+            request.idempotency_key,
+        )
+        return self._store.ingest_timer(
+            occurrence,
+            idempotency_key=request.idempotency_key,
+            trigger_id=trigger_id,
+        )
+
+
+def _deterministic_noop(request: IntelligenceRequest) -> SemanticDecision | None:
+    """Pure application eligibility policy evaluated before the intelligence port."""
+
+    if not request.agenda_item.title.startswith("noop:"):
+        return None
+    decision = Decision(
+        namespace=request.namespace,
+        decision_id=request.decision_id,
+        wake_cycle_id=request.wake_cycle.wake_cycle_id,
+        agenda_item_id=request.agenda_item.agenda_item_id,
+        kind=DecisionKind.NO_ACTION,
+        rationale="Deterministic application policy completed an explicit no-op.",
+        proposed_effect_id=None,
+        actor=request.model_principal,
+        correlation_id=request.agenda_item.correlation_id,
+        causation_id=request.agenda_item.agenda_item_id,
+        occurred_at=request.occurred_at,
+        revision=1,
+    )
+    return SemanticDecision(SemanticOutcome.NO_OP, decision, None, request.request_id)
 
 
 class WakeService:
@@ -149,7 +254,11 @@ class WakeService:
             return None
         self._checkpoint.hit("trigger_claimed")
         wake_id = self._identifiers.derive("wake", claim.trigger_id, str(claim.fencing_token))
-        agenda_id = self._identifiers.derive("agenda", claim.event_id)
+        agenda_id = (
+            self._identifiers.derive("agenda", claim.source_id)
+            if claim.source_record_type == "input_event"
+            else self._identifiers.derive("agenda", "timer", claim.source_id)
+        )
         wake, agenda = self._store.materialize_agenda(
             claim,
             wake_cycle_id=wake_id,
@@ -195,7 +304,9 @@ class WakeService:
                 proposal_valid_until=now + timedelta(hours=1),
             )
             try:
-                semantic = self._intelligence.decide(request)
+                semantic = _deterministic_noop(request)
+                if semantic is None:
+                    semantic = self._intelligence.decide(request)
                 self._checkpoint.hit("decision_produced")
                 self._store.commit_semantic_decision(claim, semantic)
                 self._checkpoint.hit("decision_committed")
@@ -216,13 +327,17 @@ class ApprovalService:
         clock: ClockPort,
         identifiers: IdentifierPort,
         service_principal: Principal,
+        approval_validity: timedelta = timedelta(minutes=15),
     ) -> None:
         if service_principal.kind is not PrincipalKind.SERVICE:
             raise ValidationError("approval attempt actor must be a service principal")
+        if approval_validity <= timedelta(0):
+            raise ValidationError("approval validity policy must be positive")
         self._store = store
         self._clock = clock
         self._identifiers = identifiers
         self._service_principal = service_principal
+        self._approval_validity = approval_validity
 
     def decide(
         self,
@@ -230,13 +345,62 @@ class ApprovalService:
         context: RequestPrincipalContext,
         mandate_id: str,
         expected_mandate_revision: int,
-        decision: HumanApprovalDecision,
+        request: ApprovalRequest,
     ) -> tuple[HumanApprovalDecision, str | None, bool]:
-        if decision.author != context.principal:
-            raise PermissionDeniedError("approval author does not match request authority")
         if context.principal.kind is not PrincipalKind.HUMAN:
             raise PermissionDeniedError("approval requires a durable human principal")
-        context.namespace.require_exact(decision.namespace)
+        replay = self._store.get_approval_replay(context.namespace, request.idempotency_key)
+        if replay is not None:
+            existing, attempt = replay
+            replay_binding = (
+                existing.approval_decision_id,
+                existing.proposal_id,
+                existing.proposal_revision,
+                existing.proposal_payload_digest,
+                existing.proposal_digest,
+                existing.choice,
+                existing.idempotency_key,
+                existing.author,
+            )
+            request_binding = (
+                request.approval_decision_id,
+                request.proposal_id,
+                request.proposal_revision,
+                request.proposal_payload_digest,
+                request.proposal_digest,
+                request.choice,
+                request.idempotency_key,
+                context.principal,
+            )
+            if replay_binding != request_binding:
+                raise ConflictError("approval idempotency replay drifted")
+            return (
+                existing,
+                attempt.effect_attempt_id if attempt is not None else None,
+                False,
+            )
+        now = self._clock.now()
+        proposal = self._store.get_proposal(context.namespace, request.proposal_id)
+        if now < proposal.occurred_at:
+            raise PermissionDeniedError("approval cannot precede the proposal")
+        if now > proposal.constraints.valid_until:
+            raise PermissionDeniedError("proposal validity has expired")
+        decision = HumanApprovalDecision(
+            namespace=context.namespace,
+            approval_decision_id=request.approval_decision_id,
+            proposal_id=request.proposal_id,
+            proposal_revision=request.proposal_revision,
+            proposal_payload_digest=request.proposal_payload_digest,
+            proposal_digest=request.proposal_digest,
+            choice=request.choice,
+            author=context.principal,
+            idempotency_key=request.idempotency_key,
+            correlation_id=proposal.correlation_id,
+            causation_id=proposal.proposal_id,
+            occurred_at=now,
+            valid_until=min(now + self._approval_validity, proposal.constraints.valid_until),
+            revision=1,
+        )
         attempt_id = self._identifiers.derive(
             "attempt", decision.proposal_id, str(decision.proposal_revision), "1"
         )

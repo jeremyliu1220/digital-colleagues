@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
+from datetime import timedelta
 from pathlib import Path
 
 from digital_colleagues.adapters.channel.reference import ReferenceChannel
@@ -19,16 +20,16 @@ from digital_colleagues.application.services import (
     EventService,
     WakeService,
 )
-from digital_colleagues.core.effects import ApprovalChoice, HumanApprovalDecision
 from tests.p3.fixtures import (
     T0,
     T1,
     T2,
     T3,
-    T4,
     admin,
+    approval_request,
     finite_work,
     input_event,
+    input_event_request,
     mandate,
     model,
     namespace,
@@ -61,11 +62,11 @@ class GoldenPathTests(unittest.TestCase):
                 correlation_id="correlation-bootstrap",
             )
             self.assertTrue(created)
-            event_service = EventService(store, identifiers)
+            event_service = EventService(store, identifiers, FixedClock(T0))
             event = input_event()
             stored_event, event_created = event_service.submit(
                 context=RequestPrincipalContext(namespace(), user()),
-                event=event,
+                request=input_event_request(),
                 idempotency_key="event-key-synthetic",
             )
             self.assertTrue(event_created)
@@ -91,22 +92,7 @@ class GoldenPathTests(unittest.TestCase):
             request_id = identifiers.derive("request", agenda_id, "1")
             proposal_id = identifiers.derive("proposal", request_id)
             proposal = store.get_proposal(namespace(), proposal_id)
-            decision = HumanApprovalDecision(
-                namespace=namespace(),
-                approval_decision_id="approval-synthetic",
-                proposal_id=proposal.proposal_id,
-                proposal_revision=proposal.revision,
-                proposal_payload_digest=proposal.payload_digest,
-                proposal_digest=proposal.proposal_digest,
-                choice=ApprovalChoice.APPROVE,
-                author=user(),
-                idempotency_key="approval-key-synthetic",
-                correlation_id=proposal.correlation_id,
-                causation_id=proposal.proposal_id,
-                occurred_at=T2,
-                valid_until=T4,
-                revision=1,
-            )
+            approval = approval_request(proposal)
             approval_service = ApprovalService(
                 store=store,
                 clock=FixedClock(T2),
@@ -117,11 +103,13 @@ class GoldenPathTests(unittest.TestCase):
                 context=RequestPrincipalContext(namespace(), user()),
                 mandate_id="mandate-synthetic",
                 expected_mandate_revision=1,
-                decision=decision,
+                request=approval,
             )
             self.assertTrue(approval_created)
             self.assertIsNotNone(attempt_id)
-            self.assertEqual(stored_approval, decision)
+            decision = stored_approval
+            self.assertEqual(decision.occurred_at, T2)
+            self.assertEqual(decision.valid_until, T2 + timedelta(minutes=15))
             channel = ReferenceChannel((ChannelOutcomeKind.SUCCEEDED,))
             dispatch = DispatchService(
                 store=store,
@@ -182,25 +170,28 @@ class GoldenPathTests(unittest.TestCase):
             ).encode("utf-8")
             self.assertEqual(canonical_after, canonical_before)
 
-            replayed_event, replay_event_created = EventService(restarted, identifiers).submit(
+            replayed_event, replay_event_created = EventService(
+                restarted, identifiers, FixedClock(T3)
+            ).submit(
                 context=RequestPrincipalContext(namespace(), user()),
-                event=event,
+                request=input_event_request(),
                 idempotency_key="event-key-synthetic",
             )
             self.assertFalse(replay_event_created)
             self.assertEqual(replayed_event, event)
             replay_approval = ApprovalService(
                 store=restarted,
-                clock=FixedClock(T2),
+                clock=FixedClock(T3),
                 identifiers=identifiers,
                 service_principal=service(),
             ).decide(
                 context=RequestPrincipalContext(namespace(), user()),
                 mandate_id="mandate-synthetic",
                 expected_mandate_revision=1,
-                decision=decision,
+                request=approval,
             )
             self.assertFalse(replay_approval[2])
+            self.assertEqual(replay_approval[0], decision)
             replay_channel = ReferenceChannel((ChannelOutcomeKind.SUCCEEDED,))
             replay_dispatch = DispatchService(
                 store=restarted,

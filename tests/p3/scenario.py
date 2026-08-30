@@ -15,15 +15,15 @@ from digital_colleagues.application.services import (
     EventService,
     WakeService,
 )
-from digital_colleagues.core.effects import ApprovalChoice, EffectProposal, HumanApprovalDecision
+from digital_colleagues.core.effects import EffectProposal, HumanApprovalDecision
 from tests.p3.fixtures import (
     T0,
     T1,
     T2,
-    T4,
     admin,
+    approval_request,
     finite_work,
-    input_event,
+    input_event_request,
     mandate,
     model,
     namespace,
@@ -63,9 +63,9 @@ def prepare_proposal(database: Path, *, identifier_namespace: str = "scenario") 
         work=finite_work(),
         correlation_id="correlation-bootstrap",
     )
-    EventService(store, identifiers).submit(
+    EventService(store, identifiers, FixedClock(T0)).submit(
         context=RequestPrincipalContext(namespace(), user()),
-        event=input_event(),
+        request=input_event_request(),
         idempotency_key="event-key-synthetic",
     )
     wake = WakeService(
@@ -88,23 +88,7 @@ def prepare_proposal(database: Path, *, identifier_namespace: str = "scenario") 
 
 def approve(scenario: PreparedScenario) -> HumanApprovalDecision:
     proposal = scenario.proposal
-    decision = HumanApprovalDecision(
-        namespace=namespace(),
-        approval_decision_id="approval-synthetic",
-        proposal_id=proposal.proposal_id,
-        proposal_revision=proposal.revision,
-        proposal_payload_digest=proposal.payload_digest,
-        proposal_digest=proposal.proposal_digest,
-        choice=ApprovalChoice.APPROVE,
-        author=user(),
-        idempotency_key="approval-key-synthetic",
-        correlation_id=proposal.correlation_id,
-        causation_id=proposal.proposal_id,
-        occurred_at=T2,
-        valid_until=T4,
-        revision=1,
-    )
-    ApprovalService(
+    stored, _, _ = ApprovalService(
         store=scenario.store,
         clock=FixedClock(T2),
         identifiers=scenario.identifiers,
@@ -113,7 +97,7 @@ def approve(scenario: PreparedScenario) -> HumanApprovalDecision:
         context=RequestPrincipalContext(namespace(), user()),
         mandate_id="mandate-synthetic",
         expected_mandate_revision=1,
-        decision=decision,
+        request=approval_request(proposal),
     )
-    scenario.decision = decision
-    return decision
+    scenario.decision = stored
+    return stored

@@ -41,7 +41,7 @@ class P2BoundaryTests(unittest.TestCase):
         self.assertEqual(architecture["gate"], "p3_architecture_clean")
         self.assertEqual(
             architecture["policy_version"],
-            "p3-dependency-determinism-allowlist-v1",
+            "p3-boundary-specific-determinism-allowlist-v2",
         )
         self.assertEqual(architecture["unapproved_imports"], 0)
         self.assertEqual(architecture["dependency_violations"], 0)

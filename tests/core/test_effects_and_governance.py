@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import dataclasses
 import unittest
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from digital_colleagues.core import (
@@ -151,6 +151,41 @@ class EffectsAndGovernanceTests(unittest.TestCase):
                 approval_decision(proposal),
                 evaluated_at=EXPIRY.replace(hour=EXPIRY.hour + 1),
             )
+
+    def test_approval_time_authority_rejects_future_backdated_expired_and_overlong(
+        self,
+    ) -> None:
+        proposal = effect_proposal()
+        decision = approval_decision(proposal)
+        cases = {
+            "future": (
+                dataclasses.replace(decision, occurred_at=T5 + timedelta(seconds=1)),
+                T5,
+                AuthorizationError,
+            ),
+            "backdated": (
+                dataclasses.replace(decision, occurred_at=T4 - timedelta(seconds=1)),
+                T5,
+                CoreInvariantError,
+            ),
+            "expired": (
+                dataclasses.replace(decision, valid_until=T5),
+                T5 + timedelta(seconds=1),
+                AuthorizationError,
+            ),
+            "overlong": (
+                dataclasses.replace(decision, valid_until=EXPIRY + timedelta(seconds=1)),
+                T5,
+                AuthorizationError,
+            ),
+        }
+        for label, (candidate, evaluated_at, error) in cases.items():
+            with self.subTest(case=label), self.assertRaises(error):
+                authorize_human_approval(
+                    proposal,
+                    candidate,
+                    evaluated_at=evaluated_at,
+                )
 
     def test_rejection_decision_cannot_authorize_an_effect(self) -> None:
         proposal = effect_proposal()

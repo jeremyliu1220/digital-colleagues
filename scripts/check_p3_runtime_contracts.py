@@ -46,6 +46,7 @@ FORBIDDEN_AUTHORITY_FIELDS = {
     "tenant",
     "tenant_id",
 }
+FORBIDDEN_TEMPORAL_FIELDS = {"occurred_at", "valid_until"}
 
 
 class RuntimeContractError(RuntimeError):
@@ -66,9 +67,11 @@ def _class_fields(tree: ast.Module, name: str) -> set[str]:
 def check_runtime_contracts(root: Path) -> dict[str, object]:
     ports_path = root / "src/digital_colleagues/application/ports.py"
     api_path = root / "src/digital_colleagues/api/app.py"
+    contracts_path = root / "src/digital_colleagues/application/contracts.py"
     try:
         ports_tree = ast.parse(ports_path.read_text(encoding="utf-8"))
         api_tree = ast.parse(api_path.read_text(encoding="utf-8"))
+        contracts_tree = ast.parse(contracts_path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, SyntaxError) as exc:
         raise RuntimeContractError("P3 contract source is unreadable") from exc
     protocol_classes = {
@@ -85,11 +88,22 @@ def check_runtime_contracts(root: Path) -> dict[str, object]:
         mutation_field_count += len(fields)
         if fields & FORBIDDEN_AUTHORITY_FIELDS:
             raise RuntimeContractError("an HTTP mutation accepts caller authority")
+        if fields & FORBIDDEN_TEMPORAL_FIELDS:
+            raise RuntimeContractError("an HTTP mutation accepts caller-controlled time")
         if "idempotency_key" not in fields:
             raise RuntimeContractError("an HTTP mutation lacks idempotency identity")
     approval_fields = _class_fields(api_tree, "ApprovalMutation")
     if "expected_mandate_revision" not in approval_fields:
         raise RuntimeContractError("concurrent approval mapping lacks expected revision")
+    for request_model in ("InputEventRequest", "ApprovalRequest"):
+        if _class_fields(contracts_tree, request_model) & FORBIDDEN_TEMPORAL_FIELDS:
+            raise RuntimeContractError("an application request accepts caller-controlled time")
+    timer_fields = _class_fields(contracts_tree, "TimerScheduleRequest")
+    if not {"timer_id", "occurrence_id", "due_at", "idempotency_key"}.issubset(timer_fields):
+        raise RuntimeContractError("the durable timer trigger contract is incomplete")
+    ports_text = ports_path.read_text(encoding="utf-8")
+    if "TimerOccurrence" not in ports_text or "def ingest_timer(" not in ports_text:
+        raise RuntimeContractError("the durable timer trigger port is incomplete")
     expected_channel = {
         "succeeded",
         "known_not_executed",
@@ -123,6 +137,8 @@ def check_runtime_contracts(root: Path) -> dict[str, object]:
         "mutation_model_count": len(MUTATION_MODELS),
         "mutation_field_count": mutation_field_count,
         "caller_authority_field_count": 0,
+        "caller_temporal_field_count": 0,
+        "timer_trigger_contract": "passed",
         "channel_outcome_count": len(ChannelOutcomeKind),
         "reconciliation_outcome_count": len(ReconciliationKind),
         "ambiguous_attempt_state": True,

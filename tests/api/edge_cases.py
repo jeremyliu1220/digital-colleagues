@@ -19,7 +19,7 @@ from tests.p3.scenario import PreparedScenario, prepare_proposal
 
 def _app(scenario: PreparedScenario) -> Any:
     return create_app(
-        event_service=EventService(scenario.store, scenario.identifiers),
+        event_service=EventService(scenario.store, scenario.identifiers, FixedClock(T0)),
         approval_service=ApprovalService(
             store=scenario.store,
             clock=FixedClock(T2),
@@ -44,7 +44,6 @@ def authority_case() -> None:
             "payload_digest": "sha256:" + ("2" * 64),
             "correlation_id": "correlation-api",
             "causation_id": None,
-            "occurred_at": T0.isoformat(),
             "idempotency_key": "event-key-api",
         }
         created = client.post("/events", json=event_body)
@@ -57,6 +56,7 @@ def authority_case() -> None:
             ("tenant_id", "tenant-other"),
             ("role", "tenant_admin"),
             ("principal_kind", "human"),
+            ("occurred_at", T0.isoformat()),
         ):
             invalid = dict(event_body)
             invalid[authority_field] = value
@@ -79,8 +79,6 @@ def approval_case() -> None:
             "proposal_digest": proposal.proposal_digest,
             "choice": "approve",
             "idempotency_key": "approval-key-api",
-            "occurred_at": T2.isoformat(),
-            "valid_until": T4.isoformat(),
             "mandate_id": "mandate-synthetic",
             "expected_mandate_revision": 1,
         }
@@ -88,6 +86,19 @@ def approval_case() -> None:
         assert response.status_code == 201, response.text
         assert response.json()["created"] is True
         assert response.json()["attempt_id"] is not None
+        stored = scenario.store.get_approval(namespace(), "approval-api")
+        assert stored.occurred_at == T2
+        assert stored.valid_until < T4
+        for temporal_field, value in (
+            ("occurred_at", T2.isoformat()),
+            ("valid_until", T4.isoformat()),
+        ):
+            invalid = dict(body)
+            invalid[temporal_field] = value
+            assert (
+                client.post(f"/proposals/{proposal.proposal_id}/approval", json=invalid).status_code
+                == 422
+            )
         scenario.store.close()
     with tempfile.TemporaryDirectory(prefix="digital-colleagues-p3-api-stale-") as temporary:
         stale = prepare_proposal(Path(temporary) / "state.sqlite", identifier_namespace="api-stale")

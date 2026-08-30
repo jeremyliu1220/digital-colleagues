@@ -84,6 +84,47 @@ class InputEvent:
         )
 
 
+class TimerOccurrenceState(StrEnum):
+    SCHEDULED = "scheduled"
+    DUE = "due"
+
+
+@dataclass(frozen=True, slots=True)
+class TimerOccurrence:
+    """One durable scheduled occurrence, distinct from an inbound InputEvent."""
+
+    namespace: Namespace
+    timer_id: str
+    occurrence_id: str
+    state: TimerOccurrenceState
+    due_at: datetime
+    safe_projection: FrozenJsonObject
+    actor: Principal
+    correlation_id: str
+    causation_id: str | None
+    occurred_at: datetime
+    revision: int
+    schema_version: int = SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        require_stable_id(self.timer_id, "timer_id")
+        require_stable_id(self.occurrence_id, "occurrence_id")
+        if not isinstance(self.state, TimerOccurrenceState):
+            raise CoreInvariantError("timer occurrence state must be explicit")
+        require_utc(self.due_at, "due_at")
+        if not isinstance(self.safe_projection, FrozenJsonObject):
+            raise CoreInvariantError("timer safe_projection must be immutable")
+        _validate_causal_record(
+            namespace=self.namespace,
+            actor=self.actor,
+            correlation_id=self.correlation_id,
+            causation_id=self.causation_id,
+            occurred_at=self.occurred_at,
+            revision=self.revision,
+            schema_version=self.schema_version,
+        )
+
+
 class WakeCycleState(StrEnum):
     PLANNED = "planned"
     RUNNING = "running"
@@ -107,16 +148,24 @@ class WakeCycle:
     schema_version: int = SCHEMA_VERSION
     fencing_token: int = 1
     checkpoint_generation: int = 1
+    trigger_timer_occurrence_ids: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         require_stable_id(self.wake_cycle_id, "wake_cycle_id")
         if not isinstance(self.state, WakeCycleState):
             raise CoreInvariantError("wake cycle state must be explicit")
-        trigger_ids = freeze_strings(self.trigger_event_ids, "trigger_event_ids", allow_empty=False)
+        trigger_ids = freeze_strings(self.trigger_event_ids, "trigger_event_ids")
+        timer_ids = freeze_strings(
+            self.trigger_timer_occurrence_ids,
+            "trigger_timer_occurrence_ids",
+        )
+        if not trigger_ids and not timer_ids:
+            raise CoreInvariantError("wake cycle requires an event or timer occurrence")
         agenda_ids = freeze_strings(self.agenda_item_ids, "agenda_item_ids")
-        for identifier in (*trigger_ids, *agenda_ids):
+        for identifier in (*trigger_ids, *timer_ids, *agenda_ids):
             require_stable_id(identifier, "causal record ID")
         object.__setattr__(self, "trigger_event_ids", trigger_ids)
+        object.__setattr__(self, "trigger_timer_occurrence_ids", timer_ids)
         object.__setattr__(self, "agenda_item_ids", agenda_ids)
         _validate_causal_record(
             namespace=self.namespace,
@@ -127,8 +176,8 @@ class WakeCycle:
             revision=self.revision,
             schema_version=self.schema_version,
         )
-        if self.causation_id not in trigger_ids:
-            raise CoreInvariantError("wake cycle causation must name one trigger event")
+        if self.causation_id not in (*trigger_ids, *timer_ids):
+            raise CoreInvariantError("wake cycle causation must name one trigger source")
         require_revision(self.fencing_token, "fencing_token")
         require_revision(self.checkpoint_generation, "checkpoint_generation")
 
@@ -146,7 +195,7 @@ class AgendaItem:
     namespace: Namespace
     agenda_item_id: str
     wake_cycle_id: str
-    source_event_id: str
+    source_event_id: str | None
     work_id: str | None
     title: str
     state: AgendaItemState
@@ -161,11 +210,20 @@ class AgendaItem:
     generation: int = 1
     handled_generation: int = 0
     cause_ids: tuple[str, ...] = ()
+    source_timer_occurrence_id: str | None = None
 
     def __post_init__(self) -> None:
         require_stable_id(self.agenda_item_id, "agenda_item_id")
         require_stable_id(self.wake_cycle_id, "wake_cycle_id")
-        require_stable_id(self.source_event_id, "source_event_id")
+        if (self.source_event_id is None) == (self.source_timer_occurrence_id is None):
+            raise CoreInvariantError("Agenda must name exactly one event or timer source")
+        if self.source_event_id is not None:
+            require_stable_id(self.source_event_id, "source_event_id")
+        if self.source_timer_occurrence_id is not None:
+            require_stable_id(
+                self.source_timer_occurrence_id,
+                "source_timer_occurrence_id",
+            )
         if self.work_id is not None:
             require_stable_id(self.work_id, "work_id")
         object.__setattr__(self, "title", require_text(self.title, "title"))
@@ -192,12 +250,14 @@ class AgendaItem:
             or not 0 <= self.handled_generation <= self.generation
         ):
             raise CoreInvariantError("handled_generation must be within the Agenda generation")
-        causes = self.cause_ids or (self.source_event_id,)
+        source_id = self.source_event_id or self.source_timer_occurrence_id
+        assert source_id is not None
+        causes = self.cause_ids or (source_id,)
         causes = freeze_strings(causes, "cause_ids", allow_empty=False)
         for cause_id in causes:
             require_stable_id(cause_id, "cause_id")
-        if self.source_event_id not in causes:
-            raise CoreInvariantError("Agenda causes must retain the source event")
+        if source_id not in causes:
+            raise CoreInvariantError("Agenda causes must retain the trigger source")
         object.__setattr__(self, "cause_ids", causes)
 
 

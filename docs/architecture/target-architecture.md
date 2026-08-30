@@ -34,21 +34,24 @@ ORMs, or orchestration frameworks. Adapters translate their values into stable c
 P3 keeps P2 `core/` and `governance/` pure and adds `application/` contracts, stable ports,
 and services; `adapters/` for SQLite, deterministic intelligence, the reference channel,
 clock, IDs, and entropy; a minimal `api/` mapping edge; and a bounded `worker/` facade.
-Core runtime values receive additive Mandate binding, Agenda generation, wake fencing, and
-typed ambiguous outcomes. Application imports no concrete adapter or HTTP type.
+Core runtime values receive additive Mandate binding, typed Event and Timer occurrences,
+Agenda generation, wake fencing, and typed ambiguous outcomes. Application imports no
+concrete adapter, filesystem implementation, database type, or HTTP type.
 
 The SQLite adapter stores private contract JSON through a construction-replaying codec;
 computed proposal and payload digests are rechecked on load. Domain rows, audit, replay,
-triggers, Agenda runtime, and outbox rows carry explicit namespace and schema columns.
+Event triggers, separate Timer triggers, Agenda runtime, and outbox rows carry explicit
+namespace and schema columns.
 Application methods group state, audit, replay, approval consumption, attempts, and outbox
 updates in `BEGIN IMMEDIATE` transactions with optimistic revisions. This store is a local
 semantic reference, not a tenant-isolation or availability claim.
 
-Architecture checks parse all boundaries with explicit import allowlists. Core cannot
+Architecture checks parse all boundaries with boundary-specific import allowlists. Core cannot
 depend outward; application cannot import infrastructure; Pydantic/FastAPI cannot leave
 `api/`; deterministic boundaries reject hidden wall clock, UUID, randomness, environment,
-filesystem, process, and network capabilities. Adversarial unknown imports and aliases are
-required to fail.
+filesystem, process, and network capabilities. Import aliases and assigned callable aliases
+are resolved transitively, so rebinding `datetime.now`, `open`, or `sqlite3.connect` cannot
+bypass the gate. Stable ports reject concrete connection, Path, ORM, edge, and provider types.
 
 ## Repository topology
 
@@ -95,7 +98,9 @@ effect boundaries. An identity card is a projection; it is not an authority sour
 
 Finite work, dependencies, obligations, events, agenda items, wake cycles, proposals, and
 outcomes use stable IDs and explicit lifecycle states. Time, randomness, IDs, and I/O are
-injected. Restart must preserve enough state to resume without guessing.
+injected. TimerOccurrence remains semantically distinct from InputEvent, with stable
+timer/occurrence identity and an explicit due time. Restart must preserve enough state to
+resume without guessing.
 
 ### Effect and approval
 
@@ -113,7 +118,8 @@ insufficient-role, or partially rebound decisions fail closed.
 FastAPI is the application edge. Pydantic request and response models translate to and from
 core contracts; Pydantic types never enter core. Mutation requests include an idempotency
 key and the expected revision where concurrency matters. The server derives namespace,
-principal, and roles from its session, never from caller-supplied authority fields.
+principal, roles, durable event acceptance time, approval time, and bounded approval validity,
+never from caller-supplied authority or temporal fields.
 
 P3 injects a RequestPrincipalContext into the mapping edge; it does not implement or claim
 the P4 session, bootstrap, enrollment, Origin, or CSRF boundary. Studio remains a static
@@ -124,10 +130,12 @@ shell. UI hiding is never an authorization boundary.
 v0.1 uses one `state.sqlite` through standard-library `sqlite3` with:
 
 - WAL mode and foreign keys enabled on every connection;
-- numbered migrations with immutable checksums;
+- numbered migrations with immutable checksums; migration 003 adds Timer triggers while 001
+  and 002 remain byte-immutable, and version-2 databases upgrade in place;
 - transactional repositories and an outbox behind stable ports;
 - UTC timestamps, explicit string IDs, schema versions, and complete namespace columns;
-- durable event/timer triggers, Agenda generation checkpoints, leases and fencing;
+- semantically distinct durable Event/Timer triggers, Agenda generation checkpoints, leases
+  and fencing;
 - immutable safe audit, replay ledger, attempt/result records, and transactional outbox;
 - restart checks with all product/store instances reconstructed over the same temporary file.
 
@@ -142,6 +150,8 @@ without network, environment, hidden time, or randomness. The reference channel 
 complete typed effect and returns success, known-not-executed, retryable, permanent, or
 ambiguous results without contacting a live provider. Reconciliation distinguishes
 confirmed-applied, confirmed-absent, and still-unknown; only confirmed absence can retry.
+Pure application policy resolves explicit deterministic no-ops before this provider and
+durably records their Decision without producing an effect.
 
 ## Future deployment topology (P4)
 

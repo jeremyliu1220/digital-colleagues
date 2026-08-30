@@ -47,12 +47,13 @@ from digital_colleagues.core.effects import (
     HumanApprovalDecision,
 )
 from digital_colleagues.core.namespace import Namespace, NamespaceScope
-from digital_colleagues.core.principals import Principal
+from digital_colleagues.core.principals import Principal, PrincipalKind
 from digital_colleagues.core.runtime import (
     AgendaItem,
     AgendaItemState,
     Decision,
     InputEvent,
+    TimerOccurrence,
     WakeCycle,
     WakeCycleState,
 )
@@ -75,6 +76,7 @@ _RECORD_IDENTITIES: dict[type[object], tuple[str, str, bool]] = {
     Mandate: ("mandate", "mandate_id", False),
     FiniteWork: ("finite_work", "work_id", False),
     InputEvent: ("input_event", "event_id", True),
+    TimerOccurrence: ("timer_occurrence", "occurrence_id", True),
     WakeCycle: ("wake_cycle", "wake_cycle_id", False),
     AgendaItem: ("agenda_item", "agenda_item_id", False),
     Decision: ("decision", "decision_id", True),
@@ -445,6 +447,15 @@ class SQLiteRuntimeStore:
     def get_event(self, namespace: Namespace, event_id: str) -> InputEvent:
         return self._get_record(self._connection, namespace, "input_event", event_id, InputEvent)
 
+    def get_timer_occurrence(self, namespace: Namespace, occurrence_id: str) -> TimerOccurrence:
+        return self._get_record(
+            self._connection,
+            namespace,
+            "timer_occurrence",
+            occurrence_id,
+            TimerOccurrence,
+        )
+
     def get_wake_cycle(self, namespace: Namespace, wake_cycle_id: str) -> WakeCycle:
         return self._get_record(self._connection, namespace, "wake_cycle", wake_cycle_id, WakeCycle)
 
@@ -468,6 +479,47 @@ class SQLiteRuntimeStore:
             approval_decision_id,
             HumanApprovalDecision,
         )
+
+    def get_approval_replay(
+        self, namespace: Namespace, idempotency_key: str
+    ) -> tuple[HumanApprovalDecision, EffectAttempt | None] | None:
+        replay = self._connection.execute(
+            """
+            SELECT record_id FROM replay_ledger
+            WHERE tenant_id = ? AND namespace_scope = ? AND namespace_scope_id = ?
+              AND ledger_kind = 'approval' AND idempotency_key = ?
+            """,
+            (*_ns(namespace), idempotency_key),
+        ).fetchone()
+        if replay is None:
+            return None
+        decision = self._get_record(
+            self._connection,
+            namespace,
+            "human_approval",
+            replay["record_id"],
+            HumanApprovalDecision,
+        )
+        attempt_row = self._connection.execute(
+            """
+            SELECT effect_attempt_id FROM outbox
+            WHERE tenant_id = ? AND namespace_scope = ? AND namespace_scope_id = ?
+              AND approval_decision_id = ?
+            """,
+            (*_ns(namespace), decision.approval_decision_id),
+        ).fetchone()
+        attempt = (
+            None
+            if attempt_row is None
+            else self._get_record(
+                self._connection,
+                namespace,
+                "effect_attempt",
+                attempt_row["effect_attempt_id"],
+                EffectAttempt,
+            )
+        )
+        return decision, attempt
 
     def get_action_result(self, namespace: Namespace, action_result_id: str) -> ActionResult:
         return self._get_record(
@@ -594,7 +646,7 @@ class SQLiteRuntimeStore:
                     replay["record_id"],
                     InputEvent,
                 )
-                if existing != event:
+                if replace(event, occurred_at=existing.occurred_at) != existing:
                     raise ConflictError("input idempotency replay drifted")
                 return existing, False
             self._insert_record(connection, event)
@@ -638,6 +690,75 @@ class SQLiteRuntimeStore:
                 raise ConflictError("input replay or trigger identity conflict") from exc
         return event, True
 
+    def ingest_timer(
+        self,
+        occurrence: TimerOccurrence,
+        *,
+        idempotency_key: str,
+        trigger_id: str,
+    ) -> tuple[TimerOccurrence, bool]:
+        with self._transaction() as connection:
+            replay = connection.execute(
+                """
+                SELECT record_id FROM replay_ledger
+                WHERE tenant_id = ? AND namespace_scope = ? AND namespace_scope_id = ?
+                  AND ledger_kind = 'timer_occurrence' AND idempotency_key = ?
+                """,
+                (*_ns(occurrence.namespace), idempotency_key),
+            ).fetchone()
+            if replay is not None:
+                existing = self._get_record(
+                    connection,
+                    occurrence.namespace,
+                    "timer_occurrence",
+                    replay["record_id"],
+                    TimerOccurrence,
+                )
+                if replace(occurrence, occurred_at=existing.occurred_at) != existing:
+                    raise ConflictError("timer occurrence replay drifted")
+                return existing, False
+            self._insert_record(connection, occurrence)
+            try:
+                connection.execute(
+                    """
+                    INSERT INTO replay_ledger(
+                      schema_version, tenant_id, namespace_scope, namespace_scope_id,
+                      ledger_kind, idempotency_key, record_type, record_id, created_at
+                    ) VALUES (?, ?, ?, ?, 'timer_occurrence', ?, 'timer_occurrence', ?, ?)
+                    """,
+                    (
+                        SCHEMA_VERSION,
+                        *_ns(occurrence.namespace),
+                        idempotency_key,
+                        occurrence.occurrence_id,
+                        datetime_to_z(occurrence.occurred_at),
+                    ),
+                )
+                connection.execute(
+                    """
+                    INSERT INTO timer_triggers(
+                      schema_version, tenant_id, namespace_scope, namespace_scope_id,
+                      trigger_id, occurrence_id, timer_id, due_at, state,
+                      correlation_id, causation_id, actor_principal_id, created_at, revision
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, 1)
+                    """,
+                    (
+                        SCHEMA_VERSION,
+                        *_ns(occurrence.namespace),
+                        trigger_id,
+                        occurrence.occurrence_id,
+                        occurrence.timer_id,
+                        datetime_to_z(occurrence.due_at),
+                        occurrence.correlation_id,
+                        occurrence.occurrence_id,
+                        occurrence.actor.principal_id,
+                        datetime_to_z(occurrence.occurred_at),
+                    ),
+                )
+            except sqlite3.IntegrityError as exc:
+                raise ConflictError("timer replay or trigger identity conflict") from exc
+        return occurrence, True
+
     def claim_trigger(
         self,
         namespace: Namespace,
@@ -647,7 +768,7 @@ class SQLiteRuntimeStore:
         lease_until: datetime,
     ) -> TriggerClaim | None:
         with self._transaction() as connection:
-            row = connection.execute(
+            event_row = connection.execute(
                 """
                 SELECT * FROM triggers
                 WHERE tenant_id = ? AND namespace_scope = ? AND namespace_scope_id = ?
@@ -661,12 +782,43 @@ class SQLiteRuntimeStore:
                 """,
                 (*_ns(namespace), datetime_to_z(now), datetime_to_z(now)),
             ).fetchone()
-            if row is None:
+            timer_row = connection.execute(
+                """
+                SELECT * FROM timer_triggers
+                WHERE tenant_id = ? AND namespace_scope = ? AND namespace_scope_id = ?
+                  AND due_at <= ?
+                  AND (
+                    state = 'pending'
+                    OR (state = 'claimed' AND lease_until < ?)
+                  )
+                ORDER BY due_at, trigger_id
+                LIMIT 1
+                """,
+                (*_ns(namespace), datetime_to_z(now), datetime_to_z(now)),
+            ).fetchone()
+            candidates = tuple(
+                (source_type, candidate)
+                for source_type, candidate in (
+                    ("input_event", event_row),
+                    ("timer_occurrence", timer_row),
+                )
+                if candidate is not None
+            )
+            if not candidates:
                 return None
+            source_record_type, row = min(
+                candidates,
+                key=lambda item: (
+                    item[1]["due_at"],
+                    item[1]["trigger_id"],
+                    item[0],
+                ),
+            )
+            trigger_table = "triggers" if source_record_type == "input_event" else "timer_triggers"
             fencing = row["fencing_token"] + 1
             cursor = connection.execute(
-                """
-                UPDATE triggers
+                f"""
+                UPDATE {trigger_table}
                 SET state = 'claimed', lease_owner = ?, lease_until = ?,
                     fencing_token = ?, attempt_count = attempt_count + 1,
                     revision = revision + 1
@@ -687,7 +839,10 @@ class SQLiteRuntimeStore:
             return TriggerClaim(
                 namespace=namespace,
                 trigger_id=row["trigger_id"],
-                event_id=row["event_id"],
+                source_record_type=source_record_type,
+                source_id=(
+                    row["event_id"] if source_record_type == "input_event" else row["occurrence_id"]
+                ),
                 trigger_kind=row["trigger_kind"],
                 lease_owner=owner,
                 lease_until=lease_until,
@@ -709,6 +864,23 @@ class SQLiteRuntimeStore:
         )
         return source_key, work, priority, title
 
+    @staticmethod
+    def _timer_source_key(
+        occurrence: TimerOccurrence,
+    ) -> tuple[str, str | None, int, str]:
+        work_id = occurrence.safe_projection.get("work_id")
+        work = work_id if isinstance(work_id, str) and work_id else None
+        source_key = f"timer:{occurrence.timer_id}"
+        raw_priority = occurrence.safe_projection.get("priority")
+        priority = raw_priority if type(raw_priority) is int else 100
+        raw_title = occurrence.safe_projection.get("title")
+        title = (
+            raw_title
+            if isinstance(raw_title, str) and raw_title.strip()
+            else "scheduled timer work"
+        )
+        return source_key, work, priority, title
+
     def materialize_agenda(
         self,
         claim: TriggerClaim,
@@ -719,9 +891,18 @@ class SQLiteRuntimeStore:
         occurred_at: datetime,
     ) -> tuple[WakeCycle, AgendaItem]:
         with self._transaction() as connection:
+            trigger_table = (
+                "triggers"
+                if claim.source_record_type == "input_event"
+                else "timer_triggers"
+                if claim.source_record_type == "timer_occurrence"
+                else ""
+            )
+            if not trigger_table:
+                raise ConflictError("trigger source type is unsupported")
             trigger = connection.execute(
-                """
-                SELECT * FROM triggers
+                f"""
+                SELECT * FROM {trigger_table}
                 WHERE tenant_id = ? AND namespace_scope = ? AND namespace_scope_id = ?
                   AND trigger_id = ?
                 """,
@@ -734,10 +915,35 @@ class SQLiteRuntimeStore:
                 or trigger["fencing_token"] != claim.fencing_token
             ):
                 raise ConflictError("stale trigger owner or fencing token")
-            event = self._get_record(
-                connection, claim.namespace, "input_event", claim.event_id, InputEvent
-            )
-            source_key, work_id, priority, title = self._event_source_key(event)
+            source: InputEvent | TimerOccurrence
+            trigger_event_ids: tuple[str, ...]
+            trigger_timer_ids: tuple[str, ...]
+            if claim.source_record_type == "input_event":
+                source = self._get_record(
+                    connection,
+                    claim.namespace,
+                    "input_event",
+                    claim.source_id,
+                    InputEvent,
+                )
+                source_key, work_id, priority, title = self._event_source_key(source)
+                source_event_id: str | None = source.event_id
+                source_timer_id: str | None = None
+                trigger_event_ids = (source.event_id,)
+                trigger_timer_ids = ()
+            else:
+                source = self._get_record(
+                    connection,
+                    claim.namespace,
+                    "timer_occurrence",
+                    claim.source_id,
+                    TimerOccurrence,
+                )
+                source_key, work_id, priority, title = self._timer_source_key(source)
+                source_event_id = None
+                source_timer_id = source.occurrence_id
+                trigger_event_ids = ()
+                trigger_timer_ids = (source.occurrence_id,)
             existing = connection.execute(
                 """
                 SELECT * FROM agenda_runtime
@@ -749,9 +955,9 @@ class SQLiteRuntimeStore:
             actual_agenda_id = agenda_item_id if existing is None else existing["agenda_item_id"]
             generation = 1 if existing is None else existing["generation"] + 1
             causes = (
-                [event.event_id]
+                [claim.source_id]
                 if existing is None
-                else list(json.loads(existing["cause_ids_json"])) + [event.event_id]
+                else list(json.loads(existing["cause_ids_json"])) + [claim.source_id]
             )
             if len(causes) != len(set(causes)):
                 raise ConflictError("Agenda cause replay was not coalesced safely")
@@ -759,15 +965,16 @@ class SQLiteRuntimeStore:
                 namespace=claim.namespace,
                 wake_cycle_id=wake_cycle_id,
                 state=WakeCycleState.RUNNING,
-                trigger_event_ids=(event.event_id,),
+                trigger_event_ids=trigger_event_ids,
                 agenda_item_ids=(actual_agenda_id,),
                 actor=actor,
-                correlation_id=event.correlation_id,
-                causation_id=event.event_id,
+                correlation_id=source.correlation_id,
+                causation_id=claim.source_id,
                 occurred_at=occurred_at,
                 revision=1,
                 fencing_token=claim.fencing_token,
                 checkpoint_generation=generation,
+                trigger_timer_occurrence_ids=trigger_timer_ids,
             )
             self._insert_record(connection, wake)
             if existing is None:
@@ -775,20 +982,21 @@ class SQLiteRuntimeStore:
                     namespace=claim.namespace,
                     agenda_item_id=actual_agenda_id,
                     wake_cycle_id=wake_cycle_id,
-                    source_event_id=event.event_id,
+                    source_event_id=source_event_id,
                     work_id=work_id,
                     title=title,
                     state=AgendaItemState.PENDING,
                     priority=priority,
                     due_at=None,
                     actor=actor,
-                    correlation_id=event.correlation_id,
+                    correlation_id=source.correlation_id,
                     causation_id=wake_cycle_id,
                     occurred_at=occurred_at,
                     revision=1,
                     generation=1,
                     handled_generation=0,
                     cause_ids=tuple(causes),
+                    source_timer_occurrence_id=source_timer_id,
                 )
                 self._insert_record(connection, agenda)
                 connection.execute(
@@ -825,10 +1033,11 @@ class SQLiteRuntimeStore:
                 agenda = replace(
                     existing_agenda,
                     wake_cycle_id=wake_cycle_id,
-                    source_event_id=event.event_id,
+                    source_event_id=source_event_id,
+                    source_timer_occurrence_id=source_timer_id,
                     state=state,
                     actor=actor,
-                    correlation_id=event.correlation_id,
+                    correlation_id=source.correlation_id,
                     causation_id=wake_cycle_id,
                     occurred_at=occurred_at,
                     revision=existing_agenda.revision + 1,
@@ -854,8 +1063,8 @@ class SQLiteRuntimeStore:
                     ),
                 )
             cursor = connection.execute(
-                """
-                UPDATE triggers
+                f"""
+                UPDATE {trigger_table}
                 SET state = 'completed', lease_owner = NULL, lease_until = NULL,
                     revision = revision + 1
                 WHERE tenant_id = ? AND namespace_scope = ? AND namespace_scope_id = ?
@@ -1115,7 +1324,14 @@ class SQLiteRuntimeStore:
                     replay["record_id"],
                     HumanApprovalDecision,
                 )
-                if existing != decision:
+                if (
+                    replace(
+                        decision,
+                        occurred_at=existing.occurred_at,
+                        valid_until=existing.valid_until,
+                    )
+                    != existing
+                ):
                     raise ConflictError("approval idempotency replay drifted")
                 attempt_row = connection.execute(
                     """
@@ -1386,9 +1602,13 @@ class SQLiteRuntimeStore:
             or row["state"] not in states
             or row["lease_owner"] != claim.lease_owner
             or row["fencing_token"] != claim.fencing_token
+            or row["proposal_id"] != claim.proposal_id
+            or row["approval_decision_id"] != claim.approval_decision_id
             or row["effect_attempt_id"] != claim.effect_attempt_id
+            or row["effect_idempotency_key"] != claim.effect_idempotency_key
+            or row["attempt_number"] != claim.attempt_number
         ):
-            raise ConflictError("stale outbox owner, attempt, or fencing token")
+            raise ConflictError("stale or drifted outbox claim binding")
         return cast(sqlite3.Row, row)
 
     def load_dispatch_bundle(self, claim: OutboxClaim, *, mandate_id: str) -> DispatchBundle:
@@ -1420,8 +1640,47 @@ class SQLiteRuntimeStore:
         )
         approver = self.get_principal(claim.namespace.tenant_id, approval.author.principal_id)
         mandate = self.get_mandate(claim.namespace, mandate_id)
-        if proposal.mandate_id != mandate.mandate_id:
-            raise PermissionDeniedError("outbox proposal Mandate identity drifted")
+        expected_attempt_state = (
+            EffectAttemptState.PLANNED
+            if row["state"] == "claimed"
+            else EffectAttemptState.AMBIGUOUS
+        )
+        bindings_valid = (
+            row["proposal_id"] == proposal.proposal_id == attempt.proposal_id
+            and row["approval_decision_id"]
+            == approval.approval_decision_id
+            == attempt.approval_decision_id
+            and row["effect_attempt_id"] == attempt.effect_attempt_id
+            and row["attempt_number"] == attempt.attempt_number
+            and row["maximum_attempts"] == proposal.constraints.maximum_attempts
+            and row["effect_idempotency_key"] == proposal.constraints.idempotency_key
+            and attempt.proposal_revision == proposal.revision
+            and approval.proposal_id == proposal.proposal_id
+            and approval.proposal_revision == proposal.revision
+            and approval.proposal_payload_digest == proposal.payload_digest
+            and approval.proposal_digest == proposal.proposal_digest
+            and claim.proposal_id == row["proposal_id"]
+            and claim.approval_decision_id == row["approval_decision_id"]
+            and claim.effect_attempt_id == row["effect_attempt_id"]
+            and claim.effect_idempotency_key == row["effect_idempotency_key"]
+            and claim.attempt_number == row["attempt_number"]
+            and proposal.mandate_id == mandate.mandate_id
+            and proposal.mandate_revision == mandate.revision
+            and approval.author == approver
+            and approval.author.kind is PrincipalKind.HUMAN
+            and attempt.actor.kind is PrincipalKind.SERVICE
+            and attempt.state is expected_attempt_state
+            and proposal.correlation_id
+            == approval.correlation_id
+            == attempt.correlation_id
+            == row["correlation_id"]
+            and approval.causation_id == proposal.proposal_id
+            and attempt.causation_id == approval.approval_decision_id
+            and row["causation_id"] == approval.approval_decision_id
+            and row["actor_principal_id"] == attempt.actor.principal_id
+        )
+        if not bindings_valid:
+            raise PermissionDeniedError("complete durable outbox effect binding drifted")
         return DispatchBundle(
             proposal=proposal,
             approval=approval,

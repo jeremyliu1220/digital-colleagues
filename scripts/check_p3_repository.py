@@ -27,6 +27,7 @@ REQUIRED_FILES = {
     "docs/p3/acceptance.md",
     "migrations/001_initial.sql",
     "migrations/002_runtime_indexes.sql",
+    "migrations/003_timer_triggers.sql",
     "migrations/manifest.json",
     "provenance/p3-migration-receipt.json",
     "requirements/p3.lock",

@@ -67,7 +67,7 @@ def _results() -> dict[str, dict[str, object]]:
         },
         "architecture": {
             "gate": "p3_architecture_clean",
-            "policy_version": "p3-dependency-determinism-allowlist-v1",
+            "policy_version": "p3-boundary-specific-determinism-allowlist-v2",
             "unapproved_imports": 0,
             "dependency_violations": 0,
             "edge_type_leaks": 0,
@@ -80,7 +80,7 @@ def _results() -> dict[str, dict[str, object]]:
             "gate": "p3_migrations_clean",
             "journal_mode": "wal",
             "foreign_keys": True,
-            "migration_count": 2,
+            "migration_count": 3,
         },
         "persistence": {"gate": "p3_persistence_clean"},
         "runtime_contracts": {"gate": "p3_runtime_contracts_clean"},

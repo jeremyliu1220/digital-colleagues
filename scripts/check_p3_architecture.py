@@ -10,7 +10,7 @@ import json
 import sys
 from pathlib import Path
 
-POLICY_VERSION = "p3-dependency-determinism-allowlist-v1"
+POLICY_VERSION = "p3-boundary-specific-determinism-allowlist-v2"
 BOUNDARIES = {
     "core": "src/digital_colleagues/core",
     "governance": "src/digital_colleagues/governance",
@@ -22,27 +22,45 @@ BOUNDARIES = {
     "api": "src/digital_colleagues/api",
     "worker": "src/digital_colleagues/worker",
 }
-STDLIB = frozenset(
-    {
-        "__future__",
-        "argparse",
-        "ast",
-        "collections",
-        "contextlib",
-        "dataclasses",
-        "datetime",
-        "enum",
-        "hashlib",
-        "json",
-        "math",
-        "pathlib",
-        "re",
-        "sqlite3",
-        "sys",
-        "threading",
-        "typing",
-    }
-)
+STDLIB_ALLOWED = {
+    "core": frozenset(
+        {
+            "__future__",
+            "collections",
+            "dataclasses",
+            "datetime",
+            "enum",
+            "hashlib",
+            "json",
+            "math",
+            "re",
+            "typing",
+        }
+    ),
+    "governance": frozenset({"__future__", "dataclasses", "datetime"}),
+    "application": frozenset({"__future__", "dataclasses", "datetime", "enum", "typing"}),
+    "sqlite_adapter": frozenset(
+        {
+            "__future__",
+            "collections",
+            "contextlib",
+            "dataclasses",
+            "datetime",
+            "enum",
+            "hashlib",
+            "json",
+            "pathlib",
+            "sqlite3",
+            "threading",
+            "typing",
+        }
+    ),
+    "intelligence_adapter": frozenset({"__future__", "dataclasses"}),
+    "channel_adapter": frozenset({"__future__", "dataclasses", "hashlib", "json"}),
+    "system_adapter": frozenset({"__future__", "dataclasses", "datetime", "hashlib"}),
+    "api": frozenset({"__future__", "collections", "typing"}),
+    "worker": frozenset({"__future__", "dataclasses"}),
+}
 INTERNAL_ALLOWED = {
     "core": ("digital_colleagues.core",),
     "governance": ("digital_colleagues.core", "digital_colleagues.governance"),
@@ -105,6 +123,7 @@ FORBIDDEN_CAPABILITY_ROOTS = frozenset(
         "multiprocessing",
         "openai",
         "os",
+        "pathlib",
         "poplib",
         "random",
         "requests",
@@ -112,6 +131,7 @@ FORBIDDEN_CAPABILITY_ROOTS = frozenset(
         "shutil",
         "smtplib",
         "socket",
+        "sqlite3",
         "subprocess",
         "tempfile",
         "time",
@@ -135,6 +155,22 @@ FORBIDDEN_CALLS = frozenset(
     }
 )
 EDGE_TYPES = frozenset({"fastapi", "pydantic", "sqlalchemy", "sqlmodel"})
+STABLE_PORT_FORBIDDEN_TOKENS = frozenset(
+    {
+        "fastapi",
+        "openai",
+        "orm.session",
+        "pathlib.path",
+        "pydantic",
+        "requests",
+        "sqlalchemy",
+        "sqlite3.connection",
+        "sqlmodel",
+    }
+)
+STABLE_PORT_FORBIDDEN_TYPE_NAMES = frozenset(
+    {"BaseModel", "Connection", "FastAPI", "Path", "Session"}
+)
 
 
 class ArchitectureError(RuntimeError):
@@ -163,6 +199,28 @@ def _aliases(tree: ast.AST) -> dict[str, str]:
             for item in node.names:
                 if item.name != "*":
                     aliases[item.asname or item.name] = f"{node.module}.{item.name}"
+    changed = True
+    while changed:
+        changed = False
+        for node in ast.walk(tree):
+            targets: tuple[ast.expr, ...] = ()
+            value: ast.expr | None = None
+            if isinstance(node, ast.Assign):
+                targets = tuple(node.targets)
+                value = node.value
+            elif isinstance(node, ast.AnnAssign):
+                targets = (node.target,)
+                value = node.value
+            if value is None or not all(isinstance(target, ast.Name) for target in targets):
+                continue
+            resolved = _resolve(value, aliases)
+            if resolved is None:
+                continue
+            for target in targets:
+                assert isinstance(target, ast.Name)
+                if target.id not in aliases:
+                    aliases[target.id] = resolved
+                    changed = True
     return aliases
 
 
@@ -221,7 +279,7 @@ def check_architecture(root: Path) -> dict[str, object]:
                 for module in modules:
                     import_root = module.split(".", 1)[0]
                     allowed = (
-                        import_root in STDLIB
+                        import_root in STDLIB_ALLOWED[boundary]
                         or _internal_allowed(boundary, module)
                         or import_root in THIRD_PARTY_ALLOWED.get(boundary, frozenset())
                     )
@@ -253,11 +311,14 @@ def check_architecture(root: Path) -> dict[str, object]:
                         violations.append(f"{relative}:hidden_nondeterministic_call")
             if boundary == "application" and document.name == "ports.py":
                 text = document.read_text(encoding="utf-8").lower()
-                leaked = tuple(
-                    value for value in EDGE_TYPES | {"openai", "requests"} if value in text
-                )
-                if leaked:
-                    counts["stable_port_leaks"] += len(leaked)
+                leaked = tuple(value for value in STABLE_PORT_FORBIDDEN_TOKENS if value in text)
+                leaked_types = {
+                    node.id
+                    for node in ast.walk(tree)
+                    if isinstance(node, ast.Name) and node.id in STABLE_PORT_FORBIDDEN_TYPE_NAMES
+                }
+                if leaked or leaked_types:
+                    counts["stable_port_leaks"] += len(leaked) + len(leaked_types)
                     violations.append(f"{relative}:stable_port_concrete_type")
     if violations:
         raise ArchitectureError("; ".join(sorted(set(violations))))

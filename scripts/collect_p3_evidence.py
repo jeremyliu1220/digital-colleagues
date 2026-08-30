@@ -16,7 +16,7 @@ from scripts.run_p3_unittest_suite import REQUIRED_TEST_BOUNDARIES
 
 P2_BASE_COMMIT = "37fa1c3d21440130fcbeeaacf0534e445afeb343"
 SOURCE_REVISION = "dea9a9accc82fbedd35deb7117dcb5173223cf44"
-ARCHITECTURE_POLICY = "p3-dependency-determinism-allowlist-v1"
+ARCHITECTURE_POLICY = "p3-boundary-specific-determinism-allowlist-v2"
 PARENT_FIELDS = frozenset(
     {
         "schema_version",

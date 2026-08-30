@@ -31,22 +31,6 @@ class DeterministicIntelligence:
         if request.model_principal.kind is not PrincipalKind.MODEL:
             raise ValueError("deterministic intelligence requires a model principal")
         self.call_count += 1
-        if request.agenda_item.title.startswith("noop:"):
-            decision = Decision(
-                namespace=request.namespace,
-                decision_id=request.decision_id,
-                wake_cycle_id=request.wake_cycle.wake_cycle_id,
-                agenda_item_id=request.agenda_item.agenda_item_id,
-                kind=DecisionKind.NO_ACTION,
-                rationale="Deterministic no-op selected by the synthetic fixture.",
-                proposed_effect_id=None,
-                actor=request.model_principal,
-                correlation_id=request.agenda_item.correlation_id,
-                causation_id=request.agenda_item.agenda_item_id,
-                occurred_at=request.occurred_at,
-                revision=1,
-            )
-            return SemanticDecision(SemanticOutcome.NO_OP, decision, None, request.request_id)
         boundary = request.mandate.effect_boundaries[0]
         if boundary.effect_kind is not EffectKind.REFERENCE_MESSAGE:
             raise ValueError("deterministic reference path requires a reference-message boundary")

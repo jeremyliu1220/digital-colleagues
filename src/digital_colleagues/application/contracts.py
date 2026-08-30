@@ -18,7 +18,12 @@ from digital_colleagues.core.common import (
     require_stable_id,
     require_utc,
 )
-from digital_colleagues.core.effects import EffectAttempt, EffectProposal, HumanApprovalDecision
+from digital_colleagues.core.effects import (
+    ApprovalChoice,
+    EffectAttempt,
+    EffectProposal,
+    HumanApprovalDecision,
+)
 from digital_colleagues.core.namespace import Namespace
 from digital_colleagues.core.principals import Principal
 from digital_colleagues.core.runtime import AgendaItem, Decision, WakeCycle
@@ -39,10 +44,84 @@ class RequestPrincipalContext:
 
 
 @dataclass(frozen=True, slots=True)
+class InputEventRequest:
+    """Caller content only; authority and accepted time are server supplied."""
+
+    event_id: str
+    event_type: str
+    safe_projection: FrozenJsonObject
+    payload_digest: str
+    correlation_id: str
+    causation_id: str | None
+    schema_version: int = SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        require_schema_version(self.schema_version)
+        require_stable_id(self.event_id, "event_id")
+        require_stable_id(self.event_type, "event_type")
+        if not isinstance(self.safe_projection, FrozenJsonObject):
+            raise ValueError("event safe projection must be immutable")
+        require_digest(self.payload_digest, "payload_digest")
+        require_stable_id(self.correlation_id, "correlation_id")
+        if self.causation_id is not None:
+            require_stable_id(self.causation_id, "causation_id")
+
+
+@dataclass(frozen=True, slots=True)
+class ApprovalRequest:
+    """Exact proposal choice without caller-controlled authority or timestamps."""
+
+    approval_decision_id: str
+    proposal_id: str
+    proposal_revision: int
+    proposal_payload_digest: str
+    proposal_digest: str
+    choice: ApprovalChoice
+    idempotency_key: str
+    schema_version: int = SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        require_schema_version(self.schema_version)
+        require_stable_id(self.approval_decision_id, "approval_decision_id")
+        require_stable_id(self.proposal_id, "proposal_id")
+        require_revision(self.proposal_revision, "proposal_revision")
+        require_digest(self.proposal_payload_digest, "proposal_payload_digest")
+        require_digest(self.proposal_digest, "proposal_digest")
+        if not isinstance(self.choice, ApprovalChoice):
+            raise ValueError("approval choice must be explicit")
+        require_stable_id(self.idempotency_key, "idempotency_key")
+
+
+@dataclass(frozen=True, slots=True)
+class TimerScheduleRequest:
+    timer_id: str
+    occurrence_id: str
+    due_at: datetime
+    safe_projection: FrozenJsonObject
+    correlation_id: str
+    causation_id: str | None
+    idempotency_key: str
+    schema_version: int = SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        require_schema_version(self.schema_version)
+        require_stable_id(self.timer_id, "timer_id")
+        require_stable_id(self.occurrence_id, "occurrence_id")
+        require_utc(self.due_at, "due_at")
+        if not isinstance(self.safe_projection, FrozenJsonObject):
+            raise ValueError("timer safe projection must be immutable")
+        require_stable_id(self.correlation_id, "correlation_id")
+        if self.causation_id is not None:
+            require_stable_id(self.causation_id, "causation_id")
+        require_stable_id(self.idempotency_key, "idempotency_key")
+
+
+@dataclass(frozen=True, slots=True)
 class TriggerClaim:
     namespace: Namespace
     trigger_id: str
-    event_id: str
+    source_record_type: str
+    source_id: str
     trigger_kind: str
     lease_owner: str
     lease_until: datetime
@@ -56,7 +135,8 @@ class TriggerClaim:
         self.namespace.require_colleague()
         for value, field in (
             (self.trigger_id, "trigger_id"),
-            (self.event_id, "event_id"),
+            (self.source_record_type, "source_record_type"),
+            (self.source_id, "source_id"),
             (self.trigger_kind, "trigger_kind"),
             (self.lease_owner, "lease_owner"),
             (self.correlation_id, "correlation_id"),

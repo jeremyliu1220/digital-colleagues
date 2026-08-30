@@ -7,6 +7,7 @@
   "new_implementations": [
     {"destination": "migrations/001_initial.sql", "classification": "new_implementation", "implementation_basis": "public_architecture_documents", "gate_result": "not_a_source_migration"},
     {"destination": "migrations/002_runtime_indexes.sql", "classification": "new_implementation", "implementation_basis": "public_architecture_documents", "gate_result": "not_a_source_migration"},
+    {"destination": "migrations/003_timer_triggers.sql", "classification": "new_implementation", "implementation_basis": "public_architecture_documents", "gate_result": "not_a_source_migration"},
     {"destination": "migrations/manifest.json", "classification": "new_implementation", "implementation_basis": "public_architecture_documents", "gate_result": "not_a_source_migration"},
     {"destination": "requirements/p3.lock", "classification": "new_implementation", "implementation_basis": "public_architecture_documents", "gate_result": "not_a_source_migration"},
     {"destination": "src/digital_colleagues/adapters/__init__.py", "classification": "new_implementation", "implementation_basis": "public_architecture_documents", "gate_result": "not_a_source_migration"},

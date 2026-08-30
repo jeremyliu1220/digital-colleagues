@@ -14,7 +14,8 @@ provider. P2 contracts and accepted P0/P1/P2 evidence remain historical and unch
 
 - Application contracts, ports, services, and a bounded headless worker under `src/`.
 - Standard-library `sqlite3` persistence and canonical storage codec behind stable ports.
-- `migrations/001_initial.sql`, `002_runtime_indexes.sql`, and their immutable manifest.
+- Immutable `migrations/001_initial.sql` and `002_runtime_indexes.sql`, additive
+  `003_timer_triggers.sql`, and their checksum manifest.
 - Deterministic time, ID, intelligence, and reference-channel adapters.
 - FastAPI/Pydantic request and response mappings with injected server request context.
 - Synthetic persistence, runtime, API, adversarial architecture, and restart tests.
@@ -28,7 +29,10 @@ Core remains frozen standard-library values and cannot import application, gover
 FastAPI, Pydantic, SQLite, adapters, workers, providers, or hidden capabilities. Application
 and stable ports may depend only on core, governance, and application contracts; they cannot
 import concrete adapters or HTTP types. Pydantic and FastAPI are confined to `api/`. Stable
-ports expose no ORM, provider, framework, or database types. Architecture fixtures must
+ports expose no ORM, provider, framework, filesystem-path, or database types. Each boundary
+has its own standard-library allowlist; SQLite and filesystem I/O are confined to the
+SQLite adapter. Import, from-import, assigned-callable, attribute-chain, and simple rebinding
+aliases are resolved before capability checks. Architecture fixtures must
 make unknown imports, reverse dependencies, edge-type leakage, wall-clock calls, UUID,
 randomness, environment, filesystem, process, and network access fail with nonzero status.
 
@@ -44,24 +48,38 @@ audits, replay ledgers, approval consumption, attempts, and outbox changes. Test
 OS temporary databases. Runtime databases, WAL/SHM files, logs, caches, and build output are
 forbidden from the public tree.
 
+Migration 003 adds a typed, namespaced `timer_triggers` table without modifying migrations
+001 or 002. A version-2 database upgrades in place while retaining durable records. Timer
+occurrences have stable timer/occurrence IDs, injected UTC schedule time, explicit UTC due
+time, replay identity, lease/fencing state, and a foreign key to the durable typed record.
+
 ## Authorization and replay invariants
 
-Namespace, principal, kind, and roles come from durable server-side context, never request
-bodies. MODEL and SERVICE principals cannot become HUMAN or write HumanApprovalDecision.
+Namespace, principal, kind, roles, accepted-event time, and approval decision time come from
+durable server-side context, never request bodies. Approval validity is server policy capped
+by proposal validity. Future-dated, expired, before-proposal, non-UTC, or overlong approval
+authority fails closed. MODEL and SERVICE principals cannot become HUMAN or write
+HumanApprovalDecision.
 Approval and dispatch revalidate the current Mandate revision, exact Namespace, durable
 human principal and canonical role, expiry, proposal revision, complete proposal and payload
 digests, boundary and typed constraints, effect idempotency key, attempt ceiling, and replay
-state. Drift, tampering, stale revisions, partial binding, unknown constraints, cross-scope
+state. The claim, outbox row, proposal, approval, attempt, Mandate, principal, attempt limit,
+correlation, and causation bindings must all agree exactly. Drift, tampering, stale revisions,
+partial binding, unknown constraints, cross-scope
 access, and wrong principals fail before the reference channel call. Event, approval,
 effect, and proposal-revision replay identities are durable and transactional.
 
-Triggers and Agenda claims carry durable leases and monotonically increasing fencing tokens.
+Distinct Event and Timer triggers and Agenda claims carry durable leases and monotonically
+increasing fencing tokens. A Timer cannot be claimed before its due time; replay cannot add
+a duplicate occurrence, trigger, or Agenda generation.
 Agenda coalescing retains every cause and uses generation/handled-generation checkpoints, so
 a new cause arriving during a claim stays pending after the old decision commits. Attention
 ordering is deterministic; a persisted starvation counter advances lower-priority work.
 Wake work is bounded by item and decision counts. No pending Agenda means no intelligence
-call. Decisions are typed, side-effect free, stable-request-id outputs and never dispatch an
-effect directly.
+call. An explicit deterministic no-op is recognized by pure application policy before the
+intelligence port, commits a durable typed Decision, completes the Agenda generation, and
+creates no proposal, approval, attempt, outbox, or channel call. Other decisions are typed,
+side-effect free, stable-request-id outputs and never dispatch an effect directly.
 
 The outbox claims durably, creates explicit attempt/result records, and has a bounded attempt
 limit. Successful, known-not-executed, retryable, permanent, and ambiguous results are typed.
@@ -109,8 +127,10 @@ not be executed or used to rewrite accepted artifacts.
 Mechanical evidence may claim only repository hygiene, P3 provenance coverage, dependency
 direction, deterministic-capability exclusion, migration identity and SQLite pragmas,
 namespaced local persistence semantics, transaction rollback, optimistic revision checks,
-exact-effect authorization, replay suppression, trigger/Agenda/outbox lease and fencing
-semantics, ambiguity reconciliation, typed HTTP mapping, complete zero-exception unittest
+exact-effect and complete outbox binding, server-controlled approval time, replay suppression,
+Event/Timer trigger and Agenda/outbox lease and fencing semantics, application-layer no-op,
+ambiguity reconciliation, boundary-specific alias rejection, typed HTTP mapping, complete
+zero-exception unittest
 counts, adjacent P3 parent-fingerprint equality, restart recovery, and byte-equivalent
 synthetic output. The collector records required test IDs and fault boundaries, P2 base and
 merge-base, the implementation commit tested, the later evidence commit target, migration

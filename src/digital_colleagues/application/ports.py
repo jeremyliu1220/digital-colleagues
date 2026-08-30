@@ -28,7 +28,7 @@ from digital_colleagues.core.effects import (
 )
 from digital_colleagues.core.namespace import Namespace
 from digital_colleagues.core.principals import Principal
-from digital_colleagues.core.runtime import AgendaItem, InputEvent, WakeCycle
+from digital_colleagues.core.runtime import AgendaItem, InputEvent, TimerOccurrence, WakeCycle
 from digital_colleagues.core.work import FiniteWork
 
 
@@ -80,6 +80,8 @@ class PersistencePort(UnitOfWorkPort, Protocol):
 
     def get_event(self, namespace: Namespace, event_id: str) -> InputEvent: ...
 
+    def get_timer_occurrence(self, namespace: Namespace, occurrence_id: str) -> TimerOccurrence: ...
+
     def get_wake_cycle(self, namespace: Namespace, wake_cycle_id: str) -> WakeCycle: ...
 
     def get_agenda_item(self, namespace: Namespace, agenda_item_id: str) -> AgendaItem: ...
@@ -89,6 +91,10 @@ class PersistencePort(UnitOfWorkPort, Protocol):
     def get_approval(
         self, namespace: Namespace, approval_decision_id: str
     ) -> HumanApprovalDecision: ...
+
+    def get_approval_replay(
+        self, namespace: Namespace, idempotency_key: str
+    ) -> tuple[HumanApprovalDecision, EffectAttempt | None] | None: ...
 
     def get_action_result(self, namespace: Namespace, action_result_id: str) -> ActionResult: ...
 
@@ -101,6 +107,14 @@ class TriggerAgendaPort(Protocol):
     def ingest_event(
         self, event: InputEvent, *, idempotency_key: str, trigger_id: str
     ) -> tuple[InputEvent, bool]: ...
+
+    def ingest_timer(
+        self,
+        occurrence: TimerOccurrence,
+        *,
+        idempotency_key: str,
+        trigger_id: str,
+    ) -> tuple[TimerOccurrence, bool]: ...
 
     def claim_trigger(
         self,

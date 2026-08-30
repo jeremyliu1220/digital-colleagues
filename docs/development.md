@@ -24,6 +24,11 @@ repository `.venv`, `node_modules`, cache, database, coverage, or build output. 
 runtime and development dependencies are exactly pinned in `pyproject.toml`; the lock also
 pins resolved transitives.
 
+The current schema applies migrations 001, 002, and additive Timer migration 003. Never edit
+an applied migration; add the next numbered file and checksum instead. Timer tests use an
+injected clock to exercise not-due, due, lease takeover, restart, replay, and namespace
+isolation without sleeping.
+
 ## Verification
 
 ```bash
@@ -74,6 +79,11 @@ compares the exact parent-fingerprint objects; records the tested implementation
 and atomically writes `artifacts/p3/summary.json`. Its public-tree digest excludes only that
 summary to avoid self-hashing. Commit the summary separately, then rerun `make check` and
 the public-boundary scan. Historical `make evidence-p1` and `make evidence-p2` are forbidden.
+
+Required P3 test identities include complete outbox field binding, server-controlled approval
+time, boundary/alias bypass rejection, version-2 Timer upgrade and Timer restart semantics,
+and application-layer deterministic no-op behavior. A missing identity, skip, or nonzero test
+outcome prevents evidence replacement.
 
 ## Headless and HTTP boundaries
 

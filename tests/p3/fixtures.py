@@ -4,7 +4,12 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-from digital_colleagues.application.contracts import RequestPrincipalContext
+from digital_colleagues.application.contracts import (
+    ApprovalRequest,
+    InputEventRequest,
+    RequestPrincipalContext,
+    TimerScheduleRequest,
+)
 from digital_colleagues.core.authority import (
     CapabilityGrant,
     Constraint,
@@ -15,6 +20,7 @@ from digital_colleagues.core.authority import (
     ResponsibilityDefinition,
 )
 from digital_colleagues.core.common import FrozenJsonObject
+from digital_colleagues.core.effects import ApprovalChoice, EffectProposal
 from digital_colleagues.core.namespace import Namespace
 from digital_colleagues.core.principals import HumanRole, Principal
 from digital_colleagues.core.runtime import InputEvent, InputEventState
@@ -162,6 +168,69 @@ def input_event(
         causation_id=None,
         occurred_at=T0,
         revision=1,
+    )
+
+
+def input_event_request(
+    *, event_id: str = "event-synthetic", correlation_id: str = "correlation-p3"
+) -> InputEventRequest:
+    event = input_event(event_id=event_id, correlation_id=correlation_id)
+    return InputEventRequest(
+        event_id=event.event_id,
+        event_type=event.event_type,
+        safe_projection=event.safe_projection,
+        payload_digest=event.payload_digest,
+        correlation_id=event.correlation_id,
+        causation_id=event.causation_id,
+    )
+
+
+def request_for_event(event: InputEvent) -> InputEventRequest:
+    return InputEventRequest(
+        event_id=event.event_id,
+        event_type=event.event_type,
+        safe_projection=event.safe_projection,
+        payload_digest=event.payload_digest,
+        correlation_id=event.correlation_id,
+        causation_id=event.causation_id,
+    )
+
+
+def approval_request(
+    proposal: EffectProposal,
+    *,
+    approval_decision_id: str = "approval-synthetic",
+    idempotency_key: str = "approval-key-synthetic",
+) -> ApprovalRequest:
+    return ApprovalRequest(
+        approval_decision_id=approval_decision_id,
+        proposal_id=proposal.proposal_id,
+        proposal_revision=proposal.revision,
+        proposal_payload_digest=proposal.payload_digest,
+        proposal_digest=proposal.proposal_digest,
+        choice=ApprovalChoice.APPROVE,
+        idempotency_key=idempotency_key,
+    )
+
+
+def timer_request(
+    *,
+    timer_id: str = "timer-synthetic",
+    occurrence_id: str = "timer-occurrence-synthetic",
+    due_at: datetime = T2,
+    correlation_id: str = "correlation-timer",
+    idempotency_key: str = "timer-key-synthetic",
+) -> TimerScheduleRequest:
+    return TimerScheduleRequest(
+        timer_id=timer_id,
+        occurrence_id=occurrence_id,
+        due_at=due_at,
+        safe_projection=frozen(
+            {"work_id": "work-synthetic", "priority": 600, "title": "scheduled work"}
+        ),
+        correlation_id=correlation_id,
+        causation_id=None,
+        idempotency_key=idempotency_key,
     )
 
 

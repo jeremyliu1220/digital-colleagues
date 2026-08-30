@@ -5,13 +5,16 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import datetime
 from typing import Any
 
 from fastapi import Depends, FastAPI, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
-from digital_colleagues.application.contracts import RequestPrincipalContext
+from digital_colleagues.application.contracts import (
+    ApprovalRequest,
+    InputEventRequest,
+    RequestPrincipalContext,
+)
 from digital_colleagues.application.errors import (
     ApplicationError,
     ConflictError,
@@ -22,7 +25,7 @@ from digital_colleagues.application.errors import (
 from digital_colleagues.application.ports import PersistencePort
 from digital_colleagues.application.services import ApprovalService, EventService
 from digital_colleagues.core.common import FrozenJsonObject
-from digital_colleagues.core.effects import ApprovalChoice, HumanApprovalDecision
+from digital_colleagues.core.effects import ApprovalChoice
 from digital_colleagues.core.errors import (
     AuthorizationError,
     CoreInvariantError,
@@ -30,7 +33,6 @@ from digital_colleagues.core.errors import (
     ReplayError,
     RevisionMismatchError,
 )
-from digital_colleagues.core.runtime import InputEvent, InputEventState
 
 
 class _MutationModel(BaseModel):
@@ -44,7 +46,6 @@ class InputEventMutation(_MutationModel):
     payload_digest: str
     correlation_id: str = Field(min_length=1, max_length=128)
     causation_id: str | None = Field(default=None, max_length=128)
-    occurred_at: datetime
     idempotency_key: str = Field(min_length=1, max_length=128)
 
 
@@ -62,8 +63,6 @@ class ApprovalMutation(_MutationModel):
     proposal_digest: str
     choice: ApprovalChoice
     idempotency_key: str = Field(min_length=1, max_length=128)
-    occurred_at: datetime
-    valid_until: datetime
     mandate_id: str = Field(min_length=1, max_length=128)
     expected_mandate_revision: int = Field(gt=0)
 
@@ -116,22 +115,17 @@ def create_app(
         context: RequestPrincipalContext = Depends(context_provider),  # noqa: B008
     ) -> InputEventResponse:
         try:
-            event = InputEvent(
-                namespace=context.namespace,
+            request = InputEventRequest(
                 event_id=body.event_id,
                 event_type=body.event_type,
-                state=InputEventState.ACCEPTED,
                 safe_projection=FrozenJsonObject.from_mapping(body.safe_projection),
                 payload_digest=body.payload_digest,
-                actor=context.principal,
                 correlation_id=body.correlation_id,
                 causation_id=body.causation_id,
-                occurred_at=body.occurred_at,
-                revision=1,
             )
             stored, created = event_service.submit(
                 context=context,
-                event=event,
+                request=request,
                 idempotency_key=body.idempotency_key,
             )
             return InputEventResponse(
@@ -162,27 +156,20 @@ def create_app(
         context: RequestPrincipalContext = Depends(context_provider),  # noqa: B008
     ) -> ApprovalResponse:
         try:
-            decision = HumanApprovalDecision(
-                namespace=context.namespace,
+            request = ApprovalRequest(
                 approval_decision_id=body.approval_decision_id,
                 proposal_id=proposal_id,
                 proposal_revision=body.proposal_revision,
                 proposal_payload_digest=body.proposal_payload_digest,
                 proposal_digest=body.proposal_digest,
                 choice=body.choice,
-                author=context.principal,
                 idempotency_key=body.idempotency_key,
-                correlation_id=store.get_proposal(context.namespace, proposal_id).correlation_id,
-                causation_id=proposal_id,
-                occurred_at=body.occurred_at,
-                valid_until=body.valid_until,
-                revision=1,
             )
             stored, attempt_id, created = approval_service.decide(
                 context=context,
                 mandate_id=body.mandate_id,
                 expected_mandate_revision=body.expected_mandate_revision,
-                decision=decision,
+                request=request,
             )
             return ApprovalResponse(
                 approval_decision_id=stored.approval_decision_id,

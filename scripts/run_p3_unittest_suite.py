@@ -13,14 +13,18 @@ from typing import Any, TextIO
 
 REQUIRED_TEST_BOUNDARIES = {
     "tests.architecture.test_p3_boundaries.P3ArchitectureTests.test_adversarial_unknown_import_alias_bypass_and_reverse_dependencies_fail": "architecture_adversarial",
+    "tests.architecture.test_p3_boundaries.P3ArchitectureTests.test_boundary_specific_allowlists_and_assigned_alias_bypasses_fail_cli_and_direct": "architecture_boundary_alias_bypass",
     "tests.persistence.test_sqlite_semantics.SQLiteSemanticsTests.test_migration_order_checksum_tampering_and_future_schema_fail_closed": "migration_identity",
     "tests.persistence.test_sqlite_semantics.SQLiteSemanticsTests.test_migration_failure_rolls_back_without_partial_schema_or_metadata": "migration_atomicity",
+    "tests.persistence.test_sqlite_semantics.SQLiteSemanticsTests.test_v2_database_upgrades_to_timer_schema_without_losing_durable_records": "migration_v2_timer_upgrade",
     "tests.persistence.test_sqlite_semantics.SQLiteSemanticsTests.test_every_store_connection_enables_wal_foreign_keys_and_busy_handling": "sqlite_pragmas",
     "tests.persistence.test_sqlite_semantics.SQLiteSemanticsTests.test_namespace_isolation_and_atomic_bootstrap_rollback": "namespace_atomicity",
     "tests.persistence.test_sqlite_semantics.SQLiteSemanticsTests.test_trigger_lease_takeover_increments_fence_and_refuses_stale_owner": "lease_fencing",
     "tests.persistence.test_sqlite_semantics.SQLiteSemanticsTests.test_transaction_crash_and_optimistic_revision_conflict_roll_back_atomically": "transaction_revision_atomicity",
     "tests.persistence.test_sqlite_semantics.SQLiteSemanticsTests.test_outbox_lease_takeover_increments_fence_and_refuses_stale_owner": "outbox_lease_fencing",
     "tests.runtime.test_p3_runtime.RuntimeSemanticsTests.test_exact_effect_tampering_and_stale_mandate_never_call_channel": "exact_effect_dispatch",
+    "tests.runtime.test_outbox_binding.OutboxBindingTests.test_complete_outbox_binding_tampering_never_calls_channel": "complete_outbox_binding",
+    "tests.runtime.test_outbox_binding.OutboxBindingTests.test_retryable_failures_stop_exactly_at_durable_maximum_attempts": "durable_attempt_limit",
     "tests.runtime.test_p3_runtime.RuntimeSemanticsTests.test_model_and_service_cannot_construct_or_submit_human_approval": "principal_separation",
     "tests.runtime.test_p3_runtime.RuntimeSemanticsTests.test_retryable_outcome_uses_new_attempt_and_stops_at_success": "bounded_retry",
     "tests.runtime.test_p3_runtime.RuntimeSemanticsTests.test_ambiguous_outcome_requires_reconciliation_before_confirmed_absent_retry": "ambiguity_reconciliation",
@@ -30,10 +34,14 @@ REQUIRED_TEST_BOUNDARIES = {
     "tests.runtime.test_p3_runtime.RuntimeSemanticsTests.test_attention_order_is_deterministic_and_starved_work_advances": "attention_starvation",
     "tests.runtime.test_p3_runtime.RuntimeSemanticsTests.test_wake_cycle_bounds_preserve_pending_work_and_agenda_takeover_fences_stale_owner": "wake_bounds_agenda_fencing",
     "tests.runtime.test_p3_runtime.RuntimeSemanticsTests.test_deterministic_provider_is_byte_equivalent_and_no_pending_work_avoids_call": "deterministic_noop",
+    "tests.runtime.test_p3_runtime.RuntimeSemanticsTests.test_pending_application_noop_is_durable_without_intelligence_or_effects_after_restart": "application_layer_noop",
+    "tests.runtime.test_p3_runtime.RuntimeSemanticsTests.test_server_authoritative_approval_time_is_stamped_and_replay_is_not_reinterpreted": "server_approval_time_authority",
+    "tests.runtime.test_timer_runtime.TimerRuntimeTests.test_durable_timer_due_replay_restart_fencing_causation_and_namespace_isolation": "durable_timer_trigger",
     "tests.p3.test_golden_path.GoldenPathTests.test_headless_restart_golden_path_is_recoverable_and_byte_equivalent": "restart_golden_path",
     "tests.api.test_fastapi_edge.FastAPIEdgeTests.test_in_process_mapping_derives_authority_and_rejects_caller_authority_fields": "http_authority_mapping",
     "tests.api.test_fastapi_edge.FastAPIEdgeTests.test_exact_approval_mapping_uses_expected_revision_and_stable_errors": "http_exact_approval",
     "tests.core.test_effects_and_governance.EffectsAndGovernanceTests.test_approval_binds_every_authoritative_effect_field": "p2_effect_field_regression",
+    "tests.core.test_effects_and_governance.EffectsAndGovernanceTests.test_approval_time_authority_rejects_future_backdated_expired_and_overlong": "approval_time_fail_closed",
 }
 
 

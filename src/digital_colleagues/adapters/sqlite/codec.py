@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import Field, fields, is_dataclass
+from dataclasses import MISSING, Field, fields, is_dataclass
 from datetime import datetime
 from enum import Enum
 from typing import Any
@@ -42,6 +42,8 @@ from digital_colleagues.core.runtime import (
     DecisionKind,
     InputEvent,
     InputEventState,
+    TimerOccurrence,
+    TimerOccurrenceState,
     WakeCycle,
     WakeCycleState,
 )
@@ -70,6 +72,7 @@ _DATACLASSES: tuple[type[object], ...] = (
     Responsibility,
     Obligation,
     InputEvent,
+    TimerOccurrence,
     WakeCycle,
     AgendaItem,
     Decision,
@@ -89,6 +92,7 @@ _ENUMS: tuple[type[Enum], ...] = (
     ResponsibilityState,
     ObligationState,
     InputEventState,
+    TimerOccurrenceState,
     WakeCycleState,
     AgendaItemState,
     DecisionKind,
@@ -175,16 +179,30 @@ def _decode(value: object) -> object:
             raise PersistenceError("a durable dataclass has invalid fields")
         cls = _DATACLASS_REGISTRY[class_name]
         declared: tuple[Field[Any], ...] = fields(cls)  # type: ignore[arg-type]
-        if set(raw_fields) != {field.name for field in declared}:
+        declared_names = {field.name for field in declared}
+        required_names = {
+            field.name
+            for field in declared
+            if field.init and field.default is MISSING and field.default_factory is MISSING
+        }
+        if not set(raw_fields).issubset(declared_names) or not required_names.issubset(raw_fields):
             raise PersistenceError("a durable dataclass field set drifted")
         decoded = {name: _decode(item) for name, item in raw_fields.items()}
-        kwargs = {field.name: decoded[field.name] for field in declared if field.init}
+        kwargs = {
+            field.name: decoded[field.name]
+            for field in declared
+            if field.init and field.name in decoded
+        }
         try:
             instance = cls(**kwargs)
         except (TypeError, ValueError) as exc:
             raise PersistenceError("a durable record violates current invariants") from exc
         for field in declared:
-            if not field.init and getattr(instance, field.name) != decoded[field.name]:
+            if (
+                not field.init
+                and field.name in decoded
+                and getattr(instance, field.name) != decoded[field.name]
+            ):
                 raise PersistenceError("a durable computed integrity field drifted")
         return instance
     return {str(key): _decode(item) for key, item in value.items()}

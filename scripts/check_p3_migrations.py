@@ -24,6 +24,7 @@ REQUIRED_NAMESPACED_TABLES = {
     "outbox",
     "replay_ledger",
     "triggers",
+    "timer_triggers",
 }
 REQUIRED_NAMESPACE_COLUMNS = {
     "schema_version",

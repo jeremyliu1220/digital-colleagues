@@ -184,6 +184,10 @@ def authorize_human_approval(
         raise CoreInvariantError("approval correlation does not match the proposal")
     if decision.occurred_at < proposal.occurred_at:
         raise CoreInvariantError("approval cannot precede its proposal")
+    if decision.occurred_at > evaluated_at:
+        raise AuthorizationError("future-dated approval is not authoritative")
+    if decision.valid_until > proposal.constraints.valid_until:
+        raise AuthorizationError("approval cannot extend proposal validity")
     if evaluated_at > proposal.constraints.valid_until or evaluated_at > decision.valid_until:
         raise AuthorizationError("approval or proposal validity has expired")
     if decision.approval_decision_id in consumed_decision_ids:

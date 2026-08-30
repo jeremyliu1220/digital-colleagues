@@ -24,16 +24,25 @@ from digital_colleagues.application.errors import (
     PermissionDeniedError,
     PersistenceError,
 )
-from digital_colleagues.application.services import DispatchService, EventService, WakeService
+from digital_colleagues.application.services import (
+    ApprovalService,
+    DispatchService,
+    EventService,
+    WakeService,
+)
 from digital_colleagues.core.common import FrozenJsonObject
 from digital_colleagues.core.effects import ApprovalChoice, HumanApprovalDecision
 from digital_colleagues.core.runtime import AgendaItemState
 from tests.p3.fixtures import (
+    T0,
     T2,
     T3,
+    T4,
+    approval_request,
     input_event,
     model,
     namespace,
+    request_for_event,
     service,
     user,
 )
@@ -65,6 +74,66 @@ def _dispatch(
 
 
 class RuntimeSemanticsTests(unittest.TestCase):
+    def test_server_authoritative_approval_time_is_stamped_and_replay_is_not_reinterpreted(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory(
+            prefix="digital-colleagues-p3-approval-time-"
+        ) as temporary:
+            scenario = prepare_proposal(
+                Path(temporary) / "state.sqlite", identifier_namespace="approval-time"
+            )
+            request = approval_request(scenario.proposal)
+            for label, now in (
+                ("before-proposal", T0),
+                ("after-expiry", T4 + timedelta(minutes=2)),
+            ):
+                candidate = replace(
+                    request,
+                    approval_decision_id=f"approval-{label}",
+                    idempotency_key=f"approval-key-{label}",
+                )
+                with self.subTest(case=label), self.assertRaises(PermissionDeniedError):
+                    ApprovalService(
+                        store=scenario.store,
+                        clock=FixedClock(now),
+                        identifiers=scenario.identifiers,
+                        service_principal=service(),
+                    ).decide(
+                        context=RequestPrincipalContext(namespace(), user()),
+                        mandate_id="mandate-synthetic",
+                        expected_mandate_revision=1,
+                        request=candidate,
+                    )
+            stored, _, created = ApprovalService(
+                store=scenario.store,
+                clock=FixedClock(T2),
+                identifiers=scenario.identifiers,
+                service_principal=service(),
+            ).decide(
+                context=RequestPrincipalContext(namespace(), user()),
+                mandate_id="mandate-synthetic",
+                expected_mandate_revision=1,
+                request=request,
+            )
+            self.assertTrue(created)
+            self.assertEqual(stored.occurred_at, T2)
+            self.assertEqual(stored.valid_until, T2 + timedelta(minutes=15))
+            replayed, _, replay_created = ApprovalService(
+                store=scenario.store,
+                clock=FixedClock(T4 + timedelta(minutes=2)),
+                identifiers=scenario.identifiers,
+                service_principal=service(),
+            ).decide(
+                context=RequestPrincipalContext(namespace(), user()),
+                mandate_id="mandate-synthetic",
+                expected_mandate_revision=1,
+                request=request,
+            )
+            self.assertFalse(replay_created)
+            self.assertEqual(replayed, stored)
+            scenario.store.close()
+
     def test_wake_cycle_bounds_preserve_pending_work_and_agenda_takeover_fences_stale_owner(
         self,
     ) -> None:
@@ -81,9 +150,9 @@ class RuntimeSemanticsTests(unittest.TestCase):
                     {"work_id": "work-agenda-lease", "priority": 800, "title": "lease"}
                 ),
             )
-            EventService(scenario.store, scenario.identifiers).submit(
+            EventService(scenario.store, scenario.identifiers, FixedClock(T0)).submit(
                 context=RequestPrincipalContext(namespace(), user()),
-                event=lease_event,
+                request=request_for_event(lease_event),
                 idempotency_key="event-key-agenda-lease",
             )
             wake = WakeService(
@@ -125,9 +194,9 @@ class RuntimeSemanticsTests(unittest.TestCase):
                     {"work_id": "work-bounded-second", "priority": 100, "title": "bounded"}
                 ),
             )
-            EventService(scenario.store, scenario.identifiers).submit(
+            EventService(scenario.store, scenario.identifiers, FixedClock(T0)).submit(
                 context=RequestPrincipalContext(namespace(), user()),
-                event=bounded_event,
+                request=request_for_event(bounded_event),
                 idempotency_key="event-key-bounded-second",
             )
             wake.materialize_next(namespace())
@@ -158,9 +227,9 @@ class RuntimeSemanticsTests(unittest.TestCase):
                         {"work_id": work_id, "priority": priority, "title": event_id}
                     ),
                 )
-                EventService(scenario.store, scenario.identifiers).submit(
+                EventService(scenario.store, scenario.identifiers, FixedClock(T0)).submit(
                     context=RequestPrincipalContext(namespace(), user()),
-                    event=event,
+                    request=request_for_event(event),
                     idempotency_key=f"key-{event_id}",
                 )
             wake = WakeService(
@@ -394,9 +463,9 @@ class RuntimeSemanticsTests(unittest.TestCase):
                 event_id="event-synthetic-second",
                 correlation_id="correlation-p3-second",
             )
-            EventService(scenario.store, scenario.identifiers).submit(
+            EventService(scenario.store, scenario.identifiers, FixedClock(T0)).submit(
                 context=RequestPrincipalContext(namespace(), user()),
-                event=second_event,
+                request=request_for_event(second_event),
                 idempotency_key="event-key-second",
             )
             wake = WakeService(
@@ -427,9 +496,9 @@ class RuntimeSemanticsTests(unittest.TestCase):
                 event_id="event-synthetic-third",
                 correlation_id="correlation-p3-third",
             )
-            EventService(scenario.store, scenario.identifiers).submit(
+            EventService(scenario.store, scenario.identifiers, FixedClock(T0)).submit(
                 context=RequestPrincipalContext(namespace(), user()),
-                event=third_event,
+                request=request_for_event(third_event),
                 idempotency_key="event-key-third",
             )
             wake.materialize_next(namespace())
@@ -502,6 +571,87 @@ class RuntimeSemanticsTests(unittest.TestCase):
             self.assertEqual(no_work.selected_count, 0)
             self.assertEqual(provider.call_count, 0)
             scenario.store.close()
+
+    def test_pending_application_noop_is_durable_without_intelligence_or_effects_after_restart(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory(prefix="digital-colleagues-p3-noop-") as temporary:
+            database = Path(temporary) / "state.sqlite"
+            scenario = prepare_proposal(database, identifier_namespace="application-noop")
+            noop_event = replace(
+                input_event(
+                    event_id="event-application-noop",
+                    correlation_id="correlation-application-noop",
+                ),
+                safe_projection=FrozenJsonObject.from_mapping(
+                    {
+                        "work_id": "work-application-noop",
+                        "priority": 500,
+                        "title": "noop: deterministic application completion",
+                    }
+                ),
+            )
+            EventService(scenario.store, scenario.identifiers, FixedClock(T0)).submit(
+                context=RequestPrincipalContext(namespace(), user()),
+                request=request_for_event(noop_event),
+                idempotency_key="event-key-application-noop",
+            )
+            intelligence = DeterministicIntelligence()
+            wake = WakeService(
+                store=scenario.store,
+                intelligence=intelligence,
+                clock=FixedClock(T2),
+                identifiers=scenario.identifiers,
+                service_principal=service(),
+                model_principal=model(),
+                mandate_id="mandate-synthetic",
+                owner_id="worker-application-noop",
+            )
+            self.assertIsNotNone(wake.materialize_next(namespace()))
+            result = wake.run(namespace())
+            self.assertEqual(result.decision_count, 1)
+            self.assertEqual(intelligence.call_count, 0)
+            history_before = scenario.store.causal_history(
+                namespace(), "correlation-application-noop"
+            )
+            record_types = {record["record_type"] for record in history_before}
+            self.assertIn("decision", record_types)
+            self.assertTrue(
+                record_types.isdisjoint(
+                    {"effect_proposal", "human_approval", "effect_attempt", "action_result"}
+                )
+            )
+            outbox_count = scenario.store._connection.execute(  # noqa: SLF001
+                "SELECT COUNT(*) FROM outbox WHERE correlation_id = ?",
+                ("correlation-application-noop",),
+            ).fetchone()[0]
+            self.assertEqual(outbox_count, 0)
+            canonical_before = json.dumps(
+                history_before, ensure_ascii=False, separators=(",", ":"), sort_keys=True
+            ).encode("utf-8")
+            scenario.store.close()
+
+            restarted = new_store(database)
+            replay_intelligence = DeterministicIntelligence()
+            replay = WakeService(
+                store=restarted,
+                intelligence=replay_intelligence,
+                clock=FixedClock(T3),
+                identifiers=scenario.identifiers,
+                service_principal=service(),
+                model_principal=model(),
+                mandate_id="mandate-synthetic",
+                owner_id="worker-application-noop-restart",
+            ).run(namespace())
+            self.assertEqual(replay.selected_count, 0)
+            self.assertEqual(replay_intelligence.call_count, 0)
+            history_after = restarted.causal_history(namespace(), "correlation-application-noop")
+            canonical_after = json.dumps(
+                history_after, ensure_ascii=False, separators=(",", ":"), sort_keys=True
+            ).encode("utf-8")
+            self.assertEqual(canonical_after, canonical_before)
+            self.assertEqual(ReferenceChannel().call_count, 0)
+            restarted.close()
 
 
 if __name__ == "__main__":

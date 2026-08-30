@@ -12,6 +12,12 @@
       "name": "runtime_indexes",
       "file": "002_runtime_indexes.sql",
       "checksum": "sha256:b0728e3e910e0f0921271b2121308518945968874a667c340d9dc007cbfea11f"
+    },
+    {
+      "version": 3,
+      "name": "timer_triggers",
+      "file": "003_timer_triggers.sql",
+      "checksum": "sha256:98325116ff022277aee6ee9038083a3866e912c907d08afeb0da4c48f97d7e98"
     }
   ]
 }

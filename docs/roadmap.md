@@ -4,8 +4,9 @@
 
 Each milestone stops at its gate. A later milestone must not begin automatically.
 
-Current checkpoint: P3 work remains isolated on its milestone branch and awaits independent
-acceptance. Accepted P0/P1/P2 artifacts remain unchanged; P4 has not started.
+Current checkpoint: the corrected P3 implementation and mechanical evidence remain isolated
+on the milestone branch and await independent acceptance. Accepted P0/P1/P2 artifacts remain
+unchanged; P4 has not started.
 
 ## P0 — Public planning and boundary gate
 
@@ -53,7 +54,11 @@ Actual: framework-neutral services and ports coordinate an injectable, namespace
 store with WAL, foreign keys, checksummed migrations, optimistic revisions, immutable audit,
 transactional replay/outbox state, leases, fencing, Agenda generations, bounded attention,
 exact-effect revalidation, ambiguity reconciliation, a deterministic provider, synthetic
-reference channel, typed FastAPI mappings, and fresh-instance restart tests. The P3 receipt
+reference channel, typed FastAPI mappings, and fresh-instance restart tests. Additive migration
+003 provides typed durable Timer occurrences and triggers with version-2 upgrade coverage.
+Approval and event acceptance times are server-stamped; complete outbox bindings fail closed;
+architecture allowlists are boundary-specific and assignment-alias aware; application no-op
+policy bypasses intelligence and effects while recording a durable Decision. The P3 receipt
 records only new implementations and zero transformed source files.
 
 ## P4 — Studio and five-minute Golden Path

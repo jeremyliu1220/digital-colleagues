@@ -30,6 +30,7 @@ from tests.p3.fixtures import (
     other_namespace,
     principals,
     profile,
+    request_for_event,
     service,
     user,
 )
@@ -71,7 +72,7 @@ class SQLiteSemanticsTests(unittest.TestCase):
             database = root / "state.sqlite"
             store = SQLiteRuntimeStore(database, migrations_path=migrations, clock=FixedClock(T0))
             store.close()
-            bad = migrations / "003_atomic_failure.sql"
+            bad = migrations / "004_atomic_failure.sql"
             bad.write_text(
                 "CREATE TABLE must_rollback(value TEXT);\nTHIS IS NOT SQL;\n",
                 encoding="utf-8",
@@ -79,7 +80,7 @@ class SQLiteSemanticsTests(unittest.TestCase):
             manifest = json.loads((migrations / "manifest.json").read_text(encoding="utf-8"))
             manifest["migrations"].append(
                 {
-                    "version": 3,
+                    "version": 4,
                     "name": "atomic_failure",
                     "file": bad.name,
                     "checksum": "sha256:" + hashlib.sha256(bad.read_bytes()).hexdigest(),
@@ -101,7 +102,60 @@ class SQLiteSemanticsTests(unittest.TestCase):
             ]
             connection.close()
             self.assertNotIn("must_rollback", tables)
-            self.assertEqual(versions, [1, 2])
+            self.assertEqual(versions, [1, 2, 3])
+
+    def test_v2_database_upgrades_to_timer_schema_without_losing_durable_records(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="digital-colleagues-p3-v2-upgrade-") as temporary:
+            root = Path(temporary)
+            migrations = root / "migrations"
+            migrations.mkdir()
+            current_manifest = json.loads(
+                (ROOT / "migrations" / "manifest.json").read_text(encoding="utf-8")
+            )
+            for filename in ("001_initial.sql", "002_runtime_indexes.sql"):
+                shutil.copy2(ROOT / "migrations" / filename, migrations / filename)
+            v2_manifest = dict(current_manifest)
+            v2_manifest["migrations"] = current_manifest["migrations"][:2]
+            (migrations / "manifest.json").write_text(json.dumps(v2_manifest), encoding="utf-8")
+            database = root / "state.sqlite"
+            v2 = SQLiteRuntimeStore(database, migrations_path=migrations, clock=FixedClock(T0))
+            BootstrapService(v2, FixedClock(T0)).initialize(
+                context=RequestPrincipalContext(namespace(), admin()),
+                principals=principals(),
+                profile=profile(),
+                mandate=mandate(),
+                work=finite_work(),
+                correlation_id="correlation-v2-upgrade",
+            )
+            v2.close()
+
+            shutil.copy2(
+                ROOT / "migrations" / "003_timer_triggers.sql",
+                migrations / "003_timer_triggers.sql",
+            )
+            (migrations / "manifest.json").write_text(
+                json.dumps(current_manifest), encoding="utf-8"
+            )
+            upgraded = SQLiteRuntimeStore(
+                database, migrations_path=migrations, clock=FixedClock(T1)
+            )
+            versions = [
+                row[0]
+                for row in upgraded._connection.execute(  # noqa: SLF001
+                    "SELECT version FROM schema_migrations ORDER BY version"
+                )
+            ]
+            tables = {
+                row[0]
+                for row in upgraded._connection.execute(  # noqa: SLF001
+                    "SELECT name FROM sqlite_master WHERE type = 'table'"
+                )
+            }
+            self.assertEqual(versions, [1, 2, 3])
+            self.assertIn("timer_triggers", tables)
+            self.assertEqual(upgraded.get_profile(namespace(), "profile-synthetic"), profile())
+            self.assertEqual(upgraded.get_work(namespace(), "work-synthetic"), finite_work())
+            upgraded.close()
 
     def test_every_store_connection_enables_wal_foreign_keys_and_busy_handling(self) -> None:
         with tempfile.TemporaryDirectory(prefix="digital-colleagues-p3-pragmas-") as temporary:
@@ -250,9 +304,9 @@ class SQLiteSemanticsTests(unittest.TestCase):
                 work=finite_work(),
                 correlation_id="correlation-bootstrap",
             )
-            EventService(store, StableHashIdentifier("fence")).submit(
+            EventService(store, StableHashIdentifier("fence"), FixedClock(T0)).submit(
                 context=RequestPrincipalContext(namespace(), user()),
-                event=input_event(),
+                request=request_for_event(input_event()),
                 idempotency_key="event-key-fence",
             )
             first = store.claim_trigger(namespace(), owner="owner-a", now=T1, lease_until=T1)
