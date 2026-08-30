@@ -128,6 +128,8 @@ class EffectProposal:
     occurred_at: datetime
     revision: int
     schema_version: int = SCHEMA_VERSION
+    mandate_id: str | None = None
+    mandate_revision: int | None = None
     payload_digest: str = field(init=False)
     proposal_digest: str = field(init=False)
 
@@ -160,6 +162,12 @@ class EffectProposal:
             raise CoreInvariantError("effect proposal causation must name its decision")
         if self.constraints.valid_until <= self.occurred_at:
             raise CoreInvariantError("effect proposal must expire after it is proposed")
+        if (self.mandate_id is None) != (self.mandate_revision is None):
+            raise CoreInvariantError("proposal mandate identity must be complete")
+        if self.mandate_id is not None:
+            require_stable_id(self.mandate_id, "mandate_id")
+            assert self.mandate_revision is not None
+            require_revision(self.mandate_revision, "mandate_revision")
         payload_digest = _payload_digest(self.payload)
         object.__setattr__(self, "payload_digest", payload_digest)
         envelope = {
@@ -181,6 +189,8 @@ class EffectProposal:
             },
             "digest_schema_version": 1,
             "effect_kind": self.effect_kind.value,
+            "mandate_id": self.mandate_id,
+            "mandate_revision": self.mandate_revision,
             "namespace": _namespace_envelope(self.namespace),
             "occurred_at": _datetime_to_canonical_z(self.occurred_at),
             "payload_digest": payload_digest,
@@ -248,6 +258,7 @@ class EffectAttemptState(StrEnum):
     STARTED = "started"
     SUCCEEDED = "succeeded"
     FAILED = "failed"
+    AMBIGUOUS = "ambiguous"
 
 
 @dataclass(frozen=True, slots=True)
@@ -291,6 +302,10 @@ class EffectAttempt:
 class ActionResultState(StrEnum):
     SUCCEEDED = "succeeded"
     FAILED = "failed"
+    NOT_EXECUTED = "not_executed"
+    RETRYABLE_FAILURE = "retryable_failure"
+    PERMANENT_FAILURE = "permanent_failure"
+    AMBIGUOUS = "ambiguous"
 
 
 @dataclass(frozen=True, slots=True)

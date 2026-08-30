@@ -19,10 +19,14 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
   "Typing :: Typed",
 ]
-dependencies = []
+dependencies = [
+  "fastapi==0.141.1",
+  "pydantic==2.13.5",
+]
 
 [project.optional-dependencies]
 dev = [
+  "httpx==0.28.1",
   "mypy==2.3.1",
   "ruff==0.16.4",
 ]

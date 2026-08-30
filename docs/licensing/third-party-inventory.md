@@ -2,26 +2,33 @@
 
 # Third-Party Dependency and Notice Inventory
 
-## P2 distribution boundary
+## P3 distribution boundary
 
-P2 copies or vendors no third-party source, binary, container image, font, icon, or media
-asset. Package managers download development and build dependencies into ignored local
-directories. The generated Studio bundle is verification output, is ignored, and is not
-published by P2. P2 adds no Python runtime dependency and does not change the Studio
-lockfile or any direct tool version reviewed in P1.
+P3 copies or vendors no third-party source, binary, container image, font, icon, or media
+asset. Package managers install the exact P3 lock only into OS temporary directories. The
+generated Studio bundle and API-test environments are verification output, are deleted,
+and are not published. P3 adds FastAPI and Pydantic as direct runtime dependencies and
+HTTPX as an in-process test dependency. It changes neither the Studio lockfile nor its
+reviewed dependency set.
 
 This inventory records declared metadata review; it is not legal advice or a substitute
 for the release-level transitive and artifact review required by P8.
 
 ## Python direct packages
 
-| Package | Version | Role | Declared license | P1 treatment |
+| Package | Version | Role | Declared license | P3 treatment |
 | --- | --- | --- | --- | --- |
 | Hatchling | 1.32.0 | PEP 517 build backend | MIT | Downloaded for builds; not vendored |
+| FastAPI | 0.141.1 | Typed HTTP mapping edge | MIT | Runtime package-manager dependency; not vendored |
+| Pydantic | 2.13.5 | HTTP request/response shape mapping | MIT | Runtime package-manager dependency; confined to API edge |
+| HTTPX | 0.28.1 | In-process FastAPI test client transport | BSD-3-Clause | Development dependency; no live-provider traffic |
 | Ruff | 0.16.4 | Development lint and format | MIT | Optional development dependency |
 | mypy | 2.3.1 | Development type checking | MIT | Optional development dependency |
 
-The Python package has no runtime dependency through P2.
+`requirements/p3.lock` resolves 20 exact Python packages: MIT (13), BSD-3-Clause (4),
+MPL-2.0 (2), and PSF-2.0 (1). The MPL packages are Certifi and Pathspec; the PSF package is
+Typing Extensions. This is a metadata and source-tree boundary review, not a release bundle
+or transitive source-text legal conclusion. P3 vendors none of these packages.
 
 ## Studio direct packages
 
@@ -58,7 +65,8 @@ external operator tools.
 
 ## NOTICE decision
 
-The direct-package review found no external attribution that must be copied into the P1
-source tree's NOTICE. The decision and its distribution limit are recorded in
+The P3 direct-package review found no external attribution that must be copied into this
+project-authored source tree's NOTICE because dependency material is neither copied nor
+vendored. The decision and its distribution limit are recorded in
 `docs/licensing/notice-review.md`. Any copied material, generated distributable bundle,
 container, optional adapter, or release archive triggers a fresh review.

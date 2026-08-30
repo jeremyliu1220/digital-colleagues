@@ -4,10 +4,11 @@
 
 ## Scope and claim boundary
 
-This model defines design requirements for the v0.1 local reference topology. P0 records
-requirements only; it does not establish that an implementation is secure. Loopback
-binding and local tokens are not enterprise IAM. Encryption at rest, OIDC, SSO, SCIM,
-distributed isolation, and high availability remain gaps.
+This model defines requirements for the v0.1 local reference topology. P3 mechanically
+tests a narrow headless implementation of namespace, authority, replay, deterministic
+execution, SQLite, outbox, and safe-audit controls. Those results do not establish product
+security or privacy effectiveness. P3 has no browser authentication. Encryption at rest,
+OIDC, SSO, SCIM, distributed isolation, and high availability remain gaps.
 
 ## Assets
 
@@ -40,13 +41,15 @@ distributed isolation, and high availability remain gaps.
 | Insecure direct object reference | Namespace every record and every repository query |
 | Stale or partially rebound approval | Expected revision plus complete canonical proposal-digest checks |
 | Duplicate mutation or approval | Idempotency key, one-time consumption, and replay ledger |
-| Ambiguous effect | Fail closed until destination, action, payload, and typed Mandate constraints are exact |
+| Ambiguous effect | Persist AMBIGUOUS, prohibit blind resend, reconcile applied/absent/unknown, retry only confirmed absence |
 | Session theft or fixation | Server-generated session ID, digest-safe storage, expiry, strict cookie policy |
 | Cross-site mutation | Origin validation and CSRF defense on every mutation |
 | Bootstrap credential disclosure | Strong random value, one display, digest-only storage, short expiry, one use |
 | Enrollment privilege escalation | Admin-issued scoped token; server selects durable role |
-| Audit tampering or gaps | Transactional causal records and append-oriented audit controls |
-| Outbox double delivery | Transactional claim, idempotent effect key, attempt and result records |
+| Audit tampering or gaps | P3 transactional immutable safe audit rows; local operator tampering remains possible |
+| Outbox double delivery | Transactional claim/lease/fence, idempotent effect key, attempt/result records, bounded retry |
+| New cause during Agenda claim | Durable generation and handled-generation retain and requeue the later cause |
+| Stale worker checkpoint | Monotonic fencing token and owner checks reject the stale checkpoint |
 | Path or diagnostic disclosure | Public-boundary scanner and sanitized error handling |
 | Credential committed to source | Scanner rules, ignored local configuration, CI gate in P1 |
 | Live data used as public fixture | Explicit denylist and separate live acceptance storage |
@@ -55,10 +58,10 @@ distributed isolation, and high availability remain gaps.
 
 ## Authentication requirements
 
-The normative local authentication decision is ADR 0002. Tests in later milestones must
-cover one-time bootstrap and enrollment, role injection, session expiry, Origin and CSRF,
-replay, namespace crossover, stale revisions, principal-kind separation, and local-only
-recovery.
+The normative local authentication decision is ADR 0002. P3 tests only an injected
+server-controlled RequestPrincipalContext and rejects caller authority fields. P4 and P6
+must separately cover one-time bootstrap and enrollment, session expiry, Origin and CSRF,
+role injection, namespace crossover, and local recovery.
 
 ## Residual risks
 

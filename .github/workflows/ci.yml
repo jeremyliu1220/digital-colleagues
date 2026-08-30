@@ -29,7 +29,7 @@ jobs:
           python-version: "3.12"
           cache: pip
       - name: Install project tools
-        run: python -m pip install mypy==2.3.1 ruff==0.16.4
+        run: python -m pip install --disable-pip-version-check -r requirements/p3.lock
       - name: Lint
         run: |
           ruff check src scripts tests
@@ -38,7 +38,7 @@ jobs:
         run: mypy src scripts tests
       - name: Test
         run: >-
-          python -B scripts/run_unittest_suite.py
+          python -B scripts/run_p3_unittest_suite.py
           --start-directory tests
           --top-level-directory .
 
@@ -72,7 +72,7 @@ jobs:
         working-directory: studio
 
   public-boundary:
-    name: P2 boundaries
+    name: P3 boundaries
     runs-on: ubuntu-latest
     steps:
       - name: Check out source
@@ -81,15 +81,19 @@ jobs:
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.12"
-      - name: Verify P2 repository and provenance
+      - name: Verify P3 repository and provenance
         run: |
-          python -B scripts/check_p2_repository.py .
-          python -B scripts/check_p2_provenance.py .
-      - name: Verify P2 architecture and contracts
+          python -B scripts/check_p3_repository.py .
+          python -B scripts/check_p3_provenance.py .
+      - name: Verify P3 architecture, persistence, and contracts
         env:
           PYTHONPATH: src
         run: |
-          python -B scripts/check_p2_architecture.py .
+          python -B scripts/check_p3_architecture.py .
+          python -B scripts/check_p3_migrations.py .
+          python -B scripts/check_p3_persistence.py
+          python -B scripts/check_p3_runtime_contracts.py .
+          python -B scripts/check_p3_golden_path.py
           python -B scripts/check_p2_core_contracts.py .
       - name: Scan public tree
         run: python -B scripts/check_public_boundary.py .

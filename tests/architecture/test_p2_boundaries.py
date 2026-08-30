@@ -8,11 +8,13 @@ import unittest
 from contextlib import redirect_stderr
 from pathlib import Path
 
-from scripts.check_p2_architecture import ArchitectureError, check_architecture
+from scripts.check_p2_architecture import ArchitectureError
+from scripts.check_p2_architecture import check_architecture as check_p2_architecture
 from scripts.check_p2_architecture import main as architecture_main
 from scripts.check_p2_core_contracts import check_core_contracts
-from scripts.check_p2_provenance import check_p2_provenance
-from scripts.check_p2_repository import check_p2_repository
+from scripts.check_p3_architecture import check_architecture as check_p3_architecture
+from scripts.check_p3_provenance import check_provenance as check_p3_provenance
+from scripts.check_p3_repository import check_repository as check_p3_repository
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
@@ -34,15 +36,17 @@ class P2BoundaryTests(unittest.TestCase):
             self.assertIn(marker, diagnostics.getvalue())
 
     def test_current_architecture_and_contract_gates_pass(self) -> None:
-        architecture = check_architecture(PROJECT_ROOT)
+        architecture = check_p3_architecture(PROJECT_ROOT)
         contracts = check_core_contracts(PROJECT_ROOT)
-        self.assertEqual(architecture["gate"], "p2_architecture_clean")
+        self.assertEqual(architecture["gate"], "p3_architecture_clean")
         self.assertEqual(
             architecture["policy_version"],
-            "p2-stdlib-internal-allowlist-v1",
+            "p3-dependency-determinism-allowlist-v1",
         )
-        self.assertEqual(architecture["forbidden_imports"], 0)
         self.assertEqual(architecture["unapproved_imports"], 0)
+        self.assertEqual(architecture["dependency_violations"], 0)
+        self.assertEqual(architecture["edge_type_leaks"], 0)
+        self.assertEqual(architecture["nondeterministic_imports"], 0)
         self.assertEqual(architecture["nondeterministic_calls"], 0)
         self.assertEqual(contracts["gate"], "p2_core_contracts_clean")
         self.assertEqual(contracts["complete_effect_binding"], "passed")
@@ -55,11 +59,12 @@ class P2BoundaryTests(unittest.TestCase):
         self.assertEqual(contracts["immutability"], "passed")
 
     def test_current_repository_and_provenance_gates_pass(self) -> None:
-        repository = check_p2_repository(PROJECT_ROOT)
-        provenance = check_p2_provenance(PROJECT_ROOT)
-        self.assertEqual(repository["gate"], "p2_repository_clean")
-        self.assertTrue(repository["p1_historical_gate_preserved"])
-        self.assertTrue(repository["parent_fingerprint_pair_validated"])
+        repository = check_p3_repository(PROJECT_ROOT)
+        provenance = check_p3_provenance(PROJECT_ROOT)
+        self.assertEqual(repository["gate"], "p3_repository_clean")
+        self.assertEqual(repository["historical_artifact_count"], 7)
+        self.assertEqual(repository["runtime_residue_count"], 0)
+        self.assertEqual(provenance["gate"], "p3_provenance_clean")
         self.assertEqual(provenance["transformed_migration_count"], 0)
         implementation_count = provenance["new_implementation_count"]
         self.assertIsInstance(implementation_count, int)
@@ -126,7 +131,7 @@ class P2BoundaryTests(unittest.TestCase):
             (core / "invalid.py").write_text("import requests\n", encoding="utf-8")
             (governance / "__init__.py").write_text("", encoding="utf-8")
             with self.assertRaisesRegex(ArchitectureError, "unapproved_import"):
-                check_architecture(root)
+                check_p2_architecture(root)
 
 
 if __name__ == "__main__":

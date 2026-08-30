@@ -4,9 +4,8 @@
 
 Each milestone stops at its gate. A later milestone must not begin automatically.
 
-Current checkpoint: the P2 core-primitives gate passed on 2026-08-28. The accepted P1
-evidence remains unchanged. P3 application, persistence, API, worker, adapter, and runtime
-work is separately gated and has not started.
+Current checkpoint: P3 work remains isolated on its milestone branch and awaits independent
+acceptance. Accepted P0/P1/P2 artifacts remain unchanged; P4 has not started.
 
 ## P0 — Public planning and boundary gate
 
@@ -49,6 +48,13 @@ WAL and foreign keys, one namespaced `state.sqlite`, deterministic provider, ref
 channel, typed FastAPI mappings, restart recovery, and causal audit records.
 
 Exit: the headless Golden Path is repeatable across restart.
+
+Actual: framework-neutral services and ports coordinate an injectable, namespaced SQLite
+store with WAL, foreign keys, checksummed migrations, optimistic revisions, immutable audit,
+transactional replay/outbox state, leases, fencing, Agenda generations, bounded attention,
+exact-effect revalidation, ambiguity reconciliation, a deterministic provider, synthetic
+reference channel, typed FastAPI mappings, and fresh-instance restart tests. The P3 receipt
+records only new implementations and zero transformed source files.
 
 ## P4 — Studio and five-minute Golden Path
 

@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "migrations": [
+    {
+      "version": 1,
+      "name": "initial",
+      "file": "001_initial.sql",
+      "checksum": "sha256:9a9a9c031bd27072333ee30603bcd6c7e2f33f60e7920f3a69ff251836093c02"
+    },
+    {
+      "version": 2,
+      "name": "runtime_indexes",
+      "file": "002_runtime_indexes.sql",
+      "checksum": "sha256:b0728e3e910e0f0921271b2121308518945968874a667c340d9dc007cbfea11f"
+    }
+  ]
+}

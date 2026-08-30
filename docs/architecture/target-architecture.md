@@ -29,22 +29,28 @@ The core is implemented with frozen standard-library dataclasses, Enums, and Pro
 It does not import FastAPI, Pydantic, provider or channel SDKs, database implementations,
 ORMs, or orchestration frameworks. Adapters translate their values into stable contracts.
 
-## P2 actual boundary
+## P3 actual boundary
 
-P2 implements `core/` and `governance/` only. Namespace uses explicit tenant scope plus an
-explicit colleague or principal scope. Principal kinds are disjoint durable values. The
-core contains frozen, slotted standard-library dataclasses, Enums, immutable nested JSON
-values, UTC validation, deterministic public serialization, lifecycle contracts, and
-causal records. Governance contains pure functions that authorize an exact effect against
-one Mandate revision and bind one durable human decision to one immutable proposal digest.
+P3 keeps P2 `core/` and `governance/` pure and adds `application/` contracts, stable ports,
+and services; `adapters/` for SQLite, deterministic intelligence, the reference channel,
+clock, IDs, and entropy; a minimal `api/` mapping edge; and a bounded `worker/` facade.
+Core runtime values receive additive Mandate binding, Agenda generation, wake fencing, and
+typed ambiguous outcomes. Application imports no concrete adapter or HTTP type.
 
-Architecture checks parse every core and governance module and reject framework, database,
-provider, application, adapter, API, worker, wall-clock, environment, randomness, process,
-and network dependencies. No P3 product directory exists.
+The SQLite adapter stores private contract JSON through a construction-replaying codec;
+computed proposal and payload digests are rechecked on load. Domain rows, audit, replay,
+triggers, Agenda runtime, and outbox rows carry explicit namespace and schema columns.
+Application methods group state, audit, replay, approval consumption, attempts, and outbox
+updates in `BEGIN IMMEDIATE` transactions with optimistic revisions. This store is a local
+semantic reference, not a tenant-isolation or availability claim.
 
-## Future repository topology
+Architecture checks parse all boundaries with explicit import allowlists. Core cannot
+depend outward; application cannot import infrastructure; Pydantic/FastAPI cannot leave
+`api/`; deterministic boundaries reject hidden wall clock, UUID, randomness, environment,
+filesystem, process, and network capabilities. Adversarial unknown imports and aliases are
+required to fail.
 
-P1 and later may introduce this layout; P0 does not create it:
+## Repository topology
 
 ```text
 src/digital_colleagues/
@@ -102,17 +108,18 @@ parameters. Mandate boundary constraints use typed, exact comparison and unknown
 indeterminate constraints fail closed. Stale, expired, cross-namespace, replayed,
 insufficient-role, or partially rebound decisions fail closed.
 
-## Future application edge (P3 and later)
+## P3 application edge
 
 FastAPI is the application edge. Pydantic request and response models translate to and from
 core contracts; Pydantic types never enter core. Mutation requests include an idempotency
 key and the expected revision where concurrency matters. The server derives namespace,
 principal, and roles from its session, never from caller-supplied authority fields.
 
-Studio uses React, TypeScript, and Vite. It displays server-derived authorization and
-revision data. UI hiding is not an authorization boundary.
+P3 injects a RequestPrincipalContext into the mapping edge; it does not implement or claim
+the P4 session, bootstrap, enrollment, Origin, or CSRF boundary. Studio remains a static
+shell. UI hiding is never an authorization boundary.
 
-## Future local persistence topology (P3)
+## P3 local persistence topology
 
 v0.1 uses one `state.sqlite` through standard-library `sqlite3` with:
 
@@ -120,18 +127,21 @@ v0.1 uses one `state.sqlite` through standard-library `sqlite3` with:
 - numbered migrations with immutable checksums;
 - transactional repositories and an outbox behind stable ports;
 - UTC timestamps, explicit string IDs, schema versions, and complete namespace columns;
-- migration, backup, restore, and restart checks before release.
+- durable event/timer triggers, Agenda generation checkpoints, leases and fencing;
+- immutable safe audit, replay ledger, attempt/result records, and transactional outbox;
+- restart checks with all product/store instances reconstructed over the same temporary file.
 
 This is a local reference topology. It provides no claim of PostgreSQL compatibility,
 distributed execution, high availability, production tenant isolation, or multi-region
 operation. A future store must implement the same ports and earn separate evidence.
 
-## Future reference adapters (P3)
+## P3 reference adapters
 
-The deterministic provider maps fixed inputs to inspectable reasoning outputs without
-network access. The reference channel accepts typed effects and returns typed ActionResult
-records without contacting a live provider. They define the required release path; vendor
-adapters are optional and later.
+The deterministic provider maps canonical requests to inspectable semantic decisions
+without network, environment, hidden time, or randomness. The reference channel accepts a
+complete typed effect and returns success, known-not-executed, retryable, permanent, or
+ambiguous results without contacting a live provider. Reconciliation distinguishes
+confirmed-applied, confirmed-absent, and still-unknown; only confirmed absence can retry.
 
 ## Future deployment topology (P4)
 

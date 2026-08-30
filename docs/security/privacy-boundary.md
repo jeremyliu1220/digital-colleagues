@@ -73,8 +73,19 @@ process. Reference receipts, deterministic fixtures, or synthetic confirmations 
 represented as live provider acceptance. Public release claims must name which evidence
 class they use.
 
-## P0 claim
+## P3 runtime and evidence boundary
 
-A clean scan establishes only that the current files passed the encoded planning/public
-boundary checks. It is not proof that a future product is private, secure, compliant, or
-production-ready.
+P3 fixtures use only synthetic tenant, colleague, principal, work, destination, and content
+values. The deterministic intelligence adapter and reference channel perform no network
+access and accept no live account or provider configuration. SQLite files, WAL/SHM files,
+logs, backups, and diagnostics are created only under OS temporary directories and are
+forbidden from the public tree. Effect payload bytes may be present in the temporary local
+state needed to dispatch the typed effect; public audit history, gate output, errors, and
+evidence contain only digests or safe projections. The P3 parent fingerprints contain only
+aggregate path-free fields and exclude exactly the repository-relative target subtree.
+
+## Evidence claim
+
+A clean scan and P3 synthetic tests establish only that the current files and encoded
+reference path passed their public-boundary checks. They do not prove that a future product
+or real-provider deployment is private, secure, compliant, or production-ready.

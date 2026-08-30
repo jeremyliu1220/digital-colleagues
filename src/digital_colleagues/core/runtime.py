@@ -105,6 +105,8 @@ class WakeCycle:
     occurred_at: datetime
     revision: int
     schema_version: int = SCHEMA_VERSION
+    fencing_token: int = 1
+    checkpoint_generation: int = 1
 
     def __post_init__(self) -> None:
         require_stable_id(self.wake_cycle_id, "wake_cycle_id")
@@ -127,6 +129,8 @@ class WakeCycle:
         )
         if self.causation_id not in trigger_ids:
             raise CoreInvariantError("wake cycle causation must name one trigger event")
+        require_revision(self.fencing_token, "fencing_token")
+        require_revision(self.checkpoint_generation, "checkpoint_generation")
 
 
 class AgendaItemState(StrEnum):
@@ -154,6 +158,9 @@ class AgendaItem:
     occurred_at: datetime
     revision: int
     schema_version: int = SCHEMA_VERSION
+    generation: int = 1
+    handled_generation: int = 0
+    cause_ids: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         require_stable_id(self.agenda_item_id, "agenda_item_id")
@@ -179,6 +186,19 @@ class AgendaItem:
         )
         if self.causation_id != self.wake_cycle_id:
             raise CoreInvariantError("agenda item causation must name its wake cycle")
+        require_revision(self.generation, "generation")
+        if (
+            type(self.handled_generation) is not int
+            or not 0 <= self.handled_generation <= self.generation
+        ):
+            raise CoreInvariantError("handled_generation must be within the Agenda generation")
+        causes = self.cause_ids or (self.source_event_id,)
+        causes = freeze_strings(causes, "cause_ids", allow_empty=False)
+        for cause_id in causes:
+            require_stable_id(cause_id, "cause_id")
+        if self.source_event_id not in causes:
+            raise CoreInvariantError("Agenda causes must retain the source event")
+        object.__setattr__(self, "cause_ids", causes)
 
 
 def agenda_order_key(item: AgendaItem) -> tuple[int, int, str, str]:

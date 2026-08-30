@@ -32,10 +32,17 @@ class RepositoryScaffoldTests(unittest.TestCase):
         self.assertIn("No reviewed direct package", review)
         self.assertIn("future container or release distributions require a fresh", review)
 
-    def test_python_metadata_keeps_no_runtime_dependencies(self) -> None:
+    def test_python_metadata_has_exact_p3_runtime_dependencies(self) -> None:
         metadata = tomllib.loads((PROJECT_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
         self.assertEqual(metadata["project"]["requires-python"], ">=3.12")
-        self.assertEqual(metadata["project"]["dependencies"], [])
+        self.assertEqual(
+            metadata["project"]["dependencies"],
+            ["fastapi==0.141.1", "pydantic==2.13.5"],
+        )
+        self.assertEqual(
+            metadata["project"]["optional-dependencies"]["dev"],
+            ["httpx==0.28.1", "mypy==2.3.1", "ruff==0.16.4"],
+        )
 
     def test_p1_empty_package_boundary_is_historical_fixture_data(self) -> None:
         self.assertEqual(
@@ -74,9 +81,13 @@ class RepositoryScaffoldTests(unittest.TestCase):
         self.assertIn("npm run typecheck", workflow)
         self.assertIn("npm run build", workflow)
         self.assertIn("scripts/check_public_boundary.py", workflow)
-        self.assertIn("scripts/check_p2_architecture.py", workflow)
+        self.assertIn("scripts/check_p3_architecture.py", workflow)
+        self.assertIn("scripts/check_p3_migrations.py", workflow)
+        self.assertIn("scripts/check_p3_persistence.py", workflow)
+        self.assertIn("scripts/check_p3_runtime_contracts.py", workflow)
+        self.assertIn("scripts/check_p3_golden_path.py", workflow)
         self.assertIn("scripts/check_p2_core_contracts.py", workflow)
-        self.assertIn("scripts/run_unittest_suite.py", workflow)
+        self.assertIn("scripts/run_p3_unittest_suite.py", workflow)
 
     def test_comment_capable_p1_files_have_spdx_headers(self) -> None:
         extensions = {".css", ".html", ".js", ".md", ".py", ".toml", ".ts", ".tsx", ".yml"}

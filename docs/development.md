@@ -4,13 +4,13 @@
 
 ## Prerequisites
 
-- Python 3.12 or newer (`PYTHON=python3.13` may be passed to Make when appropriate)
+- Python 3.12 or newer (`PYTHON=python3.13` may be passed to Make)
 - Node.js 22.12 or newer
 - npm 11 or a compatible npm that honors the committed lockfile
-- Make
+- Git and Make
 
-No provider account, credential, database, container runtime, or parent source checkout is
-needed for P2 development.
+No provider account, credential, container runtime, parent checkout, or checked-in database
+is needed. P3 tests use a synthetic reference channel and OS temporary SQLite files.
 
 ## Isolated tool workspace
 
@@ -18,10 +18,11 @@ needed for P2 development.
 make bootstrap
 ```
 
-This resolves the exact direct Python development packages and the Studio lockfile in an
-operating-system temporary directory, validates the environment, and removes it. It does
-not create `.venv`, `node_modules`, cache, or build output in the repository. It does not
-initialize Git or contact a product provider.
+The command installs `requirements/p3.lock` into a temporary virtual environment, copies
+Studio to a temporary directory, runs environment checks, and deletes both. It creates no
+repository `.venv`, `node_modules`, cache, database, coverage, or build output. Direct
+runtime and development dependencies are exactly pinned in `pyproject.toml`; the lock also
+pins resolved transitives.
 
 ## Verification
 
@@ -29,49 +30,59 @@ initialize Git or contact a product provider.
 make check
 ```
 
-The aggregate command creates the same disposable workspace and runs the equivalent of:
+The aggregate gate runs the equivalent of:
 
 ```bash
 ruff check src scripts tests
 ruff format --check src scripts tests
 mypy src scripts tests
-python -B scripts/run_unittest_suite.py --start-directory tests --top-level-directory .
+python -B scripts/run_p3_unittest_suite.py --start-directory tests --top-level-directory .
 npm --prefix studio run lint
 npm --prefix studio run format:check
 npm --prefix studio run typecheck
 npm --prefix studio test
 npm --prefix studio run build
 python -B scripts/check_public_boundary.py .
-python -B scripts/check_p2_repository.py .
-python -B scripts/check_p2_provenance.py .
-python -B scripts/check_p2_architecture.py .
-PYTHONPATH=src python -B scripts/check_p2_core_contracts.py .
+python -B scripts/check_p3_repository.py .
+python -B scripts/check_p3_provenance.py .
+python -B scripts/check_p3_architecture.py .
+PYTHONPATH=src python -B scripts/check_p3_migrations.py .
+PYTHONPATH=src python -B scripts/check_p3_persistence.py
+PYTHONPATH=src python -B scripts/check_p3_runtime_contracts.py .
+PYTHONPATH=src python -B scripts/check_p3_golden_path.py
 ```
 
-Rebuild P2 evidence only after all of those pass:
+Focused Make targets are `boundary`, `p3-repository`, `p3-provenance`,
+`p3-architecture`, `p3-migrations`, `p3-persistence`, `p3-runtime`, and `p3-golden`.
+The literal full unittest command can bootstrap its API-test dependencies into an OS
+temporary environment when FastAPI is not installed in the invoking interpreter; no test
+is skipped.
+
+## Evidence milestone
+
+After all implementation, tests, docs, fingerprints, and gates are committed with a clean
+tree, run:
 
 ```bash
-make evidence-p2
+make evidence-p3
 ```
 
-The evidence command requires the `codex/*` task branch to derive from the accepted P1
-baseline, requires zero remotes, and uses the structured unittest outcome from the one test
-execution. Any missing gate, failure, error, skip, expected failure, unexpected success,
-or malformed output blocks the atomic artifact update. Claims that cannot be checked from
-the public tree stay explicitly unevaluated. `make evidence-p1` is historical and must not
-be run on the P2 tree.
+The collector reruns every P3 gate and the complete zero-exception suite once. It refuses
+to overwrite a passed summary after any failure; verifies required test IDs and fault
+boundaries; requires the P3 branch to merge-base at the accepted P2 SHA; requires no remote;
+compares the exact parent-fingerprint objects; records the tested implementation commit;
+and atomically writes `artifacts/p3/summary.json`. Its public-tree digest excludes only that
+summary to avoid self-hashing. Commit the summary separately, then rerun `make check` and
+the public-boundary scan. Historical `make evidence-p1` and `make evidence-p2` are forbidden.
 
-## Studio shell
+## Headless and HTTP boundaries
 
-```bash
-make studio-dev
-```
+The Golden Path is exercised through application services and the bounded worker facade.
+FastAPI tests use an in-process client and an injected server-side RequestPrincipalContext;
+no public network interface is bound. P3 does not implement the P4 bootstrap, enrollment,
+session, CSRF, Origin, or Studio workflows. `make studio-dev` remains an isolated preview of
+the static shell and must not be read as a P3 product UI.
 
-Vite binds to `127.0.0.1` from a disposable copy. Restart the command to pick up source
-edits. The shell is a static positioning view. It reports the P2 core milestone but has no
-API, authentication, stored state, provider integration, or product workflow. Runtime
-orchestration begins in P3.
-
-Every check removes its temporary environment. `.venv`, `node_modules`, caches, coverage,
-and build output must not be treated as public evidence if a contributor creates them by
-other means; remove them before running the direct boundary command.
+Every check removes its temporary environment. If a contributor independently creates a
+runtime database, `.venv`, `node_modules`, cache, coverage, log, or build directory inside
+the repository, remove it before running the repository and public-boundary gates.
