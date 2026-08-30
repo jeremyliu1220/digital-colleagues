@@ -1,12 +1,12 @@
 {
   "claim_scope": "P3 local synthetic headless deterministic reference semantics only.",
-  "completed_date": "2026-08-30",
+  "completed_date": "2026-08-31",
   "evaluated_tree": {
     "branch": "codex/p3-headless-deterministic-slice",
     "evidence_commit_binding": "the subsequent commit containing these exact summary bytes",
-    "implementation_commit": "5e74e18c4daededa311239a323418775d29e615f",
+    "implementation_commit": "0e7c7f1b6514746509c52b7c1a783a8df4b2cc74",
     "merge_base": "37fa1c3d21440130fcbeeaacf0534e445afeb343",
-    "public_tree_digest_excluding_summary": "sha256:691dc8993edefcffb5cb234f282e5a8756fcdd2f36575d8358586cf459f58e7f",
+    "public_tree_digest_excluding_summary": "sha256:66744bfc8327e36fa2b09f8e636992761a60412abe7bdd62e857a3843b99a576",
     "remote_count": 0,
     "summary_exclusion_rule": "exclude_exact_artifacts/p3/summary.json_path_only"
   },
@@ -31,9 +31,9 @@
   "p2_base_commit": "37fa1c3d21440130fcbeeaacf0534e445afeb343",
   "provenance": {
     "classification": "new_implementation",
-    "implementation_tree_digest": "sha256:34df399d3bdd329dae9e37d4be5eec20f51a1739dd3c43ab7fa13c9710689985",
-    "new_implementation_count": 26,
-    "receipt_digest": "sha256:3d221785b966e0bb5d2f4415594a786a5552d5aa0e02a9dfd81ef7e5c89c915e",
+    "implementation_tree_digest": "sha256:441d85ad7ff591ae503c26b0a5d8b65226b1d4d137afdaa019d18642ab952cc9",
+    "new_implementation_count": 27,
+    "receipt_digest": "sha256:1eea8c4697e82a2c01c52170e7a4c1dc2e0acde9e8325cd36a6dea626641bbd0",
     "transformed_migration_count": 0
   },
   "results": {
@@ -45,15 +45,15 @@
       "gate": "p3_architecture_clean",
       "nondeterministic_calls": 0,
       "nondeterministic_imports": 0,
-      "policy_version": "p3-dependency-determinism-allowlist-v1",
+      "policy_version": "p3-boundary-specific-determinism-allowlist-v2",
       "schema_version": 1,
       "stable_port_leaks": 0,
       "unapproved_imports": 0
     },
     "boundary": {
-      "bytes_scanned": 892806,
+      "bytes_scanned": 977702,
       "exceptions_applied": 0,
-      "files_scanned": 170,
+      "files_scanned": 174,
       "gate": "public_boundary_clean",
       "policy_version": "p0-v1",
       "schema_version": 1
@@ -69,20 +69,22 @@
     },
     "migrations": {
       "busy_timeout_ms": 5000,
-      "foreign_key_count": 20,
+      "foreign_key_count": 25,
       "foreign_keys": true,
       "gate": "p3_migrations_clean",
       "journal_mode": "wal",
       "migration_checksums": [
         "sha256:9a9a9c031bd27072333ee30603bcd6c7e2f33f60e7920f3a69ff251836093c02",
-        "sha256:b0728e3e910e0f0921271b2121308518945968874a667c340d9dc007cbfea11f"
+        "sha256:b0728e3e910e0f0921271b2121308518945968874a667c340d9dc007cbfea11f",
+        "sha256:98325116ff022277aee6ee9038083a3866e912c907d08afeb0da4c48f97d7e98"
       ],
-      "migration_count": 2,
+      "migration_count": 3,
       "migration_versions": [
         1,
-        2
+        2,
+        3
       ],
-      "namespaced_table_count": 6,
+      "namespaced_table_count": 7,
       "schema_version": 1
     },
     "p2_core": {
@@ -119,17 +121,17 @@
     "persistence": {
       "errors": 0,
       "failures": 0,
-      "fault_boundary_count": 17,
+      "fault_boundary_count": 20,
       "gate": "p3_persistence_clean",
       "schema_version": 1,
       "skipped": 0,
-      "tests_run": 17
+      "tests_run": 20
     },
     "provenance": {
       "gate": "p3_provenance_clean",
-      "implementation_tree_digest": "sha256:34df399d3bdd329dae9e37d4be5eec20f51a1739dd3c43ab7fa13c9710689985",
-      "new_implementation_count": 26,
-      "receipt_digest": "sha256:3d221785b966e0bb5d2f4415594a786a5552d5aa0e02a9dfd81ef7e5c89c915e",
+      "implementation_tree_digest": "sha256:441d85ad7ff591ae503c26b0a5d8b65226b1d4d137afdaa019d18642ab952cc9",
+      "new_implementation_count": 27,
+      "receipt_digest": "sha256:1eea8c4697e82a2c01c52170e7a4c1dc2e0acde9e8325cd36a6dea626641bbd0",
       "schema_version": 1,
       "source_revision": "dea9a9accc82fbedd35deb7117dcb5173223cf44",
       "transformed_migration_count": 0
@@ -144,7 +146,7 @@
       "gate": "p3_repository_clean",
       "historical_artifact_count": 7,
       "p2_base_commit": "37fa1c3d21440130fcbeeaacf0534e445afeb343",
-      "required_file_count": 24,
+      "required_file_count": 25,
       "requires_python": ">=3.12",
       "runtime_dependency_count": 2,
       "runtime_residue_count": 0,
@@ -153,13 +155,15 @@
     "runtime_contracts": {
       "ambiguous_attempt_state": true,
       "caller_authority_field_count": 0,
+      "caller_temporal_field_count": 0,
       "channel_outcome_count": 5,
       "gate": "p3_runtime_contracts_clean",
-      "mutation_field_count": 18,
+      "mutation_field_count": 15,
       "mutation_model_count": 2,
       "reconciliation_outcome_count": 3,
       "schema_version": 1,
-      "stable_port_count": 13
+      "stable_port_count": 13,
+      "timer_trigger_contract": "passed"
     },
     "studio": {
       "eslint": "passed",
@@ -177,23 +181,31 @@
       "fault_boundaries": [
         "agenda_generation_interleaving",
         "ambiguity_reconciliation",
+        "application_layer_noop",
+        "approval_time_fail_closed",
         "architecture_adversarial",
+        "architecture_boundary_alias_bypass",
         "attention_starvation",
         "bounded_retry",
+        "complete_outbox_binding",
         "crash_claim_dispatch_finalize",
         "crash_dispatch_outcome",
         "deterministic_noop",
+        "durable_attempt_limit",
+        "durable_timer_trigger",
         "exact_effect_dispatch",
         "http_authority_mapping",
         "http_exact_approval",
         "lease_fencing",
         "migration_atomicity",
         "migration_identity",
+        "migration_v2_timer_upgrade",
         "namespace_atomicity",
         "outbox_lease_fencing",
         "p2_effect_field_regression",
         "principal_separation",
         "restart_golden_path",
+        "server_approval_time_authority",
         "sqlite_pragmas",
         "transaction_revision_atomicity",
         "wake_bounds_agenda_fencing"
@@ -213,6 +225,7 @@
         "tests.architecture.test_p2_boundaries.P2BoundaryTests.test_unapproved_third_party_import_exits_nonzero",
         "tests.architecture.test_p2_boundaries.P2BoundaryTests.test_uuid_randomness_exits_nonzero",
         "tests.architecture.test_p3_boundaries.P3ArchitectureTests.test_adversarial_unknown_import_alias_bypass_and_reverse_dependencies_fail",
+        "tests.architecture.test_p3_boundaries.P3ArchitectureTests.test_boundary_specific_allowlists_and_assigned_alias_bypasses_fail_cli_and_direct",
         "tests.architecture.test_p3_boundaries.P3ArchitectureTests.test_current_tree_satisfies_p3_dependency_and_determinism_policy",
         "tests.core.test_authority.AuthorityTests.test_authority_diff_rejects_wrong_identity_or_stale_revision",
         "tests.core.test_authority.AuthorityTests.test_authority_diff_validates_and_copies_direct_inputs",
@@ -233,6 +246,7 @@
         "tests.core.test_common_and_principals.CommonAndPrincipalTests.test_utc_only_datetime_and_z_round_trip",
         "tests.core.test_effects_and_governance.EffectsAndGovernanceTests.test_approval_binds_every_authoritative_effect_field",
         "tests.core.test_effects_and_governance.EffectsAndGovernanceTests.test_approval_payload_binding_cannot_be_rewritten_after_approval",
+        "tests.core.test_effects_and_governance.EffectsAndGovernanceTests.test_approval_time_authority_rejects_future_backdated_expired_and_overlong",
         "tests.core.test_effects_and_governance.EffectsAndGovernanceTests.test_authorization_binds_exact_proposal_revision_and_payload",
         "tests.core.test_effects_and_governance.EffectsAndGovernanceTests.test_caller_supplied_role_never_becomes_authority",
         "tests.core.test_effects_and_governance.EffectsAndGovernanceTests.test_cross_namespace_approval_is_rejected",
@@ -331,6 +345,9 @@
         "tests.persistence.test_sqlite_semantics.SQLiteSemanticsTests.test_outbox_lease_takeover_increments_fence_and_refuses_stale_owner",
         "tests.persistence.test_sqlite_semantics.SQLiteSemanticsTests.test_transaction_crash_and_optimistic_revision_conflict_roll_back_atomically",
         "tests.persistence.test_sqlite_semantics.SQLiteSemanticsTests.test_trigger_lease_takeover_increments_fence_and_refuses_stale_owner",
+        "tests.persistence.test_sqlite_semantics.SQLiteSemanticsTests.test_v2_database_upgrades_to_timer_schema_without_losing_durable_records",
+        "tests.runtime.test_outbox_binding.OutboxBindingTests.test_complete_outbox_binding_tampering_never_calls_channel",
+        "tests.runtime.test_outbox_binding.OutboxBindingTests.test_retryable_failures_stop_exactly_at_durable_maximum_attempts",
         "tests.runtime.test_p3_runtime.RuntimeSemanticsTests.test_ambiguous_outcome_requires_reconciliation_before_confirmed_absent_retry",
         "tests.runtime.test_p3_runtime.RuntimeSemanticsTests.test_attention_order_is_deterministic_and_starved_work_advances",
         "tests.runtime.test_p3_runtime.RuntimeSemanticsTests.test_claim_dispatch_and_finalized_crash_checkpoints_recover_without_duplicate_effects",
@@ -339,10 +356,13 @@
         "tests.runtime.test_p3_runtime.RuntimeSemanticsTests.test_exact_effect_tampering_and_stale_mandate_never_call_channel",
         "tests.runtime.test_p3_runtime.RuntimeSemanticsTests.test_generation_interleaving_retains_causes_and_old_checkpoint_cannot_finish_new_cause",
         "tests.runtime.test_p3_runtime.RuntimeSemanticsTests.test_model_and_service_cannot_construct_or_submit_human_approval",
+        "tests.runtime.test_p3_runtime.RuntimeSemanticsTests.test_pending_application_noop_is_durable_without_intelligence_or_effects_after_restart",
         "tests.runtime.test_p3_runtime.RuntimeSemanticsTests.test_retryable_outcome_uses_new_attempt_and_stops_at_success",
-        "tests.runtime.test_p3_runtime.RuntimeSemanticsTests.test_wake_cycle_bounds_preserve_pending_work_and_agenda_takeover_fences_stale_owner"
+        "tests.runtime.test_p3_runtime.RuntimeSemanticsTests.test_server_authoritative_approval_time_is_stamped_and_replay_is_not_reinterpreted",
+        "tests.runtime.test_p3_runtime.RuntimeSemanticsTests.test_wake_cycle_bounds_preserve_pending_work_and_agenda_takeover_fences_stale_owner",
+        "tests.runtime.test_timer_runtime.TimerRuntimeTests.test_durable_timer_due_replay_restart_fencing_causation_and_namespace_isolation"
       ],
-      "tests_run": 140,
+      "tests_run": 148,
       "unexpected_successes": 0
     }
   },
