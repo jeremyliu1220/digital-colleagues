@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import io
 import tempfile
 import unittest
+from contextlib import redirect_stderr
 from pathlib import Path
 
 from scripts.check_p2_architecture import ArchitectureError, check_architecture
+from scripts.check_p2_architecture import main as architecture_main
 from scripts.check_p2_core_contracts import check_core_contracts
 from scripts.check_p2_provenance import check_p2_provenance
 from scripts.check_p2_repository import check_p2_repository
@@ -15,11 +18,31 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
 class P2BoundaryTests(unittest.TestCase):
+    def assert_architecture_cli_rejects(self, source: str, marker: str) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            core = root / "src/digital_colleagues/core"
+            governance = root / "src/digital_colleagues/governance"
+            core.mkdir(parents=True)
+            governance.mkdir(parents=True)
+            (core / "invalid.py").write_text(source, encoding="utf-8")
+            (governance / "__init__.py").write_text("", encoding="utf-8")
+            diagnostics = io.StringIO()
+            with redirect_stderr(diagnostics):
+                exit_code = architecture_main([str(root)])
+            self.assertNotEqual(exit_code, 0)
+            self.assertIn(marker, diagnostics.getvalue())
+
     def test_current_architecture_and_contract_gates_pass(self) -> None:
         architecture = check_architecture(PROJECT_ROOT)
         contracts = check_core_contracts(PROJECT_ROOT)
         self.assertEqual(architecture["gate"], "p2_architecture_clean")
+        self.assertEqual(
+            architecture["policy_version"],
+            "p2-stdlib-internal-allowlist-v1",
+        )
         self.assertEqual(architecture["forbidden_imports"], 0)
+        self.assertEqual(architecture["unapproved_imports"], 0)
         self.assertEqual(architecture["nondeterministic_calls"], 0)
         self.assertEqual(contracts["gate"], "p2_core_contracts_clean")
         self.assertEqual(contracts["complete_effect_binding"], "passed")
@@ -36,55 +59,73 @@ class P2BoundaryTests(unittest.TestCase):
         provenance = check_p2_provenance(PROJECT_ROOT)
         self.assertEqual(repository["gate"], "p2_repository_clean")
         self.assertTrue(repository["p1_historical_gate_preserved"])
+        self.assertTrue(repository["parent_fingerprint_pair_validated"])
         self.assertEqual(provenance["transformed_migration_count"], 0)
         implementation_count = provenance["new_implementation_count"]
         self.assertIsInstance(implementation_count, int)
         assert isinstance(implementation_count, int)
         self.assertGreater(implementation_count, 0)
 
-    def test_core_forbidden_framework_import_fails_closed(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            core = root / "src/digital_colleagues/core"
-            governance = root / "src/digital_colleagues/governance"
-            core.mkdir(parents=True)
-            governance.mkdir(parents=True)
-            (core / "invalid.py").write_text("import fastapi\n", encoding="utf-8")
-            (governance / "__init__.py").write_text("", encoding="utf-8")
-            with self.assertRaisesRegex(ArchitectureError, "forbidden_import"):
-                check_architecture(root)
+    def test_unapproved_third_party_import_exits_nonzero(self) -> None:
+        self.assert_architecture_cli_rejects("import requests\n", "unapproved_import")
 
-    def test_wall_clock_environment_and_random_reads_fail_closed(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            core = root / "src/digital_colleagues/core"
-            governance = root / "src/digital_colleagues/governance"
-            core.mkdir(parents=True)
-            governance.mkdir(parents=True)
-            (core / "invalid.py").write_text(
-                "from datetime import datetime\n"
-                "import os\n"
-                "import random\n"
-                "VALUE = (datetime.now(), os.getenv('SYNTHETIC'), random.random())\n",
-                encoding="utf-8",
-            )
-            (governance / "__init__.py").write_text("", encoding="utf-8")
-            with self.assertRaisesRegex(ArchitectureError, "forbidden_deterministic_call"):
-                check_architecture(root)
+    def test_uuid_randomness_exits_nonzero(self) -> None:
+        self.assert_architecture_cli_rejects(
+            "from uuid import uuid4 as make_identifier\nVALUE = make_identifier()\n",
+            "forbidden_deterministic_call",
+        )
 
-    def test_reverse_core_to_governance_dependency_fails_closed(self) -> None:
+    def test_tempfile_filesystem_io_exits_nonzero(self) -> None:
+        self.assert_architecture_cli_rejects(
+            "import tempfile as temporary_files\nVALUE = temporary_files.NamedTemporaryFile()\n",
+            "forbidden_capability_import",
+        )
+
+    def test_aliased_datetime_now_and_utcnow_exit_nonzero(self) -> None:
+        fixtures = (
+            "from datetime import datetime as Clock\nVALUE = Clock.now()\n",
+            "from datetime import datetime as Clock\nVALUE = Clock.utcnow()\n",
+            "import datetime as clock_module\nVALUE = clock_module.datetime.now()\n",
+            "import datetime as clock_module\nVALUE = clock_module.now()\n",
+            "import datetime as clock_module\nVALUE = clock_module.utcnow()\n",
+        )
+        for source in fixtures:
+            with self.subTest(source=source):
+                self.assert_architecture_cli_rejects(
+                    source,
+                    "forbidden_deterministic_call",
+                )
+
+    def test_environment_random_process_and_network_capabilities_exit_nonzero(self) -> None:
+        fixtures = (
+            "import os as operating_system\nVALUE = operating_system.environ['SYNTHETIC']\n",
+            "import random as entropy\nVALUE = entropy.random()\n",
+            "import subprocess as process\nVALUE = process.run(['synthetic'])\n",
+            "import socket as network\nVALUE = network.socket()\n",
+        )
+        for source in fixtures:
+            with self.subTest(source=source):
+                self.assert_architecture_cli_rejects(
+                    source,
+                    "forbidden_capability_import",
+                )
+
+    def test_reverse_core_to_governance_dependency_exits_nonzero(self) -> None:
+        self.assert_architecture_cli_rejects(
+            "from digital_colleagues.governance import approvals\n",
+            "reverse_governance_dependency",
+        )
+
+    def test_direct_api_also_raises_on_adversarial_fixture(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             core = root / "src/digital_colleagues/core"
             governance = root / "src/digital_colleagues/governance"
             core.mkdir(parents=True)
             governance.mkdir(parents=True)
-            (core / "invalid.py").write_text(
-                "from digital_colleagues.governance import approvals\n",
-                encoding="utf-8",
-            )
+            (core / "invalid.py").write_text("import requests\n", encoding="utf-8")
             (governance / "__init__.py").write_text("", encoding="utf-8")
-            with self.assertRaisesRegex(ArchitectureError, "reverse_governance_dependency"):
+            with self.assertRaisesRegex(ArchitectureError, "unapproved_import"):
                 check_architecture(root)
 
 

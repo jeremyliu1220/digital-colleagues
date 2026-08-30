@@ -24,6 +24,8 @@ from scripts.collect_p2_evidence import (
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 EVIDENCE_PATH = PROJECT_ROOT / "artifacts/p2/summary.json"
+PARENT_FINGERPRINT_BEFORE_PATH = PROJECT_ROOT / "artifacts/p2/parent-fingerprint-before.json"
+PARENT_FINGERPRINT_AFTER_PATH = PROJECT_ROOT / "artifacts/p2/parent-fingerprint-after.json"
 PYTHON_TOOLS = ("mypy==2.3.1", "ruff==0.16.4")
 SCOPES = {"all", "bootstrap", "build", "lint", "test", "typecheck"}
 
@@ -74,6 +76,16 @@ def _json_result(output: str, label: str) -> dict[str, Any]:
         raise ToolchainError(f"{label} returned invalid JSON") from exc
     if not isinstance(value, dict):
         raise ToolchainError(f"{label} returned a non-object result")
+    return value
+
+
+def _read_json_object(path: Path, label: str) -> dict[str, Any]:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise ToolchainError(f"{label} is unavailable or invalid") from exc
+    if not isinstance(value, dict):
+        raise ToolchainError(f"{label} is not a JSON object")
     return value
 
 
@@ -371,6 +383,15 @@ def main(argv: list[str] | None = None) -> int:
                 head = _git_text("rev-parse", "HEAD")
                 merge_base = _git_text("merge-base", "HEAD", P1_BASELINE_COMMIT)
                 remotes = tuple(line for line in _git_text("remote").splitlines() if line)
+                parent_fingerprint_before = _read_json_object(
+                    PARENT_FINGERPRINT_BEFORE_PATH,
+                    "P2 parent before fingerprint",
+                )
+                parent_fingerprint_after = _read_json_object(
+                    PARENT_FINGERPRINT_AFTER_PATH,
+                    "P2 parent after fingerprint",
+                )
+                verified_gates.add("p2_parent_fingerprint")
                 write_p2_evidence(
                     evidence_path=EVIDENCE_PATH,
                     boundary=boundary or {},
@@ -378,6 +399,8 @@ def main(argv: list[str] | None = None) -> int:
                     provenance=provenance or {},
                     architecture=architecture or {},
                     core_contracts=core_contracts or {},
+                    parent_fingerprint_before=parent_fingerprint_before,
+                    parent_fingerprint_after=parent_fingerprint_after,
                     unittest_outcome=unittest_outcome or {},
                     verified_gates=verified_gates,
                     evaluated_branch=branch,

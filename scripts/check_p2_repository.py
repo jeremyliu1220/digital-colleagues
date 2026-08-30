@@ -10,12 +10,20 @@ import json
 import sys
 import tomllib
 from pathlib import Path
+from typing import Any
+
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from scripts import collect_p2_evidence as evidence  # noqa: E402
 
 LICENSE_DIGEST = "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
 P1_SUMMARY_DIGEST = "1b2650cbf90c8e50b05dc193906bed1d6c8fac37aa6b669b88605b572c05ecaa"
 REQUIRED_FILES = {
     "artifacts/p1/summary.json",
     "artifacts/p2/summary.json",
+    "artifacts/p2/parent-fingerprint-before.json",
+    "artifacts/p2/parent-fingerprint-after.json",
     "docs/p2/acceptance.md",
     "provenance/p2-migration-receipt.json",
     "scripts/collect_p2_evidence.py",
@@ -89,6 +97,22 @@ def check_p2_repository(root: Path) -> dict[str, object]:
     }:
         raise RepositoryError("the P2 evidence status is invalid")
 
+    fingerprints: list[dict[str, Any]] = []
+    for name in ("before", "after"):
+        try:
+            fingerprint: Any = json.loads(
+                (root / f"artifacts/p2/parent-fingerprint-{name}.json").read_text(encoding="utf-8")
+            )
+        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+            raise RepositoryError("a P2 parent fingerprint is unreadable") from exc
+        if not isinstance(fingerprint, dict):
+            raise RepositoryError("a P2 parent fingerprint must be an object")
+        fingerprints.append(fingerprint)
+    try:
+        evidence.validate_parent_fingerprint_pair(fingerprints[0], fingerprints[1])
+    except evidence.EvidenceError as exc:
+        raise RepositoryError("the P2 parent fingerprint pair is invalid") from exc
+
     return {
         "schema_version": 1,
         "gate": "p2_repository_clean",
@@ -99,6 +123,7 @@ def check_p2_repository(root: Path) -> dict[str, object]:
         "license_digest": "sha256:" + license_digest,
         "p1_summary_digest": "sha256:" + p1_digest,
         "p1_historical_gate_preserved": True,
+        "parent_fingerprint_pair_validated": True,
     }
 
 

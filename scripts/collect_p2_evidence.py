@@ -14,11 +14,34 @@ from typing import Any
 
 P1_BASELINE_COMMIT = "bd6953b3dceeebd33a53f52b03ce94534ff5624b"
 SOURCE_REVISION = "dea9a9accc82fbedd35deb7117dcb5173223cf44"
+PARENT_SOURCE_LABEL = "digital-colleague-runtime-research"
+PARENT_FINGERPRINT_SCOPE = "parent_source_excluding_authorized_target_subtree"
+PARENT_EXCLUDED_SUBTREE = "digital-colleagues"
+ARCHITECTURE_POLICY_VERSION = "p2-stdlib-internal-allowlist-v1"
+PARENT_FINGERPRINT_FIELDS = frozenset(
+    {
+        "schema_version",
+        "source_label",
+        "source_revision",
+        "head_revision",
+        "scope",
+        "excluded_repo_relative_subtree",
+        "status_entry_count",
+        "status_digest",
+        "tracked_diff_digest",
+        "index_diff_digest",
+        "untracked_entry_count",
+        "untracked_state_digest",
+        "ignored_entry_count",
+        "ignored_state_digest",
+    }
+)
 REQUIRED_EVIDENCE_GATES = frozenset(
     {
         "mypy_strict",
         "p2_architecture",
         "p2_core_contracts",
+        "p2_parent_fingerprint",
         "p2_provenance",
         "p2_repository",
         "public_boundary",
@@ -69,6 +92,66 @@ def _require_gate(result: dict[str, Any], expected: str, label: str) -> None:
         raise EvidenceError(f"the {label} result is not passing")
 
 
+def _is_lower_hex(value: object, length: int) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) == length
+        and all(character in "0123456789abcdef" for character in value)
+    )
+
+
+def validate_parent_fingerprint_pair(
+    before: dict[str, Any], after: dict[str, Any]
+) -> dict[str, object]:
+    """Validate a path-free pair for only this adjacent P2 correction cycle."""
+
+    for fingerprint in (before, after):
+        if set(fingerprint) != PARENT_FINGERPRINT_FIELDS:
+            raise EvidenceError("a P2 parent fingerprint has unexpected fields")
+        if fingerprint.get("schema_version") != 2:
+            raise EvidenceError("the P2 parent fingerprint schema is unsupported")
+        if fingerprint.get("source_label") != PARENT_SOURCE_LABEL:
+            raise EvidenceError("the P2 parent fingerprint source label changed")
+        if fingerprint.get("source_revision") != SOURCE_REVISION:
+            raise EvidenceError("the P2 parent fingerprint source revision changed")
+        if fingerprint.get("scope") != PARENT_FINGERPRINT_SCOPE:
+            raise EvidenceError("the P2 parent fingerprint scope changed")
+        if fingerprint.get("excluded_repo_relative_subtree") != PARENT_EXCLUDED_SUBTREE:
+            raise EvidenceError("the P2 parent fingerprint exclusion changed")
+        if not _is_lower_hex(fingerprint.get("head_revision"), 40):
+            raise EvidenceError("the P2 parent fingerprint HEAD is invalid")
+        for field in (
+            "status_entry_count",
+            "untracked_entry_count",
+            "ignored_entry_count",
+        ):
+            if type(fingerprint.get(field)) is not int or fingerprint[field] < 0:
+                raise EvidenceError("a P2 parent fingerprint entry count is invalid")
+        for field in (
+            "status_digest",
+            "tracked_diff_digest",
+            "index_diff_digest",
+            "untracked_state_digest",
+            "ignored_state_digest",
+        ):
+            if not _is_lower_hex(fingerprint.get(field), 64):
+                raise EvidenceError("a P2 parent fingerprint digest is invalid")
+    if before != after:
+        raise EvidenceError("the adjacent P2 parent before/after fingerprints differ")
+    canonical = json.dumps(before, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    fingerprint_digest = "sha256:" + hashlib.sha256(canonical).hexdigest()
+    return {
+        "status": "passed",
+        "scope": "adjacent_p2_reverification_fix_cycle_only",
+        "source_revision": SOURCE_REVISION,
+        "fingerprint_schema_version": 2,
+        "matching_field_count": len(PARENT_FINGERPRINT_FIELDS),
+        "before_fingerprint_digest": fingerprint_digest,
+        "after_fingerprint_digest": fingerprint_digest,
+        "historical_p1_to_prior_p2_interval": "not_evaluated_no_contemporaneous_pair",
+    }
+
+
 def write_p2_evidence(
     *,
     evidence_path: Path,
@@ -77,6 +160,8 @@ def write_p2_evidence(
     provenance: dict[str, Any],
     architecture: dict[str, Any],
     core_contracts: dict[str, Any],
+    parent_fingerprint_before: dict[str, Any],
+    parent_fingerprint_after: dict[str, Any],
     unittest_outcome: dict[str, Any],
     verified_gates: set[str],
     evaluated_branch: str,
@@ -89,6 +174,10 @@ def write_p2_evidence(
     if missing:
         raise EvidenceError("P2 evidence is missing required mechanical gates")
     outcome = validate_unittest_outcome(unittest_outcome)
+    parent_fingerprint = validate_parent_fingerprint_pair(
+        parent_fingerprint_before,
+        parent_fingerprint_after,
+    )
     _require_gate(boundary, "public_boundary_clean", "public-boundary")
     _require_gate(repository, "p2_repository_clean", "repository")
     _require_gate(provenance, "p2_provenance_clean", "provenance")
@@ -100,14 +189,24 @@ def write_p2_evidence(
         raise EvidenceError("P2 evidence requires zero Python runtime dependencies")
     if provenance.get("source_revision") != SOURCE_REVISION:
         raise EvidenceError("P2 provenance uses the wrong source revision")
+    if architecture.get("policy_version") != ARCHITECTURE_POLICY_VERSION:
+        raise EvidenceError("P2 architecture did not use the required allowlist policy")
     for field in (
         "forbidden_imports",
+        "unapproved_imports",
         "forbidden_io_imports",
         "dependency_violations",
         "nondeterministic_calls",
+        "alias_resolved_unsafe_calls",
+        "p3_paths_present",
     ):
         if architecture.get(field) != 0:
             raise EvidenceError("P2 architecture result contains a violation")
+    if (
+        type(architecture.get("allowed_stdlib_import_root_count")) is not int
+        or architecture["allowed_stdlib_import_root_count"] < 1
+    ):
+        raise EvidenceError("P2 architecture allowlist evidence is incomplete")
     for field in (
         "immutability",
         "namespace",
@@ -145,7 +244,7 @@ def write_p2_evidence(
         raise EvidenceError("P2 evidence requires no configured Git remotes")
 
     summary = {
-        "schema_version": 2,
+        "schema_version": 3,
         "milestone": "P2",
         "gate": "p2_core_primitives",
         "status": "passed",
@@ -175,6 +274,7 @@ def write_p2_evidence(
                 "policy_version": boundary["policy_version"],
             },
             "architecture": architecture,
+            "parent_worktree": parent_fingerprint,
             "core_contracts": core_contracts,
             "immutability": {"status": core_contracts["immutability"]},
             "namespace": {"status": core_contracts["namespace"]},
@@ -219,7 +319,8 @@ def write_p2_evidence(
         },
         "non_mechanical_claims": {
             "parent_worktree_content_used": "not_evaluated",
-            "parent_worktree_unchanged": "not_evaluated",
+            "parent_worktree_unchanged": ("verified_only_for_adjacent_p2_reverification_fix_cycle"),
+            "historical_p1_to_prior_p2_parent_worktree_unchanged": "not_evaluated",
             "personal_data_used": "not_evaluated",
             "published": "not_evaluated",
             "rights_review_beyond_receipt_shape": "not_evaluated",
@@ -234,6 +335,7 @@ def write_p2_evidence(
             "privacy effectiveness",
             "production readiness",
             "live provider acceptance",
+            "historical parent worktree stability from P1 through prior P2 commits",
         ],
         "verification_commands": [
             "make check",
@@ -242,6 +344,11 @@ def write_p2_evidence(
             "python3 -B scripts/check_public_boundary.py .",
             "python3 -B scripts/check_p2_architecture.py .",
             "PYTHONPATH=src python3 -B scripts/check_p2_core_contracts.py .",
+            (
+                "python3 -B scripts/fingerprint_source_tree.py --source "
+                "<parent-repository> --revision "
+                f"{SOURCE_REVISION} --exclude-relative digital-colleagues"
+            ),
         ],
     }
     serialized = json.dumps(summary, indent=2, sort_keys=True) + "\n"

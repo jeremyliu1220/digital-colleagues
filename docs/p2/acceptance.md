@@ -17,15 +17,24 @@ records, exact effects, human approval, replay rejection, and causal audit relat
 - A machine-readable migration receipt that distinguishes transformed source from new
   implementations.
 - A fail-closed evidence collector and `artifacts/p2/summary.json`.
+- Path-free `artifacts/p2/parent-fingerprint-before.json` and
+  `artifacts/p2/parent-fingerprint-after.json` for the adjacent P2 reverification-fix
+  cycle only.
 - Updated architecture, capability, roadmap, maturity, development, licensing, and
   provenance documentation.
 
 ## Architecture boundary
 
-Core may use only the Python standard library and may not import application,
-infrastructure, API, worker, database, provider, channel, HTTP-validation, or orchestration
-framework code. Governance may depend on core; core may not depend on governance. P2 does
-not create application orchestration, adapters, APIs, workers, persistence, or migrations.
+Core uses an explicit allowlist of standard-library modules needed by the current contracts
+and may import only `digital_colleagues.core` internally. Governance uses the same stdlib
+allowlist and may import only core or governance. Every unlisted import fails closed,
+including previously unknown third-party packages. Import aliases are resolved before
+checking calls. Wall-clock reads, UUID or other randomness, environment access, filesystem
+and temporary-file I/O, process execution, network capabilities, reverse core-to-governance
+dependencies, and unresolved relative imports are forbidden. Deterministic hashing, JSON
+serialization, datetime value validation, enums, dataclasses, typing, math, regex, and
+collections remain allowed. P2 does not create application orchestration, adapters, APIs,
+workers, persistence, or migrations.
 
 ## Provenance requirements
 
@@ -34,6 +43,16 @@ fixed revision through a digest-verified allowlist entry and only after rights a
 review. Every transformed item requires a sanitized receipt containing only approved
 fields. Code derived solely from public architecture documents is recorded as a new
 implementation and is not represented as a migration.
+
+For this correction cycle, the existing path-free fingerprint tool is run immediately
+before and after work against fixed source revision
+`dea9a9accc82fbedd35deb7117dcb5173223cf44`, excluding only the repository-relative
+`digital-colleagues` subtree. Stored fingerprints contain only an exact approved schema of
+aggregate counts and digests. The evidence collector requires both artifacts to be byte-
+equivalent as JSON values and rejects missing, extra, malformed, broader-scope, wrong-
+revision, or mismatched evidence before replacing the summary. These adjacent snapshots do
+not reconstruct the historical interval from the P1 baseline through prior P2 commits;
+that interval remains explicitly `not_evaluated` because no contemporaneous pair exists.
 
 ## Acceptance tests
 
@@ -64,7 +83,10 @@ only `approved`, so `human_approval_required` always changes the policy outcome.
 
 Architecture tests must reject forbidden imports, reverse dependencies, wall-clock reads,
 randomness, environment access, and filesystem, database, or network I/O in deterministic
-core and governance code. Serialization tests must prove that sensitive effect payloads are
+core and governance code. Adversarial CLI fixtures specifically cover an unapproved
+`requests` import, `uuid.uuid4`, `tempfile`, aliased `datetime.now` and `utcnow`, process and
+network modules, and the reverse core-to-governance dependency; every fixture must return a
+nonzero checker result. Serialization tests must prove that sensitive effect payloads are
 not emitted by the safe public projection.
 
 The full unittest result must contain a positive test count and zero failures, errors,
@@ -77,6 +99,10 @@ python3 -B -m unittest discover -s tests -v
 python3 -B scripts/check_public_boundary.py .
 python3 -B scripts/check_p2_architecture.py .
 PYTHONPATH=src python3 -B scripts/check_p2_core_contracts.py .
+python3 -B scripts/fingerprint_source_tree.py \
+  --source <parent-repository> \
+  --revision dea9a9accc82fbedd35deb7117dcb5173223cf44 \
+  --exclude-relative digital-colleagues
 make check
 make evidence-p2
 ```
@@ -90,11 +116,13 @@ must not be run or used to rewrite the accepted P1 artifact.
 Mechanical results are populated only from validated command results. Repository policy,
 core architecture, contract shape, immutability, namespace, principal separation,
 complete-effect binding, constraint enforcement, direct-construction invariants, authority
-and approval, serialization, Studio scaffold, and unittest counts may be marked passed
-only after their gates succeed. The core checker must perform negative mutation, replay,
-namespace, role, constraint, and constructor probes before returning those results. Human
-review, parent-worktree non-use, publication, production security, privacy effectiveness,
-and production readiness remain explicit `not_evaluated` claims.
+and approval, architecture allowlist enforcement, adjacent parent-worktree stability,
+serialization, Studio scaffold, and unittest counts may be marked passed only after their
+gates succeed. The core checker must perform negative mutation, replay, namespace, role,
+constraint, and constructor probes before returning those results. The adjacent parent
+result is narrowly scoped to this correction cycle; historical P1-to-prior-P2 parent
+stability, parent-worktree non-use, human review, publication, production security, privacy
+effectiveness, and production readiness remain explicit `not_evaluated` claims.
 
 ## Stop condition
 

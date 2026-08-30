@@ -1,0 +1,16 @@
+{
+  "excluded_repo_relative_subtree": "digital-colleagues",
+  "head_revision": "56813ded1fc469cee73cd88beff6ab62cd043356",
+  "ignored_entry_count": 9365,
+  "ignored_state_digest": "6b62bd0da587169be28fff02f4099a81e15440270a325d07565602812822e096",
+  "index_diff_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "schema_version": 2,
+  "scope": "parent_source_excluding_authorized_target_subtree",
+  "source_label": "digital-colleague-runtime-research",
+  "source_revision": "dea9a9accc82fbedd35deb7117dcb5173223cf44",
+  "status_digest": "fc3ed6f21dffa22bf9688b879af8273b40b51312009d9559c6ea70601b328215",
+  "status_entry_count": 50,
+  "tracked_diff_digest": "35b3acba4dbeb940e867b2c0ac2a6fa6ad2cc85014f7e97f26c53da5d9493a07",
+  "untracked_entry_count": 0,
+  "untracked_state_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+}

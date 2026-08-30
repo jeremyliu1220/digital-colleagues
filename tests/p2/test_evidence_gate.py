@@ -27,6 +27,25 @@ def valid_unittest() -> dict[str, object]:
     }
 
 
+def valid_parent_fingerprint() -> dict[str, object]:
+    return {
+        "schema_version": 2,
+        "source_label": "digital-colleague-runtime-research",
+        "source_revision": "dea9a9accc82fbedd35deb7117dcb5173223cf44",
+        "head_revision": "f" * 40,
+        "scope": "parent_source_excluding_authorized_target_subtree",
+        "excluded_repo_relative_subtree": "digital-colleagues",
+        "status_entry_count": 1,
+        "status_digest": "1" * 64,
+        "tracked_diff_digest": "2" * 64,
+        "index_diff_digest": "3" * 64,
+        "untracked_entry_count": 0,
+        "untracked_state_digest": "4" * 64,
+        "ignored_entry_count": 2,
+        "ignored_state_digest": "5" * 64,
+    }
+
+
 def valid_results() -> dict[str, dict[str, object]]:
     return {
         "boundary": {
@@ -50,10 +69,15 @@ def valid_results() -> dict[str, dict[str, object]]:
         },
         "architecture": {
             "gate": "p2_architecture_clean",
+            "policy_version": "p2-stdlib-internal-allowlist-v1",
+            "allowed_stdlib_import_root_count": 10,
             "forbidden_imports": 0,
+            "unapproved_imports": 0,
             "forbidden_io_imports": 0,
             "dependency_violations": 0,
             "nondeterministic_calls": 0,
+            "alias_resolved_unsafe_calls": 0,
+            "p3_paths_present": 0,
         },
         "core_contracts": {
             "gate": "p2_core_contracts_clean",
@@ -85,6 +109,8 @@ def write_valid(evidence: Path, **overrides: object) -> None:
         "provenance": results["provenance"],
         "architecture": results["architecture"],
         "core_contracts": results["core_contracts"],
+        "parent_fingerprint_before": valid_parent_fingerprint(),
+        "parent_fingerprint_after": valid_parent_fingerprint(),
         "unittest_outcome": valid_unittest(),
         "verified_gates": set(REQUIRED_EVIDENCE_GATES),
         "evaluated_branch": "codex/p2-core-primitives",
@@ -104,7 +130,7 @@ class P2EvidenceGateTests(unittest.TestCase):
             write_valid(evidence)
             summary = json.loads(evidence.read_text(encoding="utf-8"))
         self.assertEqual(summary["milestone"], "P2")
-        self.assertEqual(summary["schema_version"], 2)
+        self.assertEqual(summary["schema_version"], 3)
         self.assertEqual(summary["status"], "passed")
         self.assertEqual(summary["results"]["unittest"]["skipped"], 0)
         self.assertEqual(summary["migration"]["transformed_migration_count"], 0)
@@ -118,7 +144,12 @@ class P2EvidenceGateTests(unittest.TestCase):
         )
         self.assertEqual(
             summary["non_mechanical_claims"]["parent_worktree_unchanged"],
-            "not_evaluated",
+            "verified_only_for_adjacent_p2_reverification_fix_cycle",
+        )
+        self.assertEqual(summary["results"]["parent_worktree"]["status"], "passed")
+        self.assertEqual(
+            summary["results"]["parent_worktree"]["historical_p1_to_prior_p2_interval"],
+            "not_evaluated_no_contemporaneous_pair",
         )
 
     def test_missing_gate_does_not_overwrite_passed_artifact(self) -> None:
@@ -161,6 +192,35 @@ class P2EvidenceGateTests(unittest.TestCase):
             with self.assertRaisesRegex(EvidenceError, "core-contract result is incomplete"):
                 write_valid(evidence, core_contracts=results["core_contracts"])
             self.assertEqual(evidence.read_bytes(), original)
+
+    def test_parent_fingerprint_mismatch_does_not_overwrite(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            evidence = Path(temporary) / "summary.json"
+            original = b'{"status":"review_required","sentinel":true}\n'
+            evidence.write_bytes(original)
+            after = valid_parent_fingerprint()
+            after["ignored_state_digest"] = "6" * 64
+            with self.assertRaisesRegex(EvidenceError, "before/after fingerprints differ"):
+                write_valid(evidence, parent_fingerprint_after=after)
+            self.assertEqual(evidence.read_bytes(), original)
+
+    def test_parent_fingerprint_scope_revision_and_fields_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            evidence = Path(temporary) / "summary.json"
+            for label, mutation in (
+                ("revision", {"source_revision": "e" * 40}),
+                ("scope", {"scope": "broader_parent_scope"}),
+                ("extra field", {"ignored_path": "must-never-be-recorded"}),
+            ):
+                with self.subTest(label=label):
+                    before = valid_parent_fingerprint()
+                    before.update(mutation)
+                    with self.assertRaises(EvidenceError):
+                        write_valid(
+                            evidence,
+                            parent_fingerprint_before=before,
+                            parent_fingerprint_after=before,
+                        )
 
 
 if __name__ == "__main__":
