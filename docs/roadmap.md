@@ -4,9 +4,22 @@
 
 Each milestone stops at its gate. A later milestone must not begin automatically.
 
-Current checkpoint: the corrected P3 implementation and mechanical evidence remain isolated
-on the milestone branch and await independent acceptance. Accepted P0/P1/P2 artifacts remain
-unchanged; P4 has not started.
+Current checkpoint:
+
+- P3 has been accepted and fast-forward merged into `main`.
+- Historical P0–P3 artifacts and evidence remain unchanged.
+- P4 has not started.
+- The subsequent Roadmap rebaseline starts from the accepted P3 baseline.
+
+Rebaseline boundary:
+
+- [ADR 0003](adr/0003-colleague-experience-and-post-v0.1-boundary.md) defines the
+  colleague-experience capability model and the boundary between v0.1 and later work.
+- [Colleague Experience Evaluation](product/colleague-experience-evaluation.md) defines
+  P4–P6 scenarios, measurement points, and evidence classes without claiming a measured
+  improvement.
+- [Post-v0.1 Capability Outlook](product/post-v0.1-capability-outlook.md) records a
+  gated sequence for deferred capabilities. It is an outlook, not a v0.1 commitment.
 
 ## P0 — Public planning and boundary gate
 
@@ -65,30 +78,48 @@ records only new implementations and zero transformed source files.
 
 Build React, TypeScript, and Vite Studio; Docker Compose; bootstrap authentication; the
 colleague builder; work assignment; wake-cycle inspection; exact-effect approval; and
-causal audit views.
+causal audit views. Wake inspection must visualize the wake reason and trigger class.
+Present `EffectProposal` records as a proposal inbox in which a human can inspect the exact
+effect revision before approval. Add colleague-experience validation scenarios and
+measurement points for resuming work, explaining wakes, handling proposals, avoiding
+unnecessary interruptions, and completing finite work. Keep evidence classes explicit;
+synthetic and offline evidence do not imply human or live-provider validation. Semantic
+Memory is not part of P4.
 
-Exit: a clean local environment completes the documented five-minute Golden Path.
+Exit: a clean local environment completes the documented five-minute Golden Path, exposes
+the causal wake and proposal chain, and produces appropriately classified evaluation
+evidence without claiming that colleague experience has been proven to improve.
 
 ## P5 — Revisioned colleague builder
 
 Add draft lifecycle, identity cards, Mandate diffs, explicit defaults, responsibility and
-capability editing, revision confirmation, and safe change workflows.
+capability editing, revision confirmation, and safe change workflows. The revisioned builder
+must cover working hours, allowed triggers, proactivity policy, notification and interruption
+policy, wake budgets, and stop and escalation conditions. It must keep Profile preferences
+descriptive and separate from Mandate permissions and prohibitions. Every change retains an
+explicit revision, reviewable diff, confirmation, and stale-revision rejection.
 
 Exit: stale drafts and ambiguous authority changes are rejected and evidenced.
 
 ## P6 — Governance hardening
 
 Harden RBAC, session recovery, enrollment, CSRF and replay defenses, approval expiry,
-change approval, namespace tests, audit export, and abuse cases.
+change approval, namespace tests, audit export, and abuse cases. Apply RBAC, namespace
+scoping, change approval, expiry, replay protection, and abuse-case coverage to working-hour,
+trigger, proactivity, notification, interruption, wake-budget, stop, and escalation policies.
+Document security requirements for future Semantic Memory, Skills, and shared knowledge,
+including provenance, authorization, versioning, revocation, rollback, and misuse risks,
+without implementing capabilities that do not exist in v0.1.
 
 Exit: the documented local security test suite passes; production security is still not
 claimed.
 
 ## P7 — Optional adapters
 
-Add explicitly optional provider and channel adapters behind stable ports. Keep vendor
-tests separate, prevent live data from entering public fixtures, and require separate live
-acceptance.
+Add explicitly optional model, provider, and channel adapters behind stable ports. Keep
+vendor tests separate, prevent live data from entering public fixtures, and require separate
+live acceptance. The reference path remains deterministic. Semantic Memory is not required
+for P7.
 
 Exit: reference behavior stays deterministic and optional adapter contracts pass.
 
@@ -97,5 +128,18 @@ Exit: reference behavior stays deterministic and optional adapter contracts pass
 Add upgrade/backup/restore guidance, migration rollback evidence, diagnostics redaction,
 supply-chain inventory, release reproducibility, and public release checks.
 
+Converge only the implemented v0.1 scope; do not add Semantic Memory, Skill Learning, or a
+multi-person collaboration platform to the release milestone.
+
 Exit: v0.1 may be labeled a local reference release. Enterprise IAM, HA, distributed
-operation, production tenancy, compliance, and real-provider pilot claims remain separate.
+operation, production tenancy, compliance, real-provider pilot claims, Semantic Memory,
+Skill Learning, shared knowledge, multi-person collaboration, and Self-initiated autonomy
+remain separate.
+
+## Post-v0.1 outlook
+
+The non-committing [Post-v0.1 Capability Outlook](product/post-v0.1-capability-outlook.md)
+orders separately gated exploration as S1 memory-loop closure, S2 memory autonomy and
+bounded goal-driven proactivity, S3 knowledge decentralization and multi-person
+collaboration, and S4 a governed Skill system. Self-initiated autonomy may be considered
+only after those stages; none of these capabilities is required for the v0.1 P4–P8 gates.
