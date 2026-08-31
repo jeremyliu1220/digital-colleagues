@@ -59,7 +59,7 @@ class P3ArchitectureTests(unittest.TestCase):
         self.assertEqual(result["gate"], "p3_architecture_clean")
         self.assertEqual(
             result["policy_version"],
-            "p3-boundary-specific-determinism-allowlist-v3",
+            "p3-boundary-specific-determinism-allowlist-v4",
         )
         for field in (
             "unapproved_imports",
@@ -68,6 +68,7 @@ class P3ArchitectureTests(unittest.TestCase):
             "nondeterministic_imports",
             "nondeterministic_calls",
             "dynamic_capability_calls",
+            "reflection_capability_accesses",
             "alias_resolved_unsafe_calls",
             "stable_port_leaks",
         ):
@@ -172,8 +173,48 @@ class P3ArchitectureTests(unittest.TestCase):
                 with self.subTest(boundary=boundary, content=content):
                     self._assert_cli_and_direct_reject(content, boundary=boundary)
 
+    def test_reflection_and_subscript_capability_bypasses_fail_cli_and_direct(self) -> None:
+        fixtures = (
+            "loader = __builtins__.__dict__['__import__']\nDB = loader('sqlite3')\n",
+            "loader = vars(__builtins__)['__import__']\nDB = loader('sqlite3')\n",
+            "from datetime import datetime\nclock = datetime.__dict__['now']\nVALUE = clock()\n",
+            "reader = object.__getattribute__(__builtins__, 'open')\nVALUE = reader('synthetic')\n",
+        )
+        for boundary in sorted(DETERMINISTIC_BOUNDARIES):
+            for content in fixtures:
+                with self.subTest(boundary=boundary, content=content):
+                    self._assert_cli_and_direct_reject(content, boundary=boundary)
+
+    def test_reflection_builtin_variants_and_recursive_aliases_fail_cli_and_direct(self) -> None:
+        fixtures = (
+            "reader = __builtins__.__dict__['open']\nVALUE = reader('synthetic')\n",
+            "runner = __builtins__.__dict__['eval']\nVALUE = runner('1 + 1')\n",
+            "runner = __builtins__.__dict__['exec']\nrunner('VALUE = 1')\n",
+            "reader = __builtins__['open']\nVALUE = reader('synthetic')\n",
+            "name = 'open'\nmapping = __builtins__\nsecond = mapping\n"
+            "reader = second[name]\nVALUE = reader('synthetic')\n",
+            "mapping = __builtins__.__dict__\nsecond = mapping\nthird = second\n"
+            "loader = third['__import__']\nDB = loader('sqlite3')\n",
+            "reflect = vars\nsecond = reflect\nmapping = second(__builtins__)\n"
+            "loader = mapping['__import__']\nDB = loader('sqlite3')\n",
+            "scope = globals()\nloader = scope['__builtins__']['__import__']\n"
+            "DB = loader('sqlite3')\n",
+            "scope = locals()\nreader = scope['__builtins__']['open']\n"
+            "VALUE = reader('synthetic')\n",
+            "accessor = object.__getattribute__\nsecond = accessor\n"
+            "reader = second(__builtins__, 'open')\nVALUE = reader('synthetic')\n",
+        )
+        for boundary in sorted(DETERMINISTIC_BOUNDARIES):
+            for content in fixtures:
+                with self.subTest(boundary=boundary, content=content):
+                    self._assert_cli_and_direct_reject(content, boundary=boundary)
+
     def test_legal_deterministic_code_passes_cli_and_direct(self) -> None:
-        content = "from __future__ import annotations\nVALUE = (1 + 2) * 3\n"
+        content = (
+            "from __future__ import annotations\n"
+            "VALUES = {'answer': (1 + 2) * 3}\n"
+            "VALUE = VALUES['answer']\n"
+        )
         for boundary in sorted(DETERMINISTIC_BOUNDARIES):
             with self.subTest(boundary=boundary):
                 root = self._fixture(content, boundary=boundary)

@@ -10,7 +10,7 @@ import json
 import sys
 from pathlib import Path
 
-POLICY_VERSION = "p3-boundary-specific-determinism-allowlist-v3"
+POLICY_VERSION = "p3-boundary-specific-determinism-allowlist-v4"
 BOUNDARIES = {
     "core": "src/digital_colleagues/core",
     "governance": "src/digital_colleagues/governance",
@@ -171,6 +171,20 @@ FORBIDDEN_CALLS = frozenset(
     }
 )
 GETATTR_CALLS = frozenset({"builtins.getattr", "getattr"})
+REFLECTION_CALLS = frozenset(
+    {
+        "builtins.globals",
+        "builtins.locals",
+        "builtins.vars",
+        "globals",
+        "locals",
+        "object.__getattribute__",
+        "type.__getattribute__",
+        "vars",
+    }
+)
+REFLECTION_ATTRIBUTES = frozenset({"__dict__", "__getattribute__"})
+REFLECTION_NAMESPACE = "<dynamic-reflection-namespace>"
 STATIC_GETATTR_ROOTS = frozenset(
     {
         "builtins",
@@ -255,32 +269,102 @@ def _resolve(node: ast.expr, aliases: dict[str, str]) -> str | None:
         resolved = aliases.get(root, "builtins" if root == "__builtins__" else root)
         return resolved + (separator + suffix if separator else "")
     if isinstance(node, ast.Call):
-        return _literal_getattr_reference(node, aliases)
+        return (
+            _literal_getattr_reference(node, aliases)
+            or _literal_getattribute_reference(node, aliases)
+            or _reflection_mapping_reference(node, aliases)
+        )
+    if isinstance(node, ast.Subscript):
+        return _literal_subscript_reference(node, aliases)
     return None
+
+
+def _literal_attribute(node: ast.expr) -> str | None:
+    if isinstance(node, ast.Constant) and isinstance(node.value, str) and node.value.isidentifier():
+        return node.value
+    return None
+
+
+def _static_attribute_reference(
+    base_node: ast.expr, attribute_node: ast.expr, aliases: dict[str, str]
+) -> str | None:
+    attribute = _literal_attribute(attribute_node)
+    if attribute is None or attribute.startswith("__"):
+        return None
+    base = _resolve(base_node, aliases)
+    if base is None or base.split(".", 1)[0] not in STATIC_GETATTR_ROOTS:
+        return None
+    return f"{base}.{attribute}"
 
 
 def _literal_getattr_reference(node: ast.Call, aliases: dict[str, str]) -> str | None:
     callee = _resolve(node.func, aliases)
     if callee not in GETATTR_CALLS or len(node.args) != 2 or node.keywords:
         return None
-    attribute = node.args[1]
-    if (
-        not isinstance(attribute, ast.Constant)
-        or not isinstance(attribute.value, str)
-        or not attribute.value.isidentifier()
-        or attribute.value.startswith("__")
-    ):
+    return _static_attribute_reference(node.args[0], node.args[1], aliases)
+
+
+def _literal_getattribute_reference(node: ast.Call, aliases: dict[str, str]) -> str | None:
+    callee = _resolve(node.func, aliases)
+    if callee in {"object.__getattribute__", "type.__getattribute__"}:
+        if len(node.args) != 2 or node.keywords:
+            return None
+        return _static_attribute_reference(node.args[0], node.args[1], aliases)
+    if callee is None or not callee.endswith(".__getattribute__"):
         return None
+    if len(node.args) != 1 or node.keywords:
+        return None
+    attribute = _literal_attribute(node.args[0])
+    if attribute is None or attribute.startswith("__"):
+        return None
+    return f"{callee.removesuffix('.__getattribute__')}.{attribute}"
+
+
+def _reflection_mapping_reference(node: ast.Call, aliases: dict[str, str]) -> str | None:
+    callee = _resolve(node.func, aliases)
+    if callee in {"globals", "builtins.globals", "locals", "builtins.locals"}:
+        return REFLECTION_NAMESPACE
+    if callee not in {"vars", "builtins.vars"}:
+        return None
+    if len(node.args) != 1 or node.keywords:
+        return REFLECTION_NAMESPACE
     base = _resolve(node.args[0], aliases)
-    if base is None or base.split(".", 1)[0] not in STATIC_GETATTR_ROOTS:
+    if base is None:
+        return REFLECTION_NAMESPACE
+    return f"{base}.__dict__"
+
+
+def _literal_subscript_reference(node: ast.Subscript, aliases: dict[str, str]) -> str | None:
+    key = _literal_attribute(node.slice)
+    if key is None:
         return None
-    return f"{base}.{attribute.value}"
+    base = _resolve(node.value, aliases)
+    if base is None:
+        return None
+    if base == "builtins" or base.endswith(".__dict__"):
+        namespace = base.removesuffix(".__dict__")
+        return f"{namespace}.{key}"
+    if base == REFLECTION_NAMESPACE or base.startswith(REFLECTION_NAMESPACE + "."):
+        if key == "__builtins__":
+            return "builtins"
+        return f"{base}.{key}"
+    return None
 
 
 def _is_forbidden_reference(name: str | None) -> bool:
     if name is None:
         return False
     return name in FORBIDDEN_CALLS or name.split(".", 1)[0] in FORBIDDEN_CAPABILITY_ROOTS
+
+
+def _is_reflection_reference(name: str | None) -> bool:
+    if name is None:
+        return False
+    return (
+        name == REFLECTION_NAMESPACE
+        or name.startswith(REFLECTION_NAMESPACE + ".")
+        or any(part in REFLECTION_ATTRIBUTES for part in name.split("."))
+    )
 
 
 def _internal_allowed(boundary: str, module: str) -> bool:
@@ -302,6 +386,7 @@ def check_architecture(root: Path) -> dict[str, object]:
         "nondeterministic_imports": 0,
         "nondeterministic_calls": 0,
         "dynamic_capability_calls": 0,
+        "reflection_capability_accesses": 0,
         "alias_resolved_unsafe_calls": 0,
         "stable_port_leaks": 0,
     }
@@ -371,6 +456,28 @@ def check_architecture(root: Path) -> dict[str, object]:
                                 else "hidden_dynamic_capability"
                             )
                             violations.append(f"{relative}:{violation}")
+                    if name in REFLECTION_CALLS:
+                        counts["reflection_capability_accesses"] += 1
+                        if name != raw:
+                            counts["alias_resolved_unsafe_calls"] += 1
+                        violations.append(f"{relative}:hidden_reflection_entry")
+                if isinstance(node, ast.Attribute) and boundary in DETERMINISTIC_BOUNDARIES:
+                    if _is_reflection_reference(_resolve(node, aliases)):
+                        counts["reflection_capability_accesses"] += 1
+                        violations.append(f"{relative}:hidden_reflection_attribute")
+                if isinstance(node, ast.Subscript) and boundary in DETERMINISTIC_BOUNDARIES:
+                    reference = _resolve(node, aliases)
+                    base = _resolve(node.value, aliases)
+                    if (
+                        base == "builtins"
+                        or _is_reflection_reference(base)
+                        or _is_reflection_reference(reference)
+                        or _is_forbidden_reference(reference)
+                    ):
+                        counts["reflection_capability_accesses"] += 1
+                        if reference is not None:
+                            counts["alias_resolved_unsafe_calls"] += 1
+                        violations.append(f"{relative}:hidden_reflection_subscript")
             if boundary == "application" and document.name == "ports.py":
                 text = document.read_text(encoding="utf-8").lower()
                 leaked = tuple(value for value in STABLE_PORT_FORBIDDEN_TOKENS if value in text)

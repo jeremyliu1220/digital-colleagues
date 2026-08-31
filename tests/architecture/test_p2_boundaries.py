@@ -41,7 +41,7 @@ class P2BoundaryTests(unittest.TestCase):
         self.assertEqual(architecture["gate"], "p3_architecture_clean")
         self.assertEqual(
             architecture["policy_version"],
-            "p3-boundary-specific-determinism-allowlist-v3",
+            "p3-boundary-specific-determinism-allowlist-v4",
         )
         self.assertEqual(architecture["unapproved_imports"], 0)
         self.assertEqual(architecture["dependency_violations"], 0)
@@ -49,6 +49,7 @@ class P2BoundaryTests(unittest.TestCase):
         self.assertEqual(architecture["nondeterministic_imports"], 0)
         self.assertEqual(architecture["nondeterministic_calls"], 0)
         self.assertEqual(architecture["dynamic_capability_calls"], 0)
+        self.assertEqual(architecture["reflection_capability_accesses"], 0)
         self.assertEqual(contracts["gate"], "p2_core_contracts_clean")
         self.assertEqual(contracts["complete_effect_binding"], "passed")
         self.assertEqual(contracts["constraint_enforcement"], "passed")
