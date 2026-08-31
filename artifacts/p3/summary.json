@@ -4,9 +4,9 @@
   "evaluated_tree": {
     "branch": "codex/p3-headless-deterministic-slice",
     "evidence_commit_binding": "the subsequent commit containing these exact summary bytes",
-    "implementation_commit": "fad2c71d73c8f7e0d2fc70358d21cf2e34f9b2ef",
+    "implementation_commit": "8c919636e063b3335a36c5570902016fb0d32f21",
     "merge_base": "37fa1c3d21440130fcbeeaacf0534e445afeb343",
-    "public_tree_digest_excluding_summary": "sha256:315bc7c606ae28b3a914dfb7104e4137cfc1d88afccfa2ca3d122e2c56aecda2",
+    "public_tree_digest_excluding_summary": "sha256:1b0af605477b2b5a1d6fade0238ef658fe7cd8e110c7c06679fbe3c36f036bed",
     "remote_count": 0,
     "summary_exclusion_rule": "exclude_exact_artifacts/p3/summary.json_path_only"
   },
@@ -46,14 +46,14 @@
       "gate": "p3_architecture_clean",
       "nondeterministic_calls": 0,
       "nondeterministic_imports": 0,
-      "policy_version": "p3-boundary-specific-determinism-allowlist-v5",
+      "policy_version": "p3-boundary-specific-determinism-allowlist-v6",
       "reflection_capability_accesses": 0,
       "schema_version": 1,
       "stable_port_leaks": 0,
       "unapproved_imports": 0
     },
     "boundary": {
-      "bytes_scanned": 1017537,
+      "bytes_scanned": 1019647,
       "exceptions_applied": 0,
       "files_scanned": 174,
       "gate": "public_boundary_clean",
@@ -187,6 +187,7 @@
         "approval_time_fail_closed",
         "architecture_adversarial",
         "architecture_boundary_alias_bypass",
+        "architecture_builtins_namespace_fail_closed",
         "architecture_deterministic_control",
         "architecture_dunder_attribute_fail_closed",
         "architecture_dynamic_builtin_loading",
@@ -235,6 +236,7 @@
         "tests.architecture.test_p2_boundaries.P2BoundaryTests.test_uuid_randomness_exits_nonzero",
         "tests.architecture.test_p3_boundaries.P3ArchitectureTests.test_adversarial_unknown_import_alias_bypass_and_reverse_dependencies_fail",
         "tests.architecture.test_p3_boundaries.P3ArchitectureTests.test_boundary_specific_allowlists_and_assigned_alias_bypasses_fail_cli_and_direct",
+        "tests.architecture.test_p3_boundaries.P3ArchitectureTests.test_builtins_namespace_references_fail_cli_and_direct",
         "tests.architecture.test_p3_boundaries.P3ArchitectureTests.test_current_tree_satisfies_p3_dependency_and_determinism_policy",
         "tests.architecture.test_p3_boundaries.P3ArchitectureTests.test_dunder_attribute_reflection_bypasses_fail_cli_and_direct",
         "tests.architecture.test_p3_boundaries.P3ArchitectureTests.test_dynamic_builtin_calls_and_recursive_aliases_fail_cli_and_direct",
@@ -378,7 +380,7 @@
         "tests.runtime.test_p3_runtime.RuntimeSemanticsTests.test_wake_cycle_bounds_preserve_pending_work_and_agenda_takeover_fences_stale_owner",
         "tests.runtime.test_timer_runtime.TimerRuntimeTests.test_durable_timer_due_replay_restart_fencing_causation_and_namespace_isolation"
       ],
-      "tests_run": 155,
+      "tests_run": 156,
       "unexpected_successes": 0
     }
   },
