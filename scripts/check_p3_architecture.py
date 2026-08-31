@@ -10,7 +10,7 @@ import json
 import sys
 from pathlib import Path
 
-POLICY_VERSION = "p3-boundary-specific-determinism-allowlist-v5"
+POLICY_VERSION = "p3-boundary-specific-determinism-allowlist-v6"
 BOUNDARIES = {
     "core": "src/digital_colleagues/core",
     "governance": "src/digital_colleagues/governance",
@@ -184,6 +184,7 @@ REFLECTION_CALLS = frozenset(
     }
 )
 ALLOWED_DUNDER_ATTRIBUTES = frozenset({"object.__setattr__"})
+FORBIDDEN_REFLECTION_NAMES = frozenset({"__builtins__"})
 REFLECTION_NAMESPACE = "<dynamic-reflection-namespace>"
 STATIC_GETATTR_ROOTS = frozenset(
     {
@@ -476,6 +477,13 @@ def check_architecture(root: Path) -> dict[str, object]:
                     ) or _is_reflection_reference(reference):
                         counts["reflection_capability_accesses"] += 1
                         violations.append(f"{relative}:hidden_reflection_attribute")
+                if (
+                    isinstance(node, ast.Name)
+                    and boundary in DETERMINISTIC_BOUNDARIES
+                    and node.id in FORBIDDEN_REFLECTION_NAMES
+                ):
+                    counts["reflection_capability_accesses"] += 1
+                    violations.append(f"{relative}:hidden_builtins_namespace")
                 if isinstance(node, ast.Subscript) and boundary in DETERMINISTIC_BOUNDARIES:
                     reference = _resolve(node, aliases)
                     base = _resolve(node.value, aliases)

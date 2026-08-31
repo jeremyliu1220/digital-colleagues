@@ -59,7 +59,7 @@ class P3ArchitectureTests(unittest.TestCase):
         self.assertEqual(result["gate"], "p3_architecture_clean")
         self.assertEqual(
             result["policy_version"],
-            "p3-boundary-specific-determinism-allowlist-v5",
+            "p3-boundary-specific-determinism-allowlist-v6",
         )
         for field in (
             "unapproved_imports",
@@ -257,11 +257,26 @@ class P3ArchitectureTests(unittest.TestCase):
         project_root = Path(__file__).resolve().parents[2]
         self.assertEqual(check_architecture(project_root)["gate"], "p3_architecture_clean")
 
+    def test_builtins_namespace_references_fail_cli_and_direct(self) -> None:
+        fixtures = (
+            "loader = __builtins__.get('__import__')\nDB = loader('sqlite3')\n",
+            "loader = dict.get(__builtins__, '__import__')\nDB = loader('sqlite3')\n",
+            "reader = __builtins__.get('open')\n",
+            "mapping = __builtins__\nsecond = mapping\n"
+            "loader = second.get('__import__')\nDB = loader('sqlite3')\n",
+            "__builtins__ = {'answer': 9}\n",
+            "del __builtins__\n",
+        )
+        for boundary in sorted(DETERMINISTIC_BOUNDARIES):
+            for content in fixtures:
+                with self.subTest(boundary=boundary, content=content):
+                    self._assert_cli_and_direct_reject(content, boundary=boundary)
+
     def test_legal_deterministic_code_passes_cli_and_direct(self) -> None:
         content = (
             "from __future__ import annotations\n"
             "VALUES = {'answer': (1 + 2) * 3}\n"
-            "VALUE = VALUES['answer']\n"
+            "VALUE = VALUES.get('answer')\n"
         )
         for boundary in sorted(DETERMINISTIC_BOUNDARIES):
             with self.subTest(boundary=boundary):

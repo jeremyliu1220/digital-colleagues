@@ -20,6 +20,7 @@ REQUIRED_TEST_BOUNDARIES = {
     "tests.architecture.test_p3_boundaries.P3ArchitectureTests.test_reflection_builtin_variants_and_recursive_aliases_fail_cli_and_direct": "architecture_reflection_alias_fail_closed",
     "tests.architecture.test_p3_boundaries.P3ArchitectureTests.test_dunder_attribute_reflection_bypasses_fail_cli_and_direct": "architecture_dunder_attribute_fail_closed",
     "tests.architecture.test_p3_boundaries.P3ArchitectureTests.test_object_setattr_exact_allowlist_and_repository_pass": "architecture_object_setattr_allowlist",
+    "tests.architecture.test_p3_boundaries.P3ArchitectureTests.test_builtins_namespace_references_fail_cli_and_direct": "architecture_builtins_namespace_fail_closed",
     "tests.architecture.test_p3_boundaries.P3ArchitectureTests.test_legal_deterministic_code_passes_cli_and_direct": "architecture_deterministic_control",
     "tests.persistence.test_sqlite_semantics.SQLiteSemanticsTests.test_migration_order_checksum_tampering_and_future_schema_fail_closed": "migration_identity",
     "tests.persistence.test_sqlite_semantics.SQLiteSemanticsTests.test_migration_failure_rolls_back_without_partial_schema_or_metadata": "migration_atomicity",

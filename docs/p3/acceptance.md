@@ -31,7 +31,7 @@ and stable ports may depend only on core, governance, and application contracts;
 import concrete adapters or HTTP types. Pydantic and FastAPI are confined to `api/`. Stable
 ports expose no ORM, provider, framework, filesystem-path, or database types. Each boundary
 has its own standard-library allowlist; SQLite and filesystem I/O are confined to the
-SQLite adapter. Policy `p3-boundary-specific-determinism-allowlist-v5` resolves import,
+SQLite adapter. Policy `p3-boundary-specific-determinism-allowlist-v6` resolves import,
 from-import, assigned-callable, attribute-chain, recursive rebinding, and statically safe
 literal `getattr` aliases before capability checks. Dynamic import and execution through
 `__import__`, `compile`, `eval`, `exec`, `input`, or `open` are forbidden directly and
@@ -41,7 +41,10 @@ unresolved dynamic `getattr` access fails closed. Reflective `__dict__` and
 entry points are rejected or resolved to their forbidden capability; unresolved reflection
 fails closed. Every double-underscore Attribute is rejected unless its resolved qualified
 name is exactly the frozen-dataclass requirement `object.__setattr__`; instance or other
-object dunder access is not allowed. Architecture fixtures must make unknown imports, reverse dependencies,
+object dunder access is not allowed. Any explicit `__builtins__` Name is forbidden in every
+AST context within a deterministic boundary, independent of how the namespace would later
+be accessed; ordinary application data may continue to use `dict.get`. Architecture
+fixtures must make unknown imports, reverse dependencies,
 edge-type leakage, wall-clock calls, UUID, randomness, environment, filesystem, process,
 network, and dynamic capability access fail with nonzero status while explicit deterministic
 code, safe literal `getattr`, and ordinary data subscripts continue to pass.
