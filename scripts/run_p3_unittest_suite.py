@@ -14,6 +14,9 @@ from typing import Any, TextIO
 REQUIRED_TEST_BOUNDARIES = {
     "tests.architecture.test_p3_boundaries.P3ArchitectureTests.test_adversarial_unknown_import_alias_bypass_and_reverse_dependencies_fail": "architecture_adversarial",
     "tests.architecture.test_p3_boundaries.P3ArchitectureTests.test_boundary_specific_allowlists_and_assigned_alias_bypasses_fail_cli_and_direct": "architecture_boundary_alias_bypass",
+    "tests.architecture.test_p3_boundaries.P3ArchitectureTests.test_dynamic_builtin_calls_and_recursive_aliases_fail_cli_and_direct": "architecture_dynamic_builtin_loading",
+    "tests.architecture.test_p3_boundaries.P3ArchitectureTests.test_literal_and_unresolved_getattr_capabilities_fail_cli_and_direct": "architecture_getattr_fail_closed",
+    "tests.architecture.test_p3_boundaries.P3ArchitectureTests.test_legal_deterministic_code_passes_cli_and_direct": "architecture_deterministic_control",
     "tests.persistence.test_sqlite_semantics.SQLiteSemanticsTests.test_migration_order_checksum_tampering_and_future_schema_fail_closed": "migration_identity",
     "tests.persistence.test_sqlite_semantics.SQLiteSemanticsTests.test_migration_failure_rolls_back_without_partial_schema_or_metadata": "migration_atomicity",
     "tests.persistence.test_sqlite_semantics.SQLiteSemanticsTests.test_v2_database_upgrades_to_timer_schema_without_losing_durable_records": "migration_v2_timer_upgrade",

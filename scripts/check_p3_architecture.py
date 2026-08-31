@@ -10,7 +10,7 @@ import json
 import sys
 from pathlib import Path
 
-POLICY_VERSION = "p3-boundary-specific-determinism-allowlist-v2"
+POLICY_VERSION = "p3-boundary-specific-determinism-allowlist-v3"
 BOUNDARIES = {
     "core": "src/digital_colleagues/core",
     "governance": "src/digital_colleagues/governance",
@@ -139,19 +139,43 @@ FORBIDDEN_CAPABILITY_ROOTS = frozenset(
         "uuid",
     }
 )
+FORBIDDEN_BUILTIN_CALLS = frozenset(
+    {
+        "__import__",
+        "compile",
+        "eval",
+        "exec",
+        "input",
+        "open",
+    }
+)
 FORBIDDEN_CALLS = frozenset(
     {
+        *(f"builtins.{name}" for name in FORBIDDEN_BUILTIN_CALLS),
+        *FORBIDDEN_BUILTIN_CALLS,
         "datetime.date.today",
         "datetime.datetime.now",
         "datetime.datetime.utcnow",
         "datetime.now",
         "datetime.utcnow",
-        "open",
         "time.monotonic",
+        "time.monotonic_ns",
         "time.perf_counter",
+        "time.perf_counter_ns",
+        "time.process_time",
+        "time.process_time_ns",
         "time.time",
+        "time.time_ns",
         "uuid.uuid1",
         "uuid.uuid4",
+    }
+)
+GETATTR_CALLS = frozenset({"builtins.getattr", "getattr"})
+STATIC_GETATTR_ROOTS = frozenset(
+    {
+        "builtins",
+        *(root for allowed in STDLIB_ALLOWED.values() for root in allowed),
+        *FORBIDDEN_CAPABILITY_ROOTS,
     }
 )
 EDGE_TYPES = frozenset({"fastapi", "pydantic", "sqlalchemy", "sqlmodel"})
@@ -226,11 +250,37 @@ def _aliases(tree: ast.AST) -> dict[str, str]:
 
 def _resolve(node: ast.expr, aliases: dict[str, str]) -> str | None:
     name = _qualified_name(node)
-    if name is None:
+    if name is not None:
+        root, separator, suffix = name.partition(".")
+        resolved = aliases.get(root, "builtins" if root == "__builtins__" else root)
+        return resolved + (separator + suffix if separator else "")
+    if isinstance(node, ast.Call):
+        return _literal_getattr_reference(node, aliases)
+    return None
+
+
+def _literal_getattr_reference(node: ast.Call, aliases: dict[str, str]) -> str | None:
+    callee = _resolve(node.func, aliases)
+    if callee not in GETATTR_CALLS or len(node.args) != 2 or node.keywords:
         return None
-    root, separator, suffix = name.partition(".")
-    resolved = aliases.get(root, root)
-    return resolved + (separator + suffix if separator else "")
+    attribute = node.args[1]
+    if (
+        not isinstance(attribute, ast.Constant)
+        or not isinstance(attribute.value, str)
+        or not attribute.value.isidentifier()
+        or attribute.value.startswith("__")
+    ):
+        return None
+    base = _resolve(node.args[0], aliases)
+    if base is None or base.split(".", 1)[0] not in STATIC_GETATTR_ROOTS:
+        return None
+    return f"{base}.{attribute.value}"
+
+
+def _is_forbidden_reference(name: str | None) -> bool:
+    if name is None:
+        return False
+    return name in FORBIDDEN_CALLS or name.split(".", 1)[0] in FORBIDDEN_CAPABILITY_ROOTS
 
 
 def _internal_allowed(boundary: str, module: str) -> bool:
@@ -251,6 +301,7 @@ def check_architecture(root: Path) -> dict[str, object]:
         "edge_type_leaks": 0,
         "nondeterministic_imports": 0,
         "nondeterministic_calls": 0,
+        "dynamic_capability_calls": 0,
         "alias_resolved_unsafe_calls": 0,
         "stable_port_leaks": 0,
     }
@@ -303,12 +354,23 @@ def check_architecture(root: Path) -> dict[str, object]:
                 if isinstance(node, ast.Call) and boundary in DETERMINISTIC_BOUNDARIES:
                     raw = _qualified_name(node.func)
                     name = _resolve(node.func, aliases)
-                    root_name = name.split(".", 1)[0] if name else ""
-                    if name in FORBIDDEN_CALLS or root_name in FORBIDDEN_CAPABILITY_ROOTS:
+                    if _is_forbidden_reference(name):
                         counts["nondeterministic_calls"] += 1
                         if name != raw:
                             counts["alias_resolved_unsafe_calls"] += 1
                         violations.append(f"{relative}:hidden_nondeterministic_call")
+                    if name in GETATTR_CALLS:
+                        reference = _literal_getattr_reference(node, aliases)
+                        if reference is None or _is_forbidden_reference(reference):
+                            counts["dynamic_capability_calls"] += 1
+                            if name != raw or reference is not None:
+                                counts["alias_resolved_unsafe_calls"] += 1
+                            violation = (
+                                "unresolved_dynamic_getattr"
+                                if reference is None
+                                else "hidden_dynamic_capability"
+                            )
+                            violations.append(f"{relative}:{violation}")
             if boundary == "application" and document.name == "ports.py":
                 text = document.read_text(encoding="utf-8").lower()
                 leaked = tuple(value for value in STABLE_PORT_FORBIDDEN_TOKENS if value in text)

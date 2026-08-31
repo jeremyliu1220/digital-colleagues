@@ -5,11 +5,12 @@ from __future__ import annotations
 import io
 import tempfile
 import unittest
-from contextlib import redirect_stderr
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
 from scripts.check_p3_architecture import (
     BOUNDARIES,
+    DETERMINISTIC_BOUNDARIES,
     ArchitectureError,
     check_architecture,
 )
@@ -25,6 +26,16 @@ class P3ArchitectureTests(unittest.TestCase):
             (root / relative).mkdir(parents=True)
         (root / BOUNDARIES[boundary] / filename).write_text(content, encoding="utf-8")
         return root
+
+    def _assert_cli_and_direct_reject(self, content: str, *, boundary: str) -> None:
+        root = self._fixture(content, boundary=boundary)
+        with self.assertRaises(ArchitectureError):
+            check_architecture(root)
+        diagnostics = io.StringIO()
+        with redirect_stderr(diagnostics):
+            exit_code = architecture_main([str(root)])
+        self.assertNotEqual(exit_code, 0)
+        self.assertIn("P3 architecture check failed", diagnostics.getvalue())
 
     def test_adversarial_unknown_import_alias_bypass_and_reverse_dependencies_fail(self) -> None:
         fixtures = (
@@ -48,7 +59,7 @@ class P3ArchitectureTests(unittest.TestCase):
         self.assertEqual(result["gate"], "p3_architecture_clean")
         self.assertEqual(
             result["policy_version"],
-            "p3-boundary-specific-determinism-allowlist-v2",
+            "p3-boundary-specific-determinism-allowlist-v3",
         )
         for field in (
             "unapproved_imports",
@@ -56,6 +67,7 @@ class P3ArchitectureTests(unittest.TestCase):
             "edge_type_leaks",
             "nondeterministic_imports",
             "nondeterministic_calls",
+            "dynamic_capability_calls",
             "alias_resolved_unsafe_calls",
             "stable_port_leaks",
         ):
@@ -105,6 +117,75 @@ class P3ArchitectureTests(unittest.TestCase):
                     exit_code = architecture_main([str(root)])
                 self.assertNotEqual(exit_code, 0)
                 self.assertIn("P3 architecture check failed", diagnostics.getvalue())
+
+    def test_dynamic_builtin_calls_and_recursive_aliases_fail_cli_and_direct(self) -> None:
+        direct_calls = (
+            "__import__('sqlite3')",
+            "compile('VALUE = 1', 'synthetic', 'exec')",
+            "eval(\"__import__('sqlite3').connect(':memory:')\")",
+            "exec(\"__import__('sqlite3').connect(':memory:')\")",
+            "input('synthetic')",
+            "open('synthetic')",
+        )
+        recursive_alias_calls = (
+            ("__import__", "('sqlite3')"),
+            ("compile", "('VALUE = 1', 'synthetic', 'exec')"),
+            ("eval", "('1 + 1')"),
+            ("exec", "('VALUE = 1')"),
+            ("input", "('synthetic')"),
+            ("open", "('synthetic')"),
+        )
+        for boundary in sorted(DETERMINISTIC_BOUNDARIES):
+            with self.subTest(boundary=boundary, kind="direct_import"):
+                self._assert_cli_and_direct_reject(
+                    "DB = __import__('sqlite3')\n", boundary=boundary
+                )
+            exact_import_alias = "loader = __import__\nDB = loader('sqlite3')\n"
+            with self.subTest(boundary=boundary, kind="assigned_import_alias"):
+                self._assert_cli_and_direct_reject(exact_import_alias, boundary=boundary)
+            for call in direct_calls:
+                with self.subTest(boundary=boundary, kind="direct", call=call):
+                    self._assert_cli_and_direct_reject(f"VALUE = {call}\n", boundary=boundary)
+            for capability, arguments in recursive_alias_calls:
+                content = (
+                    f"first = {capability}\n"
+                    "second = first\n"
+                    "third = second\n"
+                    f"VALUE = third{arguments}\n"
+                )
+                with self.subTest(boundary=boundary, kind="recursive_alias", call=capability):
+                    self._assert_cli_and_direct_reject(content, boundary=boundary)
+
+    def test_literal_and_unresolved_getattr_capabilities_fail_cli_and_direct(self) -> None:
+        fixtures = (
+            "from datetime import datetime\nclock = getattr(datetime, 'now')\nclock()\n",
+            "from datetime import datetime\nclock = getattr(datetime, 'utcnow')\nclock()\n",
+            "reader = getattr(__builtins__, 'open')\nreader('synthetic')\n",
+            "loader = getattr(__builtins__, '__import__')\nloader('sqlite3')\n",
+            "from datetime import date\nclock = getattr(date, 'today')\nclock()\n",
+            "from datetime import datetime\nname = 'now'\nclock = getattr(datetime, name)\nclock()\n",
+            "selector = getattr\nlookup = selector\nreader = lookup(__builtins__, 'open')\n"
+            "reader('synthetic')\n",
+        )
+        for boundary in sorted(DETERMINISTIC_BOUNDARIES):
+            for content in fixtures:
+                with self.subTest(boundary=boundary, content=content):
+                    self._assert_cli_and_direct_reject(content, boundary=boundary)
+
+    def test_legal_deterministic_code_passes_cli_and_direct(self) -> None:
+        content = "from __future__ import annotations\nVALUE = (1 + 2) * 3\n"
+        for boundary in sorted(DETERMINISTIC_BOUNDARIES):
+            with self.subTest(boundary=boundary):
+                root = self._fixture(content, boundary=boundary)
+                result = check_architecture(root)
+                self.assertEqual(result["gate"], "p3_architecture_clean")
+                with redirect_stdout(io.StringIO()):
+                    self.assertEqual(architecture_main([str(root)]), 0)
+        safe_getattr = "import math\nROOT = getattr(math, 'sqrt')(9)\n"
+        root = self._fixture(safe_getattr, boundary="core")
+        self.assertEqual(check_architecture(root)["gate"], "p3_architecture_clean")
+        with redirect_stdout(io.StringIO()):
+            self.assertEqual(architecture_main([str(root)]), 0)
 
 
 if __name__ == "__main__":

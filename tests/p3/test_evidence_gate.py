@@ -67,12 +67,13 @@ def _results() -> dict[str, dict[str, object]]:
         },
         "architecture": {
             "gate": "p3_architecture_clean",
-            "policy_version": "p3-boundary-specific-determinism-allowlist-v2",
+            "policy_version": "p3-boundary-specific-determinism-allowlist-v3",
             "unapproved_imports": 0,
             "dependency_violations": 0,
             "edge_type_leaks": 0,
             "nondeterministic_imports": 0,
             "nondeterministic_calls": 0,
+            "dynamic_capability_calls": 0,
             "alias_resolved_unsafe_calls": 0,
             "stable_port_leaks": 0,
         },
@@ -162,6 +163,10 @@ class P3EvidenceGateTests(unittest.TestCase):
                 _write(path, merge_base="e" * 40)
             with self.assertRaises(EvidenceError):
                 _write(path, remote_count=1)
+            results = _results()
+            results["architecture"]["dynamic_capability_calls"] = 1
+            with self.assertRaises(EvidenceError):
+                _write(path, results=results)
             results = _results()
             results["architecture"]["policy_version"] = "unknown"
             with self.assertRaises(EvidenceError):

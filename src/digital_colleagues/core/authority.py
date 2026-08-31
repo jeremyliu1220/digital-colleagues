@@ -136,13 +136,25 @@ class EffectBoundary:
             raise CoreInvariantError("human_approval_required must be boolean")
 
 
-def _freeze_unique_records(values: object, id_attribute: str, field: str) -> tuple[object, ...]:
+def _record_identifier(record: object) -> str | None:
+    if isinstance(record, ResponsibilityDefinition):
+        return record.responsibility_id
+    if isinstance(record, CapabilityGrant):
+        return record.capability_id
+    if isinstance(record, Constraint):
+        return record.constraint_id
+    if isinstance(record, EffectBoundary):
+        return record.boundary_id
+    return None
+
+
+def _freeze_unique_records(values: object, field: str) -> tuple[object, ...]:
     if not isinstance(values, Iterable):
         raise CoreInvariantError(f"{field} must be a collection")
     records: tuple[object, ...] = tuple(values)
     if not records:
         raise CoreInvariantError(f"{field} must not be empty")
-    identifiers = tuple(getattr(record, id_attribute, None) for record in records)
+    identifiers = tuple(_record_identifier(record) for record in records)
     if any(not isinstance(identifier, str) for identifier in identifiers):
         raise CoreInvariantError(f"{field} contains an invalid record")
     if len(identifiers) != len(set(identifiers)):
@@ -178,14 +190,10 @@ class Mandate:
             "service_relationship",
             require_text(self.service_relationship, "service_relationship"),
         )
-        responsibilities = _freeze_unique_records(
-            self.responsibilities, "responsibility_id", "responsibilities"
-        )
-        capabilities = _freeze_unique_records(self.capabilities, "capability_id", "capabilities")
-        constraints = _freeze_unique_records(self.constraints, "constraint_id", "constraints")
-        effect_boundaries = _freeze_unique_records(
-            self.effect_boundaries, "boundary_id", "effect_boundaries"
-        )
+        responsibilities = _freeze_unique_records(self.responsibilities, "responsibilities")
+        capabilities = _freeze_unique_records(self.capabilities, "capabilities")
+        constraints = _freeze_unique_records(self.constraints, "constraints")
+        effect_boundaries = _freeze_unique_records(self.effect_boundaries, "effect_boundaries")
         if not all(isinstance(value, ResponsibilityDefinition) for value in responsibilities):
             raise CoreInvariantError("responsibilities contain an invalid record")
         if not all(isinstance(value, CapabilityGrant) for value in capabilities):
@@ -304,18 +312,51 @@ class MandateAuthorityDiff:
         require_revision(self.to_revision, "to_revision")
         if self.to_revision <= self.from_revision:
             raise CoreInvariantError("authority diff requires an increasing revision")
-        for field_name in (
-            "mission_changed",
-            "service_relationship_changed",
-            "working_context_changed",
+        for field_name, value in (
+            ("mission_changed", self.mission_changed),
+            ("service_relationship_changed", self.service_relationship_changed),
+            ("working_context_changed", self.working_context_changed),
         ):
-            if type(getattr(self, field_name)) is not bool:
+            if type(value) is not bool:
                 raise CoreInvariantError(f"{field_name} must be boolean")
-        for prefix in ("responsibility", "capability", "constraint", "effect_boundary"):
+        diff_fields = (
+            (
+                "responsibility",
+                (
+                    ("added_responsibility_ids", self.added_responsibility_ids),
+                    ("removed_responsibility_ids", self.removed_responsibility_ids),
+                    ("changed_responsibility_ids", self.changed_responsibility_ids),
+                ),
+            ),
+            (
+                "capability",
+                (
+                    ("added_capability_ids", self.added_capability_ids),
+                    ("removed_capability_ids", self.removed_capability_ids),
+                    ("changed_capability_ids", self.changed_capability_ids),
+                ),
+            ),
+            (
+                "constraint",
+                (
+                    ("added_constraint_ids", self.added_constraint_ids),
+                    ("removed_constraint_ids", self.removed_constraint_ids),
+                    ("changed_constraint_ids", self.changed_constraint_ids),
+                ),
+            ),
+            (
+                "effect_boundary",
+                (
+                    ("added_effect_boundary_ids", self.added_effect_boundary_ids),
+                    ("removed_effect_boundary_ids", self.removed_effect_boundary_ids),
+                    ("changed_effect_boundary_ids", self.changed_effect_boundary_ids),
+                ),
+            ),
+        )
+        for prefix, fields_and_values in diff_fields:
             groups: list[tuple[str, ...]] = []
-            for operation in ("added", "removed", "changed"):
-                field_name = f"{operation}_{prefix}_ids"
-                identifiers = freeze_strings(getattr(self, field_name), field_name)
+            for field_name, raw_identifiers in fields_and_values:
+                identifiers = freeze_strings(raw_identifiers, field_name)
                 for identifier in identifiers:
                     require_stable_id(identifier, field_name)
                 object.__setattr__(self, field_name, identifiers)
@@ -331,11 +372,21 @@ class MandateAuthorityDiff:
                 raise CoreInvariantError(f"{prefix} diff categories must be disjoint")
 
 
+def _records_by_id(records: tuple[object, ...]) -> dict[str, object]:
+    records_by_id: dict[str, object] = {}
+    for record in records:
+        identifier = _record_identifier(record)
+        if identifier is None:
+            raise CoreInvariantError("authority diff contains an invalid record")
+        records_by_id[identifier] = record
+    return records_by_id
+
+
 def _record_diff(
-    before: tuple[object, ...], after: tuple[object, ...], id_attribute: str
+    before: tuple[object, ...], after: tuple[object, ...]
 ) -> tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]]:
-    before_by_id = {str(getattr(item, id_attribute)): item for item in before}
-    after_by_id = {str(getattr(item, id_attribute)): item for item in after}
+    before_by_id = _records_by_id(before)
+    after_by_id = _records_by_id(after)
     added = tuple(sorted(after_by_id.keys() - before_by_id.keys()))
     removed = tuple(sorted(before_by_id.keys() - after_by_id.keys()))
     changed = tuple(
@@ -354,12 +405,10 @@ def diff_mandate_authority(before: Mandate, after: Mandate) -> MandateAuthorityD
         raise CoreInvariantError("authority diff requires the same mandate ID")
     if after.revision <= before.revision:
         raise CoreInvariantError("authority diff requires a newer Mandate revision")
-    responsibility = _record_diff(
-        before.responsibilities, after.responsibilities, "responsibility_id"
-    )
-    capability = _record_diff(before.capabilities, after.capabilities, "capability_id")
-    constraint = _record_diff(before.constraints, after.constraints, "constraint_id")
-    boundary = _record_diff(before.effect_boundaries, after.effect_boundaries, "boundary_id")
+    responsibility = _record_diff(before.responsibilities, after.responsibilities)
+    capability = _record_diff(before.capabilities, after.capabilities)
+    constraint = _record_diff(before.constraints, after.constraints)
+    boundary = _record_diff(before.effect_boundaries, after.effect_boundaries)
     return MandateAuthorityDiff(
         namespace=before.namespace,
         mandate_id=before.mandate_id,
