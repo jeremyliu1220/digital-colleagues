@@ -59,7 +59,7 @@ class P3ArchitectureTests(unittest.TestCase):
         self.assertEqual(result["gate"], "p3_architecture_clean")
         self.assertEqual(
             result["policy_version"],
-            "p3-boundary-specific-determinism-allowlist-v4",
+            "p3-boundary-specific-determinism-allowlist-v5",
         )
         for field in (
             "unapproved_imports",
@@ -208,6 +208,54 @@ class P3ArchitectureTests(unittest.TestCase):
             for content in fixtures:
                 with self.subTest(boundary=boundary, content=content):
                     self._assert_cli_and_direct_reject(content, boundary=boundary)
+
+    def test_dunder_attribute_reflection_bypasses_fail_cli_and_direct(self) -> None:
+        function = "def marker():\n    return None\n"
+        method = "class Holder:\n    def method(self):\n        return None\nholder = Holder()\n"
+        fixtures = (
+            "import json\n"
+            "loader = json.dumps.__globals__['__builtins__']['__import__']\n"
+            "DB = loader('sqlite3')\n",
+            function + "scope = marker.__globals__\n",
+            "scope = (lambda: None).__globals__\n",
+            "CLASSES = object.__subclasses__()\n",
+            function + "VALUE = marker.__class__\n",
+            function + "VALUE = type(marker).__base__\n",
+            function + "VALUE = type(marker).__bases__\n",
+            function + "VALUE = type(marker).__mro__\n",
+            function + "VALUE = marker.__code__\n",
+            function + "VALUE = marker.__closure__\n",
+            method + "VALUE = holder.method.__func__\n",
+            method + "VALUE = holder.method.__self__\n",
+            function + "VALUE = marker.__module__\n",
+            "import json\nVALUE = json.__loader__\n",
+            "import json\nVALUE = json.__spec__\n",
+            function + "VALUE = marker.__dict__\n",
+            function + "VALUE = marker.__getattribute__\n",
+        )
+        for boundary in sorted(DETERMINISTIC_BOUNDARIES):
+            for content in fixtures:
+                with self.subTest(boundary=boundary, content=content):
+                    self._assert_cli_and_direct_reject(content, boundary=boundary)
+
+    def test_object_setattr_exact_allowlist_and_repository_pass(self) -> None:
+        content = (
+            "from dataclasses import dataclass\n"
+            "@dataclass(frozen=True)\n"
+            "class FrozenValue:\n"
+            "    value: int\n"
+            "    def __post_init__(self):\n"
+            "        object.__setattr__(self, 'value', int(self.value))\n"
+            "VALUE = FrozenValue(1)\n"
+        )
+        for boundary in sorted(DETERMINISTIC_BOUNDARIES):
+            with self.subTest(boundary=boundary):
+                root = self._fixture(content, boundary=boundary)
+                self.assertEqual(check_architecture(root)["gate"], "p3_architecture_clean")
+                with redirect_stdout(io.StringIO()):
+                    self.assertEqual(architecture_main([str(root)]), 0)
+        project_root = Path(__file__).resolve().parents[2]
+        self.assertEqual(check_architecture(project_root)["gate"], "p3_architecture_clean")
 
     def test_legal_deterministic_code_passes_cli_and_direct(self) -> None:
         content = (

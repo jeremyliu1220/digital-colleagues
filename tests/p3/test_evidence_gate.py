@@ -67,7 +67,7 @@ def _results() -> dict[str, dict[str, object]]:
         },
         "architecture": {
             "gate": "p3_architecture_clean",
-            "policy_version": "p3-boundary-specific-determinism-allowlist-v4",
+            "policy_version": "p3-boundary-specific-determinism-allowlist-v5",
             "unapproved_imports": 0,
             "dependency_violations": 0,
             "edge_type_leaks": 0,

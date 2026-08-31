@@ -10,7 +10,7 @@ import json
 import sys
 from pathlib import Path
 
-POLICY_VERSION = "p3-boundary-specific-determinism-allowlist-v4"
+POLICY_VERSION = "p3-boundary-specific-determinism-allowlist-v5"
 BOUNDARIES = {
     "core": "src/digital_colleagues/core",
     "governance": "src/digital_colleagues/governance",
@@ -183,7 +183,7 @@ REFLECTION_CALLS = frozenset(
         "vars",
     }
 )
-REFLECTION_ATTRIBUTES = frozenset({"__dict__", "__getattribute__"})
+ALLOWED_DUNDER_ATTRIBUTES = frozenset({"object.__setattr__"})
 REFLECTION_NAMESPACE = "<dynamic-reflection-namespace>"
 STATIC_GETATTR_ROOTS = frozenset(
     {
@@ -357,13 +357,20 @@ def _is_forbidden_reference(name: str | None) -> bool:
     return name in FORBIDDEN_CALLS or name.split(".", 1)[0] in FORBIDDEN_CAPABILITY_ROOTS
 
 
+def _is_dunder_attribute(attribute: str) -> bool:
+    return len(attribute) > 4 and attribute.startswith("__") and attribute.endswith("__")
+
+
 def _is_reflection_reference(name: str | None) -> bool:
     if name is None:
         return False
     return (
         name == REFLECTION_NAMESPACE
         or name.startswith(REFLECTION_NAMESPACE + ".")
-        or any(part in REFLECTION_ATTRIBUTES for part in name.split("."))
+        or (
+            name not in ALLOWED_DUNDER_ATTRIBUTES
+            and any(_is_dunder_attribute(part) for part in name.split("."))
+        )
     )
 
 
@@ -462,7 +469,11 @@ def check_architecture(root: Path) -> dict[str, object]:
                             counts["alias_resolved_unsafe_calls"] += 1
                         violations.append(f"{relative}:hidden_reflection_entry")
                 if isinstance(node, ast.Attribute) and boundary in DETERMINISTIC_BOUNDARIES:
-                    if _is_reflection_reference(_resolve(node, aliases)):
+                    reference = _resolve(node, aliases)
+                    if (
+                        _is_dunder_attribute(node.attr)
+                        and reference not in ALLOWED_DUNDER_ATTRIBUTES
+                    ) or _is_reflection_reference(reference):
                         counts["reflection_capability_accesses"] += 1
                         violations.append(f"{relative}:hidden_reflection_attribute")
                 if isinstance(node, ast.Subscript) and boundary in DETERMINISTIC_BOUNDARIES:

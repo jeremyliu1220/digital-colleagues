@@ -46,7 +46,7 @@ Application methods group state, audit, replay, approval consumption, attempts, 
 updates in `BEGIN IMMEDIATE` transactions with optimistic revisions. This store is a local
 semantic reference, not a tenant-isolation or availability claim.
 
-Architecture policy `p3-boundary-specific-determinism-allowlist-v4` parses all boundaries
+Architecture policy `p3-boundary-specific-determinism-allowlist-v5` parses all boundaries
 with boundary-specific import allowlists. Core cannot depend outward; application cannot
 import infrastructure; Pydantic/FastAPI cannot leave
 `api/`; deterministic boundaries reject hidden wall clock, UUID, randomness, environment,
@@ -55,9 +55,10 @@ aliases, assigned callable aliases, and literal `getattr` references are resolve
 transitively, so rebinding `datetime.now`, `open`, `sqlite3.connect`, `__import__`, `eval`, or
 `exec` cannot bypass the gate. Reflective `__dict__` and `__getattribute__` attribute chains,
 reflection-derived subscripts, and `vars`, `globals`, or `locals` entry points are rejected;
-unresolved dynamic reflection fails closed. Explicit safe literal `getattr` and ordinary data
-subscripts remain permitted. Stable ports reject concrete connection, Path, ORM, edge, and
-provider types.
+unresolved dynamic reflection fails closed. All double-underscore Attributes are rejected by
+default, with an exact qualified-name exception only for frozen-dataclass calls to
+`object.__setattr__`. Explicit safe literal `getattr` and ordinary data subscripts remain
+permitted. Stable ports reject concrete connection, Path, ORM, edge, and provider types.
 
 ## Repository topology
 
