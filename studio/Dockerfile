@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: Apache-2.0
+
+FROM node:24-alpine AS build
+WORKDIR /studio
+COPY package.json package-lock.json ./
+RUN npm ci --ignore-scripts
+COPY . .
+RUN npm run build
+
+FROM nginx:1.29-alpine
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /studio/dist /usr/share/nginx/html
+EXPOSE 8080

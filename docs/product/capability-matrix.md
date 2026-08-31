@@ -21,10 +21,10 @@ deferred capabilities are described only as a non-committing
 | Audit causality | Yes | P3 immutable safe records | Payload bytes become digests or safe projections in audit |
 | Single `state.sqlite` | Yes | P3 implemented | Injectable path, WAL, foreign keys, immutable migration checksums |
 | Typed headless HTTP edge | Yes | P3 minimal mapping | Injected server context; P4 authentication explicitly absent |
-| Local Studio and Compose Golden Path | Yes | P4 planned | Local UI, bootstrap authentication, builder, work, approval, and audit only |
-| Wake reason and trigger-class views | Yes | P4 planned | Explain existing durable causality; do not infer authority |
-| Exact-effect proposal inbox | Yes | P4 planned | Display and decide the exact `EffectProposal` revision; human approval remains required |
-| Colleague-experience evaluation points | Yes | P4 planned | Classify synthetic, offline, human, and live-provider evidence; no improvement claim yet |
+| Local Studio and Compose Golden Path | Yes | P4 development complete, awaiting independent acceptance | Local UI, bootstrap Admin, builder, work, recovery, approval, and audit only; Compose runtime not evaluated where no engine is installed |
+| Wake reason and trigger-class views | Yes | P4 development complete, awaiting independent acceptance | Explains existing durable Event/Timer causality and deterministic no-op; does not infer authority |
+| Exact-effect proposal inbox | Yes | P4 development complete, awaiting independent acceptance | Displays and decides the exact `EffectProposal` revision and digests; human approval remains required |
+| Colleague-experience evaluation points | Yes | P4 development complete, awaiting independent acceptance | Synthetic/offline calculations only; five-minute and human-improvement claims remain unevaluated |
 | Revisioned policy builder | Yes | P5 planned | Working hours, allowed triggers, proactivity, interruptions, budgets, stop, and escalation; Profile remains separate from Mandate |
 | Semantic Memory | No | Post-v0.1 outlook only | Not a v0.1 commitment and never an authority source |
 | Skill Learning or governed Skill system | No | Post-v0.1 outlook only | Requires an independent gate, provenance, permissions, versioning, and rollback |

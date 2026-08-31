@@ -2,11 +2,11 @@
 
 PYTHON ?= python3
 
-.PHONY: help bootstrap lint typecheck test build check boundary scaffold p2-repository p2-provenance p2-architecture p2-core p3-repository p3-provenance p3-architecture p3-migrations p3-persistence p3-runtime p3-golden evidence-p1 evidence-p2 evidence-p3 studio-dev
+.PHONY: help bootstrap lint typecheck test build check boundary scaffold p2-repository p2-provenance p2-architecture p2-core p3-repository p3-provenance p3-architecture p3-migrations p3-persistence p3-runtime p3-golden p4-repository p4-provenance p4-architecture p4-migrations p4-authentication p4-studio p4-compose p4-golden evidence-p1 evidence-p2 evidence-p3 evidence-p4 studio-dev
 
 help:
 	@echo "bootstrap    Resolve locked tools in an isolated temporary workspace"
-	@echo "check        Run every current P3 local acceptance gate"
+	@echo "check        Run every current P4 gate plus retained P0-P3 regressions"
 	@echo "lint         Run Python and Studio lint/format checks"
 	@echo "typecheck    Run Python and Studio type checking"
 	@echo "test         Run Python and Studio tests"
@@ -23,28 +23,37 @@ help:
 	@echo "p3-persistence Run focused persistence and outbox semantics"
 	@echo "p3-runtime   Validate stable ports and typed runtime contracts"
 	@echo "p3-golden    Run the synthetic restart Golden Path"
+	@echo "p4-repository Validate P4 history and residue boundaries"
+	@echo "p4-provenance Validate complete P4 change provenance"
+	@echo "p4-architecture Validate P4 dependencies and authority mapping"
+	@echo "p4-migrations Validate migration 004 and retained migrations"
+	@echo "p4-authentication Validate bootstrap and session controls"
+	@echo "p4-studio    Validate the authenticated Studio workflow"
+	@echo "p4-compose   Validate local Compose topology and runtime availability"
+	@echo "p4-golden    Run the authenticated fresh-instance Golden Path"
 	@echo "evidence-p1  Run all gates and rebuild the P1 evidence summary"
 	@echo "evidence-p2  Run all gates and atomically rebuild P2 evidence"
 	@echo "evidence-p3  Run all gates and atomically write P3 evidence"
+	@echo "evidence-p4  Run all gates and atomically write P4 evidence"
 	@echo "studio-dev   Start an isolated preview of the static Studio shell"
 
 bootstrap:
-	$(PYTHON) -B -m scripts.run_p3_toolchain --scope bootstrap
+	$(PYTHON) -B -m scripts.run_p4_toolchain --scope bootstrap
 
 lint:
-	$(PYTHON) -B -m scripts.run_p3_toolchain --scope lint
+	$(PYTHON) -B -m scripts.run_p4_toolchain --scope lint
 
 typecheck:
-	$(PYTHON) -B -m scripts.run_p3_toolchain --scope typecheck
+	$(PYTHON) -B -m scripts.run_p4_toolchain --scope typecheck
 
 test:
-	$(PYTHON) -B -m scripts.run_p3_toolchain --scope test
+	$(PYTHON) -B -m scripts.run_p4_toolchain --scope test
 
 build:
-	$(PYTHON) -B -m scripts.run_p3_toolchain --scope build
+	$(PYTHON) -B -m scripts.run_p4_toolchain --scope build
 
 check:
-	$(PYTHON) -B -m scripts.run_p3_toolchain --scope all
+	$(PYTHON) -B -m scripts.run_p4_toolchain --scope all
 
 boundary:
 	$(PYTHON) -B scripts/check_public_boundary.py .
@@ -85,6 +94,30 @@ p3-runtime:
 p3-golden:
 	PYTHONPATH=src $(PYTHON) -B scripts/check_p3_golden_path.py
 
+p4-repository:
+	$(PYTHON) -B scripts/check_p4_repository.py .
+
+p4-provenance:
+	$(PYTHON) -B scripts/check_p4_provenance.py .
+
+p4-architecture:
+	$(PYTHON) -B scripts/check_p4_architecture.py .
+
+p4-migrations:
+	PYTHONPATH=src $(PYTHON) -B scripts/check_p4_migrations.py .
+
+p4-authentication:
+	PYTHONPATH=src $(PYTHON) -B scripts/check_p4_authentication.py .
+
+p4-studio:
+	$(PYTHON) -B scripts/check_p4_studio.py .
+
+p4-compose:
+	$(PYTHON) -B scripts/check_p4_compose.py .
+
+p4-golden:
+	PYTHONPATH=src $(PYTHON) -B scripts/check_p4_golden_path.py
+
 evidence-p1:
 	$(PYTHON) -B scripts/run_p1_toolchain.py --scope all --write-evidence
 
@@ -94,5 +127,8 @@ evidence-p2:
 evidence-p3:
 	$(PYTHON) -B -m scripts.run_p3_toolchain --scope all --write-evidence
 
+evidence-p4:
+	$(PYTHON) -B -m scripts.run_p4_toolchain --scope all --write-evidence
+
 studio-dev:
-	$(PYTHON) -B -m scripts.run_p3_toolchain --studio-dev
+	$(PYTHON) -B -m scripts.run_p4_toolchain --studio-dev

@@ -62,11 +62,12 @@ class RepositoryScaffoldTests(unittest.TestCase):
             )
         )
 
-    def test_studio_shell_states_that_runtime_remains_deferred(self) -> None:
+    def test_current_studio_advances_beyond_the_historical_p1_shell(self) -> None:
         app = (PROJECT_ROOT / "studio/src/App.tsx").read_text(encoding="utf-8")
-        self.assertIn("Runtime orchestration begins", app)
-        self.assertIn("in P3", app)
-        self.assertNotIn("fetch(", app)
+        self.assertNotIn("Runtime orchestration begins", app)
+        self.assertIn("fetch(`/api${path}`", app)
+        self.assertIn('"/auth/session"', app)
+        self.assertIn('"/studio/state"', app)
         self.assertNotIn("WebSocket", app)
 
     def test_p1_studio_copy_is_preserved_as_historical_fixture_data(self) -> None:

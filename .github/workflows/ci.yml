@@ -29,7 +29,7 @@ jobs:
           python-version: "3.12"
           cache: pip
       - name: Install project tools
-        run: python -m pip install --disable-pip-version-check -r requirements/p3.lock
+        run: python -m pip install --disable-pip-version-check -r requirements/p4.lock
       - name: Lint
         run: |
           ruff check src scripts tests
@@ -37,8 +37,9 @@ jobs:
       - name: Type-check
         run: mypy src scripts tests
       - name: Test
+        # P4 runner retains every scripts/run_p3_unittest_suite.py identity.
         run: >-
-          python -B scripts/run_p3_unittest_suite.py
+          python -B scripts/run_p4_unittest_suite.py
           --start-directory tests
           --top-level-directory .
 
@@ -72,7 +73,7 @@ jobs:
         working-directory: studio
 
   public-boundary:
-    name: P3 boundaries
+    name: P4 boundaries
     runs-on: ubuntu-latest
     steps:
       - name: Check out source
@@ -95,5 +96,19 @@ jobs:
           python -B scripts/check_p3_runtime_contracts.py .
           python -B scripts/check_p3_golden_path.py
           python -B scripts/check_p2_core_contracts.py .
+      - name: Verify P4 repository, provenance, and architecture
+        run: |
+          python -B scripts/check_p4_repository.py .
+          python -B scripts/check_p4_provenance.py .
+          python -B scripts/check_p4_architecture.py .
+      - name: Verify P4 migration, authentication, Studio, Compose, and Golden Path
+        env:
+          PYTHONPATH: src
+        run: |
+          python -B scripts/check_p4_migrations.py .
+          python -B scripts/check_p4_authentication.py .
+          python -B scripts/check_p4_studio.py .
+          python -B scripts/check_p4_compose.py .
+          python -B scripts/check_p4_golden_path.py
       - name: Scan public tree
         run: python -B scripts/check_public_boundary.py .

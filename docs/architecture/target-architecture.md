@@ -162,11 +162,20 @@ confirmed-applied, confirmed-absent, and still-unknown; only confirmed absence c
 Pure application policy resolves explicit deterministic no-ops before this provider and
 durably records their Decision without producing an effect.
 
-## Future deployment topology (P4)
+## P4 local deployment topology
 
-Docker Compose will eventually run API, worker, and Studio locally with a durable volume
-for `state.sqlite`. API and Studio bind to `127.0.0.1` by default. Loopback binding reduces
-exposure but is not authentication, encryption, sandboxing, or enterprise isolation.
+Docker Compose runs API, worker, and Studio locally with one durable volume for
+`state.sqlite`; an operator profile provides the one-time bootstrap retrieval boundary.
+Published API and Studio ports bind to `127.0.0.1`. Inside the topology, API and Studio
+listen on `0.0.0.0` so Compose networking works. Loopback publishing reduces host exposure
+but is not authentication, encryption, sandboxing, production tenant isolation, or a
+production-security control.
+
+P4 adds digest-only bootstrap/session persistence in numbered migration 004. The browser
+receives a server-created HttpOnly, SameSite=Strict session cookie and a session-bound CSRF
+value; mutations derive `RequestPrincipalContext` from the durable session and validate
+Origin, namespace, principal kind, role, replay, and action-specific authority. Studio is
+an untrusted presentation edge, not an authorization boundary.
 
 ## Causal audit chain
 

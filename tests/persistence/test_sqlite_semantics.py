@@ -102,7 +102,7 @@ class SQLiteSemanticsTests(unittest.TestCase):
             ]
             connection.close()
             self.assertNotIn("must_rollback", tables)
-            self.assertEqual(versions, [1, 2, 3])
+            self.assertEqual(versions, [1, 2, 3, 4])
 
     def test_v2_database_upgrades_to_timer_schema_without_losing_durable_records(self) -> None:
         with tempfile.TemporaryDirectory(prefix="digital-colleagues-p3-v2-upgrade-") as temporary:
@@ -129,10 +129,8 @@ class SQLiteSemanticsTests(unittest.TestCase):
             )
             v2.close()
 
-            shutil.copy2(
-                ROOT / "migrations" / "003_timer_triggers.sql",
-                migrations / "003_timer_triggers.sql",
-            )
+            for filename in ("003_timer_triggers.sql", "004_local_authentication.sql"):
+                shutil.copy2(ROOT / "migrations" / filename, migrations / filename)
             (migrations / "manifest.json").write_text(
                 json.dumps(current_manifest), encoding="utf-8"
             )
@@ -151,8 +149,9 @@ class SQLiteSemanticsTests(unittest.TestCase):
                     "SELECT name FROM sqlite_master WHERE type = 'table'"
                 )
             }
-            self.assertEqual(versions, [1, 2, 3])
+            self.assertEqual(versions, [1, 2, 3, 4])
             self.assertIn("timer_triggers", tables)
+            self.assertIn("p4_sessions", tables)
             self.assertEqual(upgraded.get_profile(namespace(), "profile-synthetic"), profile())
             self.assertEqual(upgraded.get_work(namespace(), "work-synthetic"), finite_work())
             upgraded.close()

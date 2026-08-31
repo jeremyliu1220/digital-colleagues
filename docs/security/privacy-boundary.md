@@ -86,6 +86,18 @@ aggregate path-free fields and exclude exactly the repository-relative target su
 
 ## Evidence claim
 
-A clean scan and P3 synthetic tests establish only that the current files and encoded
-reference path passed their public-boundary checks. They do not prove that a future product
+A clean scan plus P3/P4 synthetic tests establish only that the current files and encoded
+reference paths passed their public-boundary checks. They do not prove that a future product
 or real-provider deployment is private, secure, compliant, or production-ready.
+
+## P4 credential and Studio boundary
+
+P4 stores bootstrap and session credentials only as digests. The bootstrap plaintext is
+created in memory and atomically claimed by the explicitly invoked one-shot operator
+process; no plaintext handoff file exists, and API, worker, and Studio have no print path
+for it. Browser state
+uses an HttpOnly, SameSite=Strict cookie and does not use local storage as persistence.
+Public tests generate transient synthetic values at runtime and public evidence records
+only control results, counts, safe projections, and digests. An operator terminal,
+unencrypted local volume, valid browser session, or same-user malware remains outside the
+public-tree scanner's security guarantee.

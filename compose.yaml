@@ -1,0 +1,98 @@
+# SPDX-License-Identifier: Apache-2.0
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command:
+      - python
+      - -m
+      - uvicorn
+      - digital_colleagues.local.asgi:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --no-access-log
+    environment:
+      DC_EXPECTED_ORIGIN: http://127.0.0.1:4173
+      DC_STATE_DIR: /state
+      PYTHONDONTWRITEBYTECODE: "1"
+    ports:
+      - 127.0.0.1:8000:8000
+    volumes:
+      - state:/state
+    read_only: true
+    tmpfs:
+      - /tmp
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2).read()
+      interval: 2s
+      timeout: 3s
+      retries: 15
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command:
+      - python
+      - -m
+      - digital_colleagues.local.worker
+    environment:
+      DC_STATE_DIR: /state
+      PYTHONDONTWRITEBYTECODE: "1"
+    depends_on:
+      api:
+        condition: service_healthy
+    volumes:
+      - state:/state
+    read_only: true
+    tmpfs:
+      - /tmp
+    restart: unless-stopped
+
+  studio:
+    build:
+      context: studio
+      dockerfile: Dockerfile
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - 127.0.0.1:4173:8080
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx
+      - /var/run
+    restart: unless-stopped
+
+  operator:
+    profiles:
+      - operator
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command:
+      - python
+      - -m
+      - digital_colleagues.local.operator
+      - bootstrap-token
+    environment:
+      DC_STATE_DIR: /state
+      PYTHONDONTWRITEBYTECODE: "1"
+    volumes:
+      - state:/state
+    read_only: true
+    tmpfs:
+      - /tmp
+    restart: "no"
+
+volumes:
+  state:

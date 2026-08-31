@@ -4,10 +4,10 @@
 
 ## Scope and claim boundary
 
-This model defines requirements for the v0.1 local reference topology. P3 mechanically
-tests a narrow headless implementation of namespace, authority, replay, deterministic
-execution, SQLite, outbox, and safe-audit controls. Those results do not establish product
-security or privacy effectiveness. P3 has no browser authentication. Encryption at rest,
+This model defines requirements for the v0.1 local reference topology. P4 mechanically
+tests a narrow local bootstrap/session boundary plus the P3 namespace, authority, replay,
+deterministic execution, SQLite, outbox, and safe-audit controls. Those results do not
+establish product security or privacy effectiveness. Encryption at rest,
 OIDC, SSO, SCIM, distributed isolation, and high availability remain gaps.
 
 ## Assets
@@ -58,10 +58,12 @@ OIDC, SSO, SCIM, distributed isolation, and high availability remain gaps.
 
 ## Authentication requirements
 
-The normative local authentication decision is ADR 0002. P3 tests only an injected
-server-controlled RequestPrincipalContext and rejects caller authority fields. P4 and P6
-must separately cover one-time bootstrap and enrollment, session expiry, Origin and CSRF,
-role injection, namespace crossover, and local recovery.
+The normative local authentication decision is ADR 0002. P4 implements the first-Admin
+subset: one-time local bootstrap retrieval, digest-only short-lived bootstrap state,
+atomic exchange, server-created HUMAN `tenant_admin` and session, strict cookie behavior,
+session expiry, Origin and CSRF validation, namespace derivation, role injection refusal,
+and principal-kind separation. General enrollment, session recovery, and complete RBAC
+hardening remain P6 work.
 
 ## Residual risks
 

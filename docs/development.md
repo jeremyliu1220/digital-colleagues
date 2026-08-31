@@ -8,9 +8,12 @@
 - Node.js 22.12 or newer
 - npm 11 or a compatible npm that honors the committed lockfile
 - Git and Make
+- Docker Engine with Compose v2 only for an actual container Golden Path
 
-No provider account, credential, container runtime, parent checkout, or checked-in database
-is needed. P3 tests use a synthetic reference channel and OS temporary SQLite files.
+No provider account, live credential, parent checkout, or checked-in database is needed.
+P4 tests use a synthetic reference channel and OS temporary SQLite files. Without Docker,
+static Compose validation and fresh-instance local smoke still run, while container
+start/restart/stop evidence is reported as not evaluated.
 
 ## Isolated tool workspace
 
@@ -18,16 +21,15 @@ is needed. P3 tests use a synthetic reference channel and OS temporary SQLite fi
 make bootstrap
 ```
 
-The command installs `requirements/p3.lock` into a temporary virtual environment, copies
+The command installs `requirements/p4.lock` into a temporary virtual environment, copies
 Studio to a temporary directory, runs environment checks, and deletes both. It creates no
 repository `.venv`, `node_modules`, cache, database, coverage, or build output. Direct
 runtime and development dependencies are exactly pinned in `pyproject.toml`; the lock also
 pins resolved transitives.
 
-The current schema applies migrations 001, 002, and additive Timer migration 003. Never edit
-an applied migration; add the next numbered file and checksum instead. Timer tests use an
-injected clock to exercise not-due, due, lease takeover, restart, replay, and namespace
-isolation without sleeping.
+The current schema applies migrations 001–004. Migration 004 adds digest-only local
+bootstrap/session and mutation-replay state; migrations 001–003 remain byte-immutable.
+Never edit an applied migration; add the next numbered file and checksum instead.
 
 ## Verification
 
@@ -41,7 +43,7 @@ The aggregate gate runs the equivalent of:
 ruff check src scripts tests
 ruff format --check src scripts tests
 mypy src scripts tests
-python -B scripts/run_p3_unittest_suite.py --start-directory tests --top-level-directory .
+python -B scripts/run_p4_unittest_suite.py --start-directory tests --top-level-directory .
 npm --prefix studio run lint
 npm --prefix studio run format:check
 npm --prefix studio run typecheck
@@ -55,10 +57,19 @@ PYTHONPATH=src python -B scripts/check_p3_migrations.py .
 PYTHONPATH=src python -B scripts/check_p3_persistence.py
 PYTHONPATH=src python -B scripts/check_p3_runtime_contracts.py .
 PYTHONPATH=src python -B scripts/check_p3_golden_path.py
+python -B scripts/check_p4_repository.py .
+python -B scripts/check_p4_provenance.py .
+python -B scripts/check_p4_architecture.py .
+PYTHONPATH=src python -B scripts/check_p4_migrations.py .
+PYTHONPATH=src python -B scripts/check_p4_authentication.py .
+python -B scripts/check_p4_studio.py .
+python -B scripts/check_p4_compose.py .
+PYTHONPATH=src python -B scripts/check_p4_golden_path.py
 ```
 
-Focused Make targets are `boundary`, `p3-repository`, `p3-provenance`,
-`p3-architecture`, `p3-migrations`, `p3-persistence`, `p3-runtime`, and `p3-golden`.
+Focused Make targets include `boundary`, `p4-repository`, `p4-provenance`,
+`p4-architecture`, `p4-migrations`, `p4-authentication`, `p4-studio`, `p4-compose`, and
+`p4-golden`. P3 targets remain available as regression gates.
 The literal full unittest command can bootstrap its API-test dependencies into an OS
 temporary environment when FastAPI is not installed in the invoking interpreter; no test
 is skipped.
@@ -69,29 +80,29 @@ After all implementation, tests, docs, fingerprints, and gates are committed wit
 tree, run:
 
 ```bash
-make evidence-p3
+make evidence-p4
 ```
 
-The collector reruns every P3 gate and the complete zero-exception suite once. It refuses
-to overwrite a passed summary after any failure; verifies required test IDs and fault
-boundaries; requires the P3 branch to merge-base at the accepted P2 SHA; requires no remote;
-compares the exact parent-fingerprint objects; records the tested implementation commit;
-and atomically writes `artifacts/p3/summary.json`. Its public-tree digest excludes only that
-summary to avoid self-hashing. Commit the summary separately, then rerun `make check` and
-the public-boundary scan. Historical `make evidence-p1` and `make evidence-p2` are forbidden.
+The collector reruns every retained P3 and P4 gate plus the complete zero-exception suite.
+It requires the authorized P4 branch and accepted P3 base, records the real tested
+implementation commit, metric denominators and not-applicable reasons, container-runtime
+evaluation status, and atomically writes `artifacts/p4/summary.json`. Its public-tree digest
+excludes only that summary to avoid self-hashing. Commit it separately, then rerun
+`make check` and the public-boundary scan. Historical evidence commands P0–P3 are forbidden.
 
 Required P3 test identities include complete outbox field binding, server-controlled approval
 time, boundary/alias bypass rejection, version-2 Timer upgrade and Timer restart semantics,
 and application-layer deterministic no-op behavior. A missing identity, skip, or nonzero test
 outcome prevents evidence replacement.
 
-## Headless and HTTP boundaries
+## Authenticated Studio and HTTP boundaries
 
-The Golden Path is exercised through application services and the bounded worker facade.
-FastAPI tests use an in-process client and an injected server-side RequestPrincipalContext;
-no public network interface is bound. P3 does not implement the P4 bootstrap, enrollment,
-session, CSRF, Origin, or Studio workflows. `make studio-dev` remains an isolated preview of
-the static shell and must not be read as a P3 product UI.
+The P4 Golden Path is exercised through the authenticated FastAPI mapping, application
+services, and bounded worker facade. A server-side session derives
+`RequestPrincipalContext`; request bodies cannot submit tenant, namespace, principal kind,
+role, or session authority. See [the operator guide](p4/golden-path.md) for the one-time
+token retrieval and isolated Compose workflow. P4 covers the first bootstrap Admin only;
+general enrollment, recovery, and full RBAC hardening remain P6.
 
 Every check removes its temporary environment. If a contributor independently creates a
 runtime database, `.venv`, `node_modules`, cache, coverage, log, or build directory inside

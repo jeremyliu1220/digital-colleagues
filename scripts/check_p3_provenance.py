@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
-"""Validate complete P3 implementation coverage and sanitized source classification."""
+"""Validate retained P3 receipt coverage and sanitized source classification."""
 
 from __future__ import annotations
 
@@ -40,28 +40,6 @@ def _safe_path(value: object) -> str:
     if path.is_absolute() or ".." in path.parts or value.endswith("/"):
         raise ProvenanceError("receipt paths must be repository-relative files")
     return path.as_posix()
-
-
-def _product_files(root: Path) -> set[str]:
-    files = {
-        "src/digital_colleagues/core/effects.py",
-        "src/digital_colleagues/core/runtime.py",
-        "requirements/p3.lock",
-    }
-    for relative in (
-        "src/digital_colleagues/application",
-        "src/digital_colleagues/adapters",
-        "src/digital_colleagues/api",
-        "src/digital_colleagues/worker",
-        "migrations",
-    ):
-        directory = root / relative
-        files.update(
-            document.relative_to(root).as_posix()
-            for document in directory.rglob("*")
-            if document.is_file()
-        )
-    return files
 
 
 def _framed_digest(root: Path, paths: set[str]) -> str:
@@ -125,9 +103,13 @@ def check_provenance(root: Path) -> dict[str, object]:
         if destination in destinations:
             raise ProvenanceError("P3 receipt destinations are duplicated")
         destinations.add(destination)
-    actual = _product_files(root)
+    # The receipt is the immutable P3-stage inventory. Later milestones add files
+    # inside the same package roots, so a current-tree recursive scan would make
+    # the historical P3 gate reject valid additive work. Current-stage completeness
+    # is enforced by that stage's provenance gate.
+    actual = {destination for destination in destinations if (root / destination).is_file()}
     if destinations != actual:
-        raise ProvenanceError("P3 receipt does not cover the complete implementation tree")
+        raise ProvenanceError("a retained P3 receipt destination is missing")
     return {
         "schema_version": 1,
         "gate": "p3_provenance_clean",

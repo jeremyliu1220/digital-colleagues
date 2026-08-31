@@ -1,0 +1,43 @@
+# SPDX-License-Identifier: Apache-2.0
+
+"""Bounded local worker loop over durable pending namespaces."""
+
+from __future__ import annotations
+
+import os
+import time
+from pathlib import Path
+
+from digital_colleagues.local.runtime import build_local_runtime
+
+
+def run_once(state_directory: Path) -> int:
+    runtime = build_local_runtime(state_directory)
+    try:
+        processed = 0
+        for namespace in runtime.store.pending_namespaces():
+            if namespace.scope_id is None:
+                continue
+            session = runtime.store.first_active_session(
+                tenant_id=namespace.tenant_id,
+                colleague_id=namespace.scope_id,
+            )
+            runtime.controller.process_once(session)
+            processed += 1
+        return processed
+    finally:
+        runtime.close()
+
+
+def main() -> int:
+    state_directory = Path(os.environ.get("DC_STATE_DIR", "/state"))
+    once = os.environ.get("DC_WORKER_ONCE", "0") == "1"
+    while True:
+        run_once(state_directory)
+        if once:
+            return 0
+        time.sleep(0.5)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
