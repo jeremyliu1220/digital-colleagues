@@ -6,10 +6,13 @@ Each milestone stops at its gate. A later milestone must not begin automatically
 
 Current checkpoint:
 
-- P3 has been accepted and fast-forward merged into `main`.
-- Historical P0–P3 artifacts and evidence remain unchanged.
-- P4 has not started.
-- The subsequent Roadmap rebaseline starts from the accepted P3 baseline.
+- P4 has been accepted and fast-forward merged into `main`.
+- The P4 post-merge Gate hotfix has been merged.
+- The accepted `main` baseline is
+  `259e5627c0a4d713934263efe18caf8c675a1669`.
+- Historical P0–P4 acceptance, artifacts, evidence, receipts, and migrations remain
+  unchanged.
+- P5 starts from that baseline and has not been accepted or merged.
 
 Rebaseline boundary:
 
