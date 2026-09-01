@@ -18,12 +18,14 @@
     {"destination": "docs/security/privacy-boundary.md", "classification": "new_implementation", "implementation_basis": "public_documents_and_accepted_p3_implementation", "gate_result": "not_a_source_migration"},
     {"destination": "docs/security/threat-model.md", "classification": "new_implementation", "implementation_basis": "public_documents_and_accepted_p3_implementation", "gate_result": "not_a_source_migration"},
     {"destination": "migrations/004_local_authentication.sql", "classification": "new_implementation", "implementation_basis": "public_documents_and_accepted_p3_implementation", "gate_result": "not_a_source_migration"},
+    {"destination": "migrations/005_evaluation_observations.sql", "classification": "new_implementation", "implementation_basis": "public_documents_and_accepted_p3_implementation", "gate_result": "not_a_source_migration"},
     {"destination": "migrations/manifest.json", "classification": "new_implementation", "implementation_basis": "public_documents_and_accepted_p3_implementation", "gate_result": "not_a_source_migration"},
     {"destination": "requirements/p4.lock", "classification": "new_implementation", "implementation_basis": "public_documents_and_accepted_p3_implementation", "gate_result": "not_a_source_migration"},
     {"destination": "scripts/check_p3_provenance.py", "classification": "new_implementation", "implementation_basis": "public_documents_and_accepted_p3_implementation", "gate_result": "not_a_source_migration"},
     {"destination": "scripts/check_p4_architecture.py", "classification": "new_implementation", "implementation_basis": "public_documents_and_accepted_p3_implementation", "gate_result": "not_a_source_migration"},
     {"destination": "scripts/check_p4_authentication.py", "classification": "new_implementation", "implementation_basis": "public_documents_and_accepted_p3_implementation", "gate_result": "not_a_source_migration"},
     {"destination": "scripts/check_p4_compose.py", "classification": "new_implementation", "implementation_basis": "public_documents_and_accepted_p3_implementation", "gate_result": "not_a_source_migration"},
+    {"destination": "scripts/check_p4_compose_runtime.py", "classification": "new_implementation", "implementation_basis": "public_documents_and_accepted_p3_implementation", "gate_result": "not_a_source_migration"},
     {"destination": "scripts/check_p4_golden_path.py", "classification": "new_implementation", "implementation_basis": "public_documents_and_accepted_p3_implementation", "gate_result": "not_a_source_migration"},
     {"destination": "scripts/check_p4_migrations.py", "classification": "new_implementation", "implementation_basis": "public_documents_and_accepted_p3_implementation", "gate_result": "not_a_source_migration"},
     {"destination": "scripts/check_p4_provenance.py", "classification": "new_implementation", "implementation_basis": "public_documents_and_accepted_p3_implementation", "gate_result": "not_a_source_migration"},
@@ -56,6 +58,7 @@
     {"destination": "tests/p4/test_authentication.py", "classification": "new_implementation", "implementation_basis": "public_documents_and_accepted_p3_implementation", "gate_result": "not_a_source_migration"},
     {"destination": "tests/p4/test_metrics.py", "classification": "new_implementation", "implementation_basis": "public_documents_and_accepted_p3_implementation", "gate_result": "not_a_source_migration"},
     {"destination": "tests/p4/test_studio_golden_path.py", "classification": "new_implementation", "implementation_basis": "public_documents_and_accepted_p3_implementation", "gate_result": "not_a_source_migration"},
+    {"destination": "tests/p4/test_worker_authority.py", "classification": "new_implementation", "implementation_basis": "public_documents_and_accepted_p3_implementation", "gate_result": "not_a_source_migration"},
     {"destination": "tests/persistence/test_sqlite_semantics.py", "classification": "new_implementation", "implementation_basis": "public_documents_and_accepted_p3_implementation", "gate_result": "not_a_source_migration"}
   ]
 }

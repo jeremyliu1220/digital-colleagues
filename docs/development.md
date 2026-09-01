@@ -64,12 +64,15 @@ PYTHONPATH=src python -B scripts/check_p4_migrations.py .
 PYTHONPATH=src python -B scripts/check_p4_authentication.py .
 python -B scripts/check_p4_studio.py .
 python -B scripts/check_p4_compose.py .
+python -B scripts/check_p4_compose_runtime.py .
 PYTHONPATH=src python -B scripts/check_p4_golden_path.py
 ```
 
 Focused Make targets include `boundary`, `p4-repository`, `p4-provenance`,
 `p4-architecture`, `p4-migrations`, `p4-authentication`, `p4-studio`, `p4-compose`, and
-`p4-golden`. P3 targets remain available as regression gates.
+`p4-compose-runtime`, and `p4-golden`. `p4-compose` is static/config validation;
+`p4-compose-runtime` is the Docker-required actual runtime Gate. P3 targets remain
+available as regression gates.
 The literal full unittest command can bootstrap its API-test dependencies into an OS
 temporary environment when FastAPI is not installed in the invoking interpreter; no test
 is skipped.
@@ -85,8 +88,8 @@ make evidence-p4
 
 The collector reruns every retained P3 and P4 gate plus the complete zero-exception suite.
 It requires the authorized P4 branch and accepted P3 base, records the real tested
-implementation commit, metric denominators and not-applicable reasons, container-runtime
-evaluation status, and atomically writes `artifacts/p4/summary.json`. Its public-tree digest
+implementation commit, operational metric sources and statuses, successful actual Compose
+runtime and cleanup, and atomically writes `artifacts/p4/summary.json`. Its public-tree digest
 excludes only that summary to avoid self-hashing. Commit it separately, then rerun
 `make check` and the public-boundary scan. Historical evidence commands P0–P3 are forbidden.
 

@@ -38,6 +38,7 @@ REQUIRED_GATES = frozenset(
         "p4_architecture",
         "p4_authentication",
         "p4_compose",
+        "p4_compose_runtime",
         "p4_golden_path",
         "p4_migrations",
         "p4_provenance",
@@ -133,7 +134,8 @@ def write_p4_evidence(
         "migrations": "p4_migrations_clean",
         "authentication": "p4_authentication_clean",
         "studio": "p4_studio_clean",
-        "compose": "p4_compose_clean",
+        "compose": "p4_compose_static_clean",
+        "compose_runtime": "p4_compose_runtime_clean",
         "golden_path": "p4_golden_path_clean",
     }
     for key, gate in expected_results.items():
@@ -143,7 +145,7 @@ def write_p4_evidence(
         raise EvidenceError("P4 evidence requires zero public-boundary exceptions")
     if results["architecture"].get("policy_version") != POLICY_VERSION:
         raise EvidenceError("P4 architecture policy drifted")
-    if results["migrations"].get("migration_versions") != [1, 2, 3, 4]:
+    if results["migrations"].get("migration_versions") != [1, 2, 3, 4, 5]:
         raise EvidenceError("P4 migration evidence is incomplete")
     if results["provenance"].get("transformed_migration_count") != 0:
         raise EvidenceError("P4 unexpectedly claims transformed source")
@@ -152,7 +154,26 @@ def write_p4_evidence(
     _require_commit(implementation_commit, "implementation commit")
     if not tree_digest.startswith("sha256:") or len(tree_digest) != 71:
         raise EvidenceError("public-tree digest is invalid")
-    compose_runtime = results["compose"].get("runtime_start_restart_stop")
+    compose_runtime = results["compose_runtime"].get("runtime_start_restart_stop")
+    if compose_runtime != "passed" or not results["compose_runtime"].get("cleanup", {}).get(
+        "passed"
+    ):
+        raise EvidenceError("P4 evidence requires actual Compose runtime and cleanup")
+    metric_observations = results["compose_runtime"].get("metric_observations")
+    if not isinstance(metric_observations, dict):
+        raise EvidenceError("P4 evidence requires operational metric observations")
+    for metric, observation in metric_observations.items():
+        if not isinstance(metric, str) or not isinstance(observation, dict):
+            raise EvidenceError("P4 metric evidence shape is invalid")
+        status = observation.get("status")
+        if status not in {"observed", "not_applicable", "not_evaluated"}:
+            raise EvidenceError("P4 metric evidence status is invalid")
+        if not isinstance(observation.get("source"), str):
+            raise EvidenceError("P4 metric evidence lacks a durable source")
+        if status == "observed" and observation.get("numerator") is None:
+            raise EvidenceError("observed P4 metric lacks an operational numerator")
+        if status == "not_evaluated" and not observation.get("reason"):
+            raise EvidenceError("unevaluated P4 metric lacks a reason")
     summary = {
         "schema_version": 1,
         "milestone": "P4",
@@ -174,7 +195,7 @@ def write_p4_evidence(
             "architecture": POLICY_VERSION,
             "public_boundary": results["boundary"].get("policy_version"),
             "scenario": "p4-golden-path-v1",
-            "metric_definition": "colleague-experience-p4-v1",
+            "metric_definition": "colleague-experience-p4-v2",
         },
         "migration_versions": results["migrations"]["migration_versions"],
         "results": {
@@ -195,46 +216,7 @@ def write_p4_evidence(
                 "vite_build": "passed",
             },
         },
-        "metric_observations": {
-            "rebrief_turns": {"numerator": 0, "denominator": 1, "status": "observed"},
-            "wrong_memory_rate": {"numerator": 0, "denominator": 1, "status": "observed"},
-            "ai_initiated_rate": {"numerator": 1, "denominator": 2, "status": "observed"},
-            "proactive_suggestion_acceptance_rate": {
-                "numerator": 0,
-                "denominator": 1,
-                "status": "observed",
-            },
-            "unnecessary_interruption_rate": {
-                "numerator": 0,
-                "denominator": 1,
-                "status": "observed",
-            },
-            "human_intervention_count": {
-                "numerator": 0,
-                "denominator": 1,
-                "status": "observed",
-            },
-            "completion_rate": {"numerator": 0, "denominator": 1, "status": "observed"},
-            "unauthorized_proposal_escape_rate": {
-                "numerator": 0,
-                "denominator": 0,
-                "status": "not_applicable",
-                "reason": "the Golden Path evaluated no unauthorized proposal candidate",
-                "target": 0,
-            },
-            "unauthorized_denominator_formula_control": {
-                "numerator": 0,
-                "denominator": 7,
-                "status": "calculation_fixture_passed",
-                "claim_limit": "not an operational governance observation",
-            },
-            "zero_denominator_control": {
-                "denominator": 0,
-                "status": "not_applicable",
-                "reason": "no eligible observation opportunity in the zero-input fixture",
-            },
-            "interpretation": "synthetic/offline only; a higher AI-initiated rate is not inherently better",
-        },
+        "metric_observations": metric_observations,
         "five_minute_objective": {
             "start": "immediately before one-time operator token retrieval",
             "end": "Studio displays ActionResult and complete causal audit after restart",
@@ -244,7 +226,6 @@ def write_p4_evidence(
             "reason": "automation does not drive or time the required human Studio steps",
         },
         "unevaluated": {
-            "compose_runtime_start_restart_stop": compose_runtime,
             "human_study": "not_evaluated",
             "live_provider": "not_evaluated",
             "production_security_privacy": "not_evaluated",
@@ -268,6 +249,7 @@ def write_p4_evidence(
             "PYTHONPATH=src python3 -B scripts/check_p4_authentication.py .",
             "python3 -B scripts/check_p4_studio.py .",
             "python3 -B scripts/check_p4_compose.py .",
+            "python3 -B scripts/check_p4_compose_runtime.py .",
             "PYTHONPATH=src python3 -B scripts/check_p4_golden_path.py",
             "make check",
             "make evidence-p4",

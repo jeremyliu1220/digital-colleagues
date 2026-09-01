@@ -4,12 +4,16 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import timedelta
 
 from digital_colleagues.application.contracts import (
     ApprovalRequest,
     InputEventRequest,
+    IntelligenceRequest,
     RequestPrincipalContext,
+    SemanticDecision,
+    SemanticOutcome,
     TimerScheduleRequest,
 )
 from digital_colleagues.application.errors import (
@@ -20,9 +24,12 @@ from digital_colleagues.application.errors import (
 from digital_colleagues.application.p4_contracts import (
     AuthenticatedSession,
     BootstrapRecord,
+    EvaluationObservation,
     InitialColleagueRequest,
     MetricResult,
     MutationReplay,
+    ProposalCandidateObservation,
+    ServiceRuntimeContext,
     SessionGrant,
     WorkAssignmentRequest,
 )
@@ -58,10 +65,18 @@ from digital_colleagues.core.authority import (
 )
 from digital_colleagues.core.common import FrozenJsonObject
 from digital_colleagues.core.effects import ApprovalChoice, EffectProposal, HumanApprovalDecision
+from digital_colleagues.core.errors import CoreInvariantError
 from digital_colleagues.core.namespace import Namespace
 from digital_colleagues.core.principals import HumanRole, Principal, PrincipalKind
+from digital_colleagues.core.runtime import DecisionKind
 from digital_colleagues.core.work import FiniteWork, WorkState
-from digital_colleagues.governance.approvals import require_authoritative_human_role
+from digital_colleagues.governance.approvals import (
+    authorize_effect_proposal,
+    require_authoritative_human_role,
+)
+
+SCENARIO_VERSION = "p4-golden-path-v1"
+METRIC_POLICY_VERSION = "colleague-experience-p4-v2"
 
 
 class AuthenticationService:
@@ -414,111 +429,307 @@ class InitialColleagueService:
         return RequestPrincipalContext(session.colleague_namespace(), session.principal)
 
 
-def _rate(metric: str, numerator: int, denominator: int, zero_reason: str) -> MetricResult:
+def _not_applicable(
+    metric: str,
+    *,
+    reason: str,
+    source: str,
+    references: tuple[str, ...] = (),
+) -> MetricResult:
+    return MetricResult(
+        metric=metric,
+        status="not_applicable",
+        numerator=None,
+        denominator=0,
+        value=None,
+        reason=reason,
+        source=source,
+        safe_causal_references=references,
+    )
+
+
+def _observed_rate(
+    metric: str,
+    *,
+    numerator: int,
+    denominator: int,
+    source: str,
+    references: tuple[str, ...],
+    evidence_class: str = "synthetic",
+) -> MetricResult:
     if denominator == 0:
-        return MetricResult(metric, "not_applicable", None, 0, None, zero_reason)
-    return MetricResult(metric, "observed", numerator, denominator, numerator / denominator, None)
+        raise ValidationError("observed metric denominator must be positive")
+    return MetricResult(
+        metric=metric,
+        status="observed",
+        numerator=numerator,
+        denominator=denominator,
+        value=numerator / denominator,
+        reason=None,
+        source=source,
+        safe_causal_references=references,
+        evidence_class=evidence_class,
+    )
 
 
-def calculate_colleague_experience_metrics(counts: dict[str, int]) -> tuple[MetricResult, ...]:
-    required = {
-        "rebrief_turns",
-        "resumptions_evaluated",
-        "wrong_resumptions",
-        "ai_eligible_opportunities",
-        "ai_visible_outputs",
-        "proactive_reviewed",
-        "proactive_accepted",
-        "ai_interactions_reviewed",
-        "unnecessary_interruptions",
-        "human_interventions",
-        "scenarios_started",
-        "scenarios_completed",
-        "unauthorized_candidates",
-        "unauthorized_escapes",
-    }
-    if set(counts) != required or any(
-        type(value) is not int or value < 0 for value in counts.values()
-    ):
-        raise ValidationError("colleague-experience counts are incomplete or invalid")
-    rebrief = (
-        MetricResult(
-            "rebrief_turns",
-            "not_applicable",
-            None,
-            0,
-            None,
-            "no resumptions were evaluated",
+class P4EvaluationService:
+    """Build honest metric readouts from durable runtime and evaluator observations."""
+
+    def __init__(self, store: StudioPersistencePort) -> None:
+        self._store = store
+
+    def record(self, observation: EvaluationObservation) -> bool:
+        return self._store.record_evaluation_observation(observation)
+
+    @staticmethod
+    def _evaluated_metric(
+        metric: str,
+        *,
+        eligible_opportunity_ids: tuple[str, ...],
+        eligible_references: tuple[str, ...],
+        observations: tuple[EvaluationObservation, ...],
+        empty_reason: str,
+        eligible_source: str,
+        is_rate: bool,
+    ) -> MetricResult:
+        eligible_count = len(eligible_opportunity_ids)
+        if eligible_count == 0:
+            return _not_applicable(
+                metric,
+                reason=empty_reason,
+                source=eligible_source,
+                references=eligible_references,
+            )
+        eligible_ids = set(eligible_opportunity_ids)
+        matching = tuple(
+            item
+            for item in observations
+            if item.metric == metric and item.opportunity_id in eligible_ids
         )
-        if counts["resumptions_evaluated"] == 0
-        else MetricResult(
-            "rebrief_turns",
-            "observed",
-            counts["rebrief_turns"],
-            counts["resumptions_evaluated"],
-            float(counts["rebrief_turns"]),
-            None,
+        references = tuple(
+            sorted(set(eligible_references) | {item.correlation_id for item in matching})
         )
-    )
-    interventions = (
-        MetricResult(
-            "human_intervention_count",
-            "not_applicable",
-            None,
-            0,
-            None,
-            "no finite-work scenarios were started",
+        if len(matching) != eligible_count:
+            return MetricResult(
+                metric=metric,
+                status="not_evaluated",
+                numerator=None,
+                denominator=eligible_count,
+                value=None,
+                reason=(
+                    "eligible opportunities exist but durable evaluator coverage is incomplete"
+                ),
+                source=(eligible_source + "; evaluator source required in p4_metric_observations"),
+                safe_causal_references=references,
+                evidence_class="offline",
+            )
+        numerator = sum(item.value for item in matching)
+        sources = ",".join(sorted({item.source for item in matching}))
+        evidence_classes = {item.evidence_class for item in matching}
+        evidence_class = next(iter(evidence_classes)) if len(evidence_classes) == 1 else "offline"
+        return MetricResult(
+            metric=metric,
+            status="observed",
+            numerator=numerator,
+            denominator=eligible_count,
+            value=numerator / eligible_count if is_rate else float(numerator),
+            reason=None,
+            source=f"durable p4_metric_observations from {sources}",
+            safe_causal_references=references,
+            evidence_class=evidence_class,
         )
-        if counts["scenarios_started"] == 0
-        else MetricResult(
-            "human_intervention_count",
-            "observed",
-            counts["human_interventions"],
-            counts["scenarios_started"],
-            float(counts["human_interventions"]),
-            None,
+
+    def evaluate(self, namespace: Namespace) -> tuple[MetricResult, ...]:
+        snapshot = self._store.studio_snapshot(namespace)
+        observations = self._store.list_evaluation_observations(namespace)
+        work_references = tuple(sorted({item.correlation_id for item in snapshot.work}))
+        proposal_references = tuple(sorted({item.correlation_id for item in snapshot.proposals}))
+        trigger_references = tuple(
+            sorted(
+                {item.correlation_id for item in snapshot.events}
+                | {item.correlation_id for item in snapshot.timers}
+            )
         )
-    )
-    return (
-        rebrief,
-        _rate(
-            "wrong_memory_rate",
-            counts["wrong_resumptions"],
-            counts["resumptions_evaluated"],
-            "no resumptions were evaluated",
-        ),
-        _rate(
-            "ai_initiated_rate",
-            counts["ai_visible_outputs"],
-            counts["ai_eligible_opportunities"],
-            "no eligible allowed-trigger opportunities produced an observation",
-        ),
-        _rate(
-            "proactive_suggestion_acceptance_rate",
-            counts["proactive_accepted"],
-            counts["proactive_reviewed"],
-            "no proactive suggestions were reviewed",
-        ),
-        _rate(
-            "unnecessary_interruption_rate",
-            counts["unnecessary_interruptions"],
-            counts["ai_interactions_reviewed"],
-            "no AI-initiated interactions were reviewed",
-        ),
-        interventions,
-        _rate(
-            "completion_rate",
-            counts["scenarios_completed"],
-            counts["scenarios_started"],
-            "no finite-work scenarios were started",
-        ),
-        _rate(
-            "unauthorized_proposal_escape_rate",
-            counts["unauthorized_escapes"],
-            counts["unauthorized_candidates"],
-            "no unauthorized proposal candidates were evaluated",
-        ),
-    )
+        visible_opportunities = {
+            item.correlation_id
+            for item in snapshot.proposals
+            if item.correlation_id in trigger_references
+        }
+        approved = sum(item.choice is ApprovalChoice.APPROVE for item in snapshot.approvals)
+        unauthorized_denominator, unauthorized_numerator, unauthorized_references = (
+            self._store.proposal_candidate_counts(namespace)
+        )
+        trigger_denominator = len(snapshot.events) + len(snapshot.timers)
+        ai_metric = (
+            _not_applicable(
+                "ai_initiated_rate",
+                reason="no allowed durable trigger opportunity was evaluated",
+                source="durable accepted InputEvent and TimerOccurrence records",
+                references=trigger_references,
+            )
+            if trigger_denominator == 0
+            else _observed_rate(
+                "ai_initiated_rate",
+                numerator=len(visible_opportunities),
+                denominator=trigger_denominator,
+                source=(
+                    "durable accepted InputEvent/TimerOccurrence denominator and "
+                    "correlated EffectProposal inbox output numerator"
+                ),
+                references=trigger_references,
+            )
+        )
+        proactive_metric = (
+            _not_applicable(
+                "proactive_suggestion_acceptance_rate",
+                reason="no durable proposal review decision exists",
+                source="durable HumanApprovalDecision records",
+                references=proposal_references,
+            )
+            if not snapshot.approvals
+            else _observed_rate(
+                "proactive_suggestion_acceptance_rate",
+                numerator=approved,
+                denominator=len(snapshot.approvals),
+                source="durable exact HumanApprovalDecision records",
+                references=tuple(sorted({item.correlation_id for item in snapshot.approvals})),
+            )
+        )
+        completion_metric = (
+            _not_applicable(
+                "completion_rate",
+                reason="no finite-work scenario was started",
+                source="durable FiniteWork lifecycle records",
+                references=work_references,
+            )
+            if not snapshot.work
+            else _observed_rate(
+                "completion_rate",
+                numerator=sum(item.state is WorkState.COMPLETED for item in snapshot.work),
+                denominator=len(snapshot.work),
+                source="durable namespaced FiniteWork lifecycle state",
+                references=work_references,
+            )
+        )
+        unauthorized_metric = (
+            _not_applicable(
+                "unauthorized_proposal_escape_rate",
+                reason="no unauthorized proposal candidate was evaluated by governance",
+                source="durable p4_proposal_candidate_observations",
+                references=unauthorized_references,
+            )
+            if unauthorized_denominator == 0
+            else _observed_rate(
+                "unauthorized_proposal_escape_rate",
+                numerator=unauthorized_numerator,
+                denominator=unauthorized_denominator,
+                source=(
+                    "durable governance candidate observations joined to namespaced "
+                    "EffectProposal records"
+                ),
+                references=unauthorized_references,
+            )
+        )
+        return (
+            self._evaluated_metric(
+                "rebrief_turns",
+                eligible_opportunity_ids=tuple(item.work_id for item in snapshot.work),
+                eligible_references=work_references,
+                observations=observations,
+                empty_reason="no durable finite-work resumption opportunity exists",
+                eligible_source="durable FiniteWork scenarios requiring offline resumption review",
+                is_rate=False,
+            ),
+            self._evaluated_metric(
+                "wrong_memory_rate",
+                eligible_opportunity_ids=tuple(item.work_id for item in snapshot.work),
+                eligible_references=work_references,
+                observations=observations,
+                empty_reason="no durable finite-work resumption opportunity exists",
+                eligible_source="durable FiniteWork scenarios requiring offline context review",
+                is_rate=True,
+            ),
+            ai_metric,
+            proactive_metric,
+            self._evaluated_metric(
+                "unnecessary_interruption_rate",
+                eligible_opportunity_ids=tuple(item.proposal_id for item in snapshot.proposals),
+                eligible_references=proposal_references,
+                observations=observations,
+                empty_reason="no user-visible AI-initiated interaction exists",
+                eligible_source="durable EffectProposal inbox interactions requiring review",
+                is_rate=True,
+            ),
+            self._evaluated_metric(
+                "human_intervention_count",
+                eligible_opportunity_ids=tuple(item.work_id for item in snapshot.work),
+                eligible_references=work_references,
+                observations=observations,
+                empty_reason="no finite-work scenario was started",
+                eligible_source="durable FiniteWork scenarios requiring offline intervention review",
+                is_rate=False,
+            ),
+            completion_metric,
+            unauthorized_metric,
+        )
+
+
+class GovernedObservedIntelligence:
+    """Refuse unauthorized candidates before proposal persistence and observe safely."""
+
+    def __init__(
+        self,
+        *,
+        inner: IntelligencePort,
+        store: StudioPersistencePort,
+        identifiers: IdentifierPort,
+    ) -> None:
+        self._inner = inner
+        self._store = store
+        self._identifiers = identifiers
+
+    def decide(self, request: IntelligenceRequest) -> SemanticDecision:
+        semantic = self._inner.decide(request)
+        proposal = semantic.proposal
+        if proposal is None:
+            return semantic
+        try:
+            authorize_effect_proposal(
+                proposal,
+                request.mandate,
+                expected_mandate_revision=request.mandate.revision,
+            )
+        except CoreInvariantError:
+            observation = ProposalCandidateObservation(
+                namespace=request.namespace,
+                observation_id=self._identifiers.derive(
+                    "observation", proposal.proposal_id, "unauthorized"
+                ),
+                candidate_id=proposal.proposal_id,
+                boundary_id=proposal.constraints.boundary_id,
+                outcome="governance_rejected_before_proposal",
+                source="governance.pre_proposal.v1",
+                evidence_class="synthetic",
+                scenario_version=SCENARIO_VERSION,
+                policy_version=METRIC_POLICY_VERSION,
+                correlation_id=proposal.correlation_id,
+                causation_id=semantic.decision.agenda_item_id,
+                observed_at=request.occurred_at,
+            )
+            self._store.record_proposal_candidate_observation(observation)
+            refused = replace(
+                semantic.decision,
+                kind=DecisionKind.NO_ACTION,
+                rationale="Governance refused an unauthorized proposal candidate.",
+                proposed_effect_id=None,
+            )
+            return SemanticDecision(
+                outcome=SemanticOutcome.NO_OP,
+                decision=refused,
+                proposal=None,
+                request_id=semantic.request_id,
+            )
+        return semantic
 
 
 class P4RuntimeController:
@@ -551,12 +762,18 @@ class P4RuntimeController:
         )
         return RequestPrincipalContext(session.colleague_namespace(), session.principal)
 
-    def _actors(self, session: AuthenticatedSession) -> tuple[Principal, Principal, str]:
-        namespace = session.colleague_namespace()
-        model = self._studio_store.first_principal(session.tenant_id, PrincipalKind.MODEL)
-        service = self._studio_store.first_principal(session.tenant_id, PrincipalKind.SERVICE)
-        mandate_id = self._identifiers.derive("mandate", namespace.scope_id or "missing")
-        return model, service, mandate_id
+    def service_context(self, namespace: Namespace) -> ServiceRuntimeContext:
+        """Resolve exact runtime identities without reading any human session state."""
+
+        colleague_id = namespace.scope_id
+        if colleague_id is None:
+            raise PermissionDeniedError("runtime requires a colleague namespace")
+        return self._studio_store.resolve_runtime_context(
+            namespace=namespace,
+            model_principal_id=self._identifiers.derive("model", colleague_id),
+            service_principal_id=self._identifiers.derive("service", colleague_id),
+            mandate_id=self._identifiers.derive("mandate", colleague_id),
+        )
 
     def submit_trigger(
         self,
@@ -569,8 +786,7 @@ class P4RuntimeController:
     ) -> str:
         context = self._context(session)
         work = self._store.get_work(context.namespace, work_id)
-        model, service, mandate_id = self._actors(session)
-        del model, mandate_id
+        runtime_context = self.service_context(context.namespace)
         event_id = self._identifiers.derive(
             "event" if trigger_class == "event" else "occurrence",
             work_id,
@@ -599,7 +815,7 @@ class P4RuntimeController:
                 self._store,
                 self._identifiers,
                 self._clock,
-                service,
+                runtime_context.service_principal,
             ).schedule(
                 namespace=context.namespace,
                 request=TimerScheduleRequest(
@@ -616,17 +832,19 @@ class P4RuntimeController:
             raise ValidationError("trigger class must be event or timer")
         return correlation_id
 
-    def process_once(self, session: AuthenticatedSession) -> dict[str, object]:
-        namespace = self._context(session).namespace
-        model, service, mandate_id = self._actors(session)
+    def process_once(self, context: ServiceRuntimeContext) -> dict[str, object]:
+        durable = self.service_context(context.namespace)
+        if durable != context:
+            raise PermissionDeniedError("stale or rebound runtime context was refused")
+        namespace = context.namespace
         wake = WakeService(
             store=self._store,
             intelligence=self._intelligence,
             clock=self._clock,
             identifiers=self._identifiers,
-            service_principal=service,
-            model_principal=model,
-            mandate_id=mandate_id,
+            service_principal=context.service_principal,
+            model_principal=context.model_principal,
+            mandate_id=context.mandate_id,
             owner_id="worker:p4-local",
         )
         materialized = wake.materialize_next(namespace)
@@ -636,9 +854,9 @@ class P4RuntimeController:
             channel=self._channel,
             clock=self._clock,
             identifiers=self._identifiers,
-            result_actor=service,
+            result_actor=context.service_principal,
             owner_id="worker:p4-dispatch",
-            mandate_id=mandate_id,
+            mandate_id=context.mandate_id,
         ).dispatch_once(namespace)
         return {
             "trigger_materialized": materialized is not None,
@@ -663,7 +881,8 @@ class P4RuntimeController:
         expected_mandate_revision: int,
     ) -> tuple[HumanApprovalDecision, str | None, bool]:
         context = self._context(session)
-        _, service, mandate_id = self._actors(session)
+        runtime_context = self.service_context(context.namespace)
+        mandate_id = runtime_context.mandate_id
         if any(
             decision.proposal_id == proposal.proposal_id
             for decision in self._studio_store.studio_snapshot(context.namespace).approvals
@@ -682,7 +901,7 @@ class P4RuntimeController:
             store=self._store,
             clock=self._clock,
             identifiers=self._identifiers,
-            service_principal=service,
+            service_principal=runtime_context.service_principal,
         ).decide(
             context=context,
             mandate_id=mandate_id,

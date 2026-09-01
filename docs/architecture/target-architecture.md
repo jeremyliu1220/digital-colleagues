@@ -177,6 +177,20 @@ value; mutations derive `RequestPrincipalContext` from the durable session and v
 Origin, namespace, principal kind, role, replay, and action-specific authority. Studio is
 an untrusted presentation edge, not an authorization boundary.
 
+Background processing never retrieves or reuses that HUMAN session. For each pending
+durable colleague namespace, the worker reconstructs an exact `ServiceRuntimeContext` from
+the namespace-derived MODEL and SERVICE principal IDs plus the current Mandate identity and
+revision. The controller re-resolves that binding before every bounded cycle. This context
+can process already accepted triggers and dispatch already approved effects; it cannot
+create or revise a Mandate or author `HumanApprovalDecision`.
+
+Additive migration 005 stores only namespaced, versioned evaluator observations and safe
+pre-proposal governance-candidate evidence. Operational metrics join those observations to
+durable work, trigger, proposal, approval, and result records. Eligible scenarios without
+evaluator coverage remain `not_evaluated`; they are never converted into observed zeros.
+Static Compose validation and the isolated actual start/recreate/recovery/stop Gate are
+separate results.
+
 ## Causal audit chain
 
 The minimum inspectable chain is:

@@ -24,6 +24,12 @@
       "name": "local_authentication",
       "file": "004_local_authentication.sql",
       "checksum": "sha256:dfe550129f32128eadc685cb54b70feed276ceb3274dbcbd76e214053d77e58b"
+    },
+    {
+      "version": 5,
+      "name": "evaluation_observations",
+      "file": "005_evaluation_observations.sql",
+      "checksum": "sha256:6649985cf92d9efd378b8b69447357193fdb98eead7d3d23f9bbec1db02b2a61"
     }
   ]
 }

@@ -2,7 +2,7 @@
 
 # P4 Local Studio Golden Path
 
-Status: development complete, awaiting independent acceptance.
+Status: independent acceptance remediation; actual Compose runtime evidence is required.
 
 This guide exercises the synthetic/offline P4 path. It does not use a real model, live
 provider, account, external network effect, or production credential. Loopback publishing
@@ -26,6 +26,23 @@ It creates a temporary SQLite file outside the repository, closes every first-in
 store and HTTP client, reconstructs them over the same file, and cleans the directory. It
 proves flow and fresh-instance recovery only. It does not start containers or measure the
 five-minute objective.
+
+The separate actual Compose runtime Gate is:
+
+```bash
+make p4-compose-runtime
+```
+
+It creates a unique synthetic Compose project, selects unused loopback ports, uses the
+project-scoped temporary `state` volume, starts API/worker/Studio, retrieves bootstrap
+authority through the one-shot operator process, completes the authenticated flow, stops
+and force-recreates the long-running containers over the same volume, verifies durable
+recovery, completes exact approval and exact rejection controls, checks ActionResult and
+causal audit, performs a normal stop, checks service logs for the in-memory credentials,
+and removes the project's containers, network, and volume in a final cleanup path. Its JSON
+readout contains timestamps, environment versions, checkpoint results, and cleanup counts,
+but no plaintext credential. This is automated synthetic runtime evidence; it does not
+measure the manual five-minute objective.
 
 ## Isolated Compose run
 
@@ -71,10 +88,11 @@ The required human steps are:
 3. Assign one finite synthetic work item to a listed responsibility.
 4. Stop at the restart checkpoint. Do not create the trigger yet.
 
-Restart every long-running service while preserving the volume:
+Stop and recreate every long-running service while preserving the volume:
 
 ```bash
-docker compose --project-name "$DC_COMPOSE_PROJECT" restart api worker studio
+docker compose --project-name "$DC_COMPOSE_PROJECT" stop api worker studio
+docker compose --project-name "$DC_COMPOSE_PROJECT" up --detach --force-recreate api worker studio
 docker compose --project-name "$DC_COMPOSE_PROJECT" ps
 ```
 

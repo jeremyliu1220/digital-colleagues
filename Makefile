@@ -2,7 +2,7 @@
 
 PYTHON ?= python3
 
-.PHONY: help bootstrap lint typecheck test build check boundary scaffold p2-repository p2-provenance p2-architecture p2-core p3-repository p3-provenance p3-architecture p3-migrations p3-persistence p3-runtime p3-golden p4-repository p4-provenance p4-architecture p4-migrations p4-authentication p4-studio p4-compose p4-golden evidence-p1 evidence-p2 evidence-p3 evidence-p4 studio-dev
+.PHONY: help bootstrap lint typecheck test build check boundary scaffold p2-repository p2-provenance p2-architecture p2-core p3-repository p3-provenance p3-architecture p3-migrations p3-persistence p3-runtime p3-golden p4-repository p4-provenance p4-architecture p4-migrations p4-authentication p4-studio p4-compose p4-compose-runtime p4-golden evidence-p1 evidence-p2 evidence-p3 evidence-p4 studio-dev
 
 help:
 	@echo "bootstrap    Resolve locked tools in an isolated temporary workspace"
@@ -26,10 +26,11 @@ help:
 	@echo "p4-repository Validate P4 history and residue boundaries"
 	@echo "p4-provenance Validate complete P4 change provenance"
 	@echo "p4-architecture Validate P4 dependencies and authority mapping"
-	@echo "p4-migrations Validate migration 004 and retained migrations"
+	@echo "p4-migrations Validate additive migrations 004-005 and retained migrations"
 	@echo "p4-authentication Validate bootstrap and session controls"
 	@echo "p4-studio    Validate the authenticated Studio workflow"
-	@echo "p4-compose   Validate local Compose topology and runtime availability"
+	@echo "p4-compose   Validate static local Compose topology and config"
+	@echo "p4-compose-runtime Run isolated actual start/recreate/recovery/stop Gate"
 	@echo "p4-golden    Run the authenticated fresh-instance Golden Path"
 	@echo "evidence-p1  Run all gates and rebuild the P1 evidence summary"
 	@echo "evidence-p2  Run all gates and atomically rebuild P2 evidence"
@@ -114,6 +115,9 @@ p4-studio:
 
 p4-compose:
 	$(PYTHON) -B scripts/check_p4_compose.py .
+
+p4-compose-runtime:
+	$(PYTHON) -B scripts/check_p4_compose_runtime.py .
 
 p4-golden:
 	PYTHONPATH=src $(PYTHON) -B scripts/check_p4_golden_path.py

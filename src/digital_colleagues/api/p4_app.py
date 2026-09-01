@@ -25,17 +25,18 @@ from digital_colleagues.application.p4_contracts import (
 )
 from digital_colleagues.application.p4_ports import StudioPersistencePort
 from digital_colleagues.application.p4_services import (
+    METRIC_POLICY_VERSION,
+    SCENARIO_VERSION,
     AuthenticationService,
     InitialColleagueService,
+    P4EvaluationService,
     P4RuntimeController,
-    calculate_colleague_experience_metrics,
 )
 from digital_colleagues.application.ports import PersistencePort
 from digital_colleagues.core.common import FrozenJsonObject
 from digital_colleagues.core.effects import ApprovalChoice
 from digital_colleagues.core.errors import CoreInvariantError
 from digital_colleagues.core.serialization import contract_to_public_data, datetime_to_z
-from digital_colleagues.core.work import WorkState
 
 SESSION_COOKIE = "dc_session"
 
@@ -244,6 +245,7 @@ def create_p4_app(
     app = FastAPI(title="Digital Colleagues P4 local Studio API", version="0.0.0-p4")
     app.state.authentication_boundary = "digest_only_bootstrap_and_server_session"
     app.state.expected_origin = expected_origin
+    evaluation = P4EvaluationService(studio_store)
 
     @app.exception_handler(ApplicationError)
     async def application_error(_: Request, error: ApplicationError) -> JSONResponse:
@@ -428,7 +430,7 @@ def create_p4_app(
         )
         if replay is not None:
             return dict(replay.items())
-        result = runtime.process_once(resolved)
+        result = runtime.process_once(runtime.service_context(resolved.colleague_namespace()))
         authentication.record_mutation(
             session=resolved,
             action="runtime_process",
@@ -469,37 +471,20 @@ def create_p4_app(
     @app.get("/evaluation/metrics")
     def metrics(request: Request) -> dict[str, object]:
         resolved, _ = _read_session(request)
-        snapshot = studio_store.studio_snapshot(resolved.colleague_namespace())
-        approved = sum(item.choice is ApprovalChoice.APPROVE for item in snapshot.approvals)
-        results = calculate_colleague_experience_metrics(
-            {
-                "rebrief_turns": 0,
-                "resumptions_evaluated": 1 if snapshot.work else 0,
-                "wrong_resumptions": 0,
-                "ai_eligible_opportunities": len(snapshot.events) + len(snapshot.timers),
-                "ai_visible_outputs": len(snapshot.proposals),
-                "proactive_reviewed": len(snapshot.approvals),
-                "proactive_accepted": approved,
-                "ai_interactions_reviewed": len(snapshot.approvals),
-                "unnecessary_interruptions": 0,
-                "human_interventions": 0,
-                "scenarios_started": len(snapshot.work),
-                "scenarios_completed": sum(
-                    item.state is WorkState.COMPLETED for item in snapshot.work
-                ),
-                "unauthorized_candidates": 0,
-                "unauthorized_escapes": 0,
-            }
+        results = evaluation.evaluate(resolved.colleague_namespace())
+        unauthorized = next(
+            item for item in results if item.metric == "unauthorized_proposal_escape_rate"
         )
         return {
             "evidence_class": "synthetic_offline",
-            "scenario_version": "p4-golden-path-v1",
-            "metric_definition_version": "colleague-experience-p4-v1",
+            "scenario_version": SCENARIO_VERSION,
+            "metric_definition_version": METRIC_POLICY_VERSION,
             "environment": "local_deterministic_reference",
-            "source": "durable_namespaced_studio_snapshot_counts",
-            "safe_causal_references": sorted(
-                {item.correlation_id for item in snapshot.events}
-                | {item.correlation_id for item in snapshot.timers}
+            "source": "per_metric_durable_sources",
+            "gate_status": (
+                "failed"
+                if unauthorized.status == "observed" and (unauthorized.numerator or 0) > 0
+                else "passed"
             ),
             "exclusions": [
                 "internal wakes without a user-visible output are excluded from the AI numerator",
@@ -514,6 +499,10 @@ def create_p4_app(
                     "denominator": item.denominator,
                     "value": item.value,
                     "reason": item.reason,
+                    "source": item.source,
+                    "safe_causal_references": list(item.safe_causal_references),
+                    "scenario_version": item.scenario_version,
+                    "policy_version": item.policy_version,
                     "evidence_class": item.evidence_class,
                 }
                 for item in results

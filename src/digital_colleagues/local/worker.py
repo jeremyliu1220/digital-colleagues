@@ -18,11 +18,8 @@ def run_once(state_directory: Path) -> int:
         for namespace in runtime.store.pending_namespaces():
             if namespace.scope_id is None:
                 continue
-            session = runtime.store.first_active_session(
-                tenant_id=namespace.tenant_id,
-                colleague_id=namespace.scope_id,
-            )
-            runtime.controller.process_once(session)
+            context = runtime.controller.service_context(namespace)
+            runtime.controller.process_once(context)
             processed += 1
         return processed
     finally:

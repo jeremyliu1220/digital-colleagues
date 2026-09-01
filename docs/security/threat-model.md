@@ -43,10 +43,12 @@ OIDC, SSO, SCIM, distributed isolation, and high availability remain gaps.
 | Duplicate mutation or approval | Idempotency key, one-time consumption, and replay ledger |
 | Ambiguous effect | Persist AMBIGUOUS, prohibit blind resend, reconcile applied/absent/unknown, retry only confirmed absence |
 | Session theft or fixation | Server-generated session ID, digest-safe storage, expiry, strict cookie policy |
+| Background worker borrows human authority | Namespace-bound SERVICE runtime context; worker never reads or reuses HUMAN sessions |
 | Cross-site mutation | Origin validation and CSRF defense on every mutation |
 | Bootstrap credential disclosure | Strong random value, one display, digest-only storage, short expiry, one use |
 | Enrollment privilege escalation | Admin-issued scoped token; server selects durable role |
 | Audit tampering or gaps | P3 transactional immutable safe audit rows; local operator tampering remains possible |
+| Unsupported zero-valued evaluation claim | Durable evaluator/governance observations; eligible unobserved scenarios remain not evaluated |
 | Outbox double delivery | Transactional claim/lease/fence, idempotent effect key, attempt/result records, bounded retry |
 | New cause during Agenda claim | Durable generation and handled-generation retain and requeue the later cause |
 | Stale worker checkpoint | Monotonic fencing token and owner checks reject the stale checkpoint |

@@ -19,7 +19,10 @@ from digital_colleagues.application.errors import (
 from digital_colleagues.application.p4_contracts import (
     AuthenticatedSession,
     BootstrapRecord,
+    EvaluationObservation,
     MutationReplay,
+    ProposalCandidateObservation,
+    ServiceRuntimeContext,
     StudioSnapshot,
 )
 from digital_colleagues.core.authority import Mandate, Profile
@@ -303,19 +306,6 @@ class SQLiteP4Store(SQLiteRuntimeStore):
                 raise ConflictError("session namespace binding is stale")
         return replace(session, active_colleague_id=colleague_id, revision=session.revision + 1)
 
-    def first_active_session(self, *, tenant_id: str, colleague_id: str) -> AuthenticatedSession:
-        row = self._connection.execute(
-            """
-            SELECT * FROM p4_sessions
-            WHERE tenant_id = ? AND active_colleague_id = ? AND revoked_at IS NULL
-            ORDER BY created_at, session_id LIMIT 1
-            """,
-            (tenant_id, colleague_id),
-        ).fetchone()
-        if row is None:
-            raise NotFoundError("no active durable session exists for the colleague")
-        return self._session_from_row(row)
-
     def get_mutation_replay(
         self, *, session: AuthenticatedSession, action: str, idempotency_key: str
     ) -> MutationReplay | None:
@@ -550,6 +540,197 @@ class SQLiteP4Store(SQLiteRuntimeStore):
                 scope_id=row["namespace_scope_id"],
             )
             for row in rows
+        )
+
+    def resolve_runtime_context(
+        self,
+        *,
+        namespace: Namespace,
+        model_principal_id: str,
+        service_principal_id: str,
+        mandate_id: str,
+    ) -> ServiceRuntimeContext:
+        namespace.require_colleague()
+        model = self.get_principal(namespace.tenant_id, model_principal_id)
+        service = self.get_principal(namespace.tenant_id, service_principal_id)
+        mandate = self.get_mandate(namespace, mandate_id)
+        if model.kind is not PrincipalKind.MODEL or service.kind is not PrincipalKind.SERVICE:
+            raise PermissionDeniedError("runtime principal kind binding was refused")
+        if model.principal_id != model_principal_id or service.principal_id != service_principal_id:
+            raise PermissionDeniedError("runtime principal identity binding was refused")
+        return ServiceRuntimeContext(
+            namespace=namespace,
+            model_principal=model,
+            service_principal=service,
+            mandate_id=mandate.mandate_id,
+            mandate_revision=mandate.revision,
+        )
+
+    @staticmethod
+    def _evaluation_observation_from_row(row: sqlite3.Row) -> EvaluationObservation:
+        return EvaluationObservation(
+            namespace=Namespace.colleague(row["tenant_id"], row["namespace_scope_id"]),
+            observation_id=row["observation_id"],
+            metric=row["metric"],
+            value=row["value"],
+            opportunity_id=row["opportunity_id"],
+            source=row["source"],
+            evidence_class=row["evidence_class"],
+            scenario_version=row["scenario_version"],
+            policy_version=row["policy_version"],
+            correlation_id=row["correlation_id"],
+            causation_id=row["causation_id"],
+            observed_at=datetime_from_z(row["observed_at"]),
+            revision=row["revision"],
+            schema_version=row["schema_version"],
+        )
+
+    def record_evaluation_observation(self, observation: EvaluationObservation) -> bool:
+        with self._transaction() as connection:
+            existing = connection.execute(
+                """
+                SELECT * FROM p4_metric_observations
+                WHERE tenant_id = ? AND namespace_scope = ? AND namespace_scope_id = ?
+                  AND observation_id = ?
+                """,
+                (*_ns(observation.namespace), observation.observation_id),
+            ).fetchone()
+            if existing is not None:
+                if self._evaluation_observation_from_row(existing) != observation:
+                    raise ConflictError("evaluation observation identity was rebound")
+                return False
+            try:
+                connection.execute(
+                    """
+                    INSERT INTO p4_metric_observations(
+                      schema_version, tenant_id, namespace_scope, namespace_scope_id,
+                      observation_id, metric, value, opportunity_id, source, evidence_class,
+                      scenario_version, policy_version, correlation_id, causation_id,
+                      observed_at, revision
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        observation.schema_version,
+                        *_ns(observation.namespace),
+                        observation.observation_id,
+                        observation.metric,
+                        observation.value,
+                        observation.opportunity_id,
+                        observation.source,
+                        observation.evidence_class,
+                        observation.scenario_version,
+                        observation.policy_version,
+                        observation.correlation_id,
+                        observation.causation_id,
+                        datetime_to_z(observation.observed_at),
+                        observation.revision,
+                    ),
+                )
+            except sqlite3.IntegrityError as exc:
+                raise ConflictError("evaluation opportunity was already observed") from exc
+        return True
+
+    def list_evaluation_observations(
+        self, namespace: Namespace
+    ) -> tuple[EvaluationObservation, ...]:
+        rows = self._connection.execute(
+            """
+            SELECT * FROM p4_metric_observations
+            WHERE tenant_id = ? AND namespace_scope = ? AND namespace_scope_id = ?
+            ORDER BY metric, observed_at, observation_id
+            """,
+            _ns(namespace),
+        ).fetchall()
+        return tuple(self._evaluation_observation_from_row(row) for row in rows)
+
+    @staticmethod
+    def _proposal_candidate_from_row(row: sqlite3.Row) -> ProposalCandidateObservation:
+        return ProposalCandidateObservation(
+            namespace=Namespace.colleague(row["tenant_id"], row["namespace_scope_id"]),
+            observation_id=row["observation_id"],
+            candidate_id=row["candidate_id"],
+            boundary_id=row["boundary_id"],
+            outcome=row["outcome"],
+            source=row["source"],
+            evidence_class=row["evidence_class"],
+            scenario_version=row["scenario_version"],
+            policy_version=row["policy_version"],
+            correlation_id=row["correlation_id"],
+            causation_id=row["causation_id"],
+            observed_at=datetime_from_z(row["observed_at"]),
+            revision=row["revision"],
+            schema_version=row["schema_version"],
+        )
+
+    def record_proposal_candidate_observation(
+        self, observation: ProposalCandidateObservation
+    ) -> bool:
+        with self._transaction() as connection:
+            existing = connection.execute(
+                """
+                SELECT * FROM p4_proposal_candidate_observations
+                WHERE tenant_id = ? AND namespace_scope = ? AND namespace_scope_id = ?
+                  AND candidate_id = ?
+                """,
+                (*_ns(observation.namespace), observation.candidate_id),
+            ).fetchone()
+            if existing is not None:
+                if self._proposal_candidate_from_row(existing) != observation:
+                    raise ConflictError("proposal candidate observation was rebound")
+                return False
+            connection.execute(
+                """
+                INSERT INTO p4_proposal_candidate_observations(
+                  schema_version, tenant_id, namespace_scope, namespace_scope_id,
+                  observation_id, candidate_id, boundary_id, outcome, source,
+                  evidence_class, scenario_version, policy_version, correlation_id,
+                  causation_id, observed_at, revision
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    observation.schema_version,
+                    *_ns(observation.namespace),
+                    observation.observation_id,
+                    observation.candidate_id,
+                    observation.boundary_id,
+                    observation.outcome,
+                    observation.source,
+                    observation.evidence_class,
+                    observation.scenario_version,
+                    observation.policy_version,
+                    observation.correlation_id,
+                    observation.causation_id,
+                    datetime_to_z(observation.observed_at),
+                    observation.revision,
+                ),
+            )
+        return True
+
+    def proposal_candidate_counts(self, namespace: Namespace) -> tuple[int, int, tuple[str, ...]]:
+        rows = self._connection.execute(
+            """
+            SELECT candidate_id, correlation_id
+            FROM p4_proposal_candidate_observations
+            WHERE tenant_id = ? AND namespace_scope = ? AND namespace_scope_id = ?
+            ORDER BY candidate_id
+            """,
+            _ns(namespace),
+        ).fetchall()
+        escaped = 0
+        for row in rows:
+            proposal = self._connection.execute(
+                """
+                SELECT 1 FROM domain_records
+                WHERE tenant_id = ? AND namespace_scope = ? AND namespace_scope_id = ?
+                  AND record_type = 'effect_proposal' AND record_id = ?
+                """,
+                (*_ns(namespace), row["candidate_id"]),
+            ).fetchone()
+            escaped += proposal is not None
+        return (
+            len(rows),
+            escaped,
+            tuple(sorted({row["correlation_id"] for row in rows})),
         )
 
     def _records[RecordT](

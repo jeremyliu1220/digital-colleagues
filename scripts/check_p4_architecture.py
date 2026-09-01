@@ -15,7 +15,7 @@ if __package__ in {None, ""}:
 
 from scripts.check_p3_architecture import check_architecture as check_p3_architecture
 
-POLICY_VERSION = "p4-session-derived-authority-and-edge-isolation-v1"
+POLICY_VERSION = "p4-session-and-service-runtime-authority-v2"
 AUTHORITY_FIELDS = {
     "tenant",
     "tenant_id",
@@ -88,7 +88,14 @@ def check_architecture(root: Path) -> dict[str, object]:
     services = (root / "src/digital_colleagues/application/p4_services.py").read_text(
         encoding="utf-8"
     )
-    for required in ("ClockPort", "IdentifierPort", "SecretTokenPort", "RequestPrincipalContext"):
+    for required in (
+        "ClockPort",
+        "IdentifierPort",
+        "SecretTokenPort",
+        "RequestPrincipalContext",
+        "ServiceRuntimeContext",
+        "GovernedObservedIntelligence",
+    ):
         if required not in services:
             violations.append("missing_injected_capability")
     if violations:

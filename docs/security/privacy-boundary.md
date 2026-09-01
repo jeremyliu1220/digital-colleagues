@@ -101,3 +101,11 @@ Public tests generate transient synthetic values at runtime and public evidence 
 only control results, counts, safe projections, and digests. An operator terminal,
 unencrypted local volume, valid browser session, or same-user malware remains outside the
 public-tree scanner's security guarantee.
+
+P4 evaluation observations contain only stable namespaced opportunity/candidate IDs,
+versioned source labels, integer judgments, safe causal references, and UTC observation
+times. Rejected proposal candidates persist no candidate payload. Actual Compose runtime
+evidence records only environment versions, a synthetic project label, timestamps,
+checkpoint booleans, metric readouts, and cleanup counts; the operator token, session
+credential, and CSRF value remain in process memory and are checked absent from service
+logs and evidence output.

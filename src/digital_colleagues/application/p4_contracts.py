@@ -12,6 +12,7 @@ from digital_colleagues.core.common import (
     SCHEMA_VERSION,
     FrozenJsonObject,
     require_digest,
+    require_revision,
     require_schema_version,
     require_stable_id,
     require_text,
@@ -109,6 +110,127 @@ class SessionGrant:
 
 
 @dataclass(frozen=True, slots=True)
+class ServiceRuntimeContext:
+    """Restricted server-created authority for one durable colleague runtime."""
+
+    namespace: Namespace
+    model_principal: Principal
+    service_principal: Principal
+    mandate_id: str
+    mandate_revision: int
+    schema_version: int = SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        require_schema_version(self.schema_version)
+        self.namespace.require_colleague()
+        self.namespace.require_same_tenant(self.model_principal.namespace)
+        self.namespace.require_same_tenant(self.service_principal.namespace)
+        if self.model_principal.kind.value != "model":
+            raise ValueError("runtime model principal kind is invalid")
+        if self.service_principal.kind.value != "service":
+            raise ValueError("runtime service principal kind is invalid")
+        if self.model_principal.roles or self.service_principal.roles:
+            raise ValueError("runtime principals cannot carry human roles")
+        require_stable_id(self.mandate_id, "mandate_id")
+        require_revision(self.mandate_revision, "mandate_revision")
+
+
+@dataclass(frozen=True, slots=True)
+class EvaluationObservation:
+    """One durable evaluator judgment for one namespaced opportunity."""
+
+    namespace: Namespace
+    observation_id: str
+    metric: str
+    value: int
+    opportunity_id: str
+    source: str
+    evidence_class: str
+    scenario_version: str
+    policy_version: str
+    correlation_id: str
+    causation_id: str
+    observed_at: datetime
+    revision: int = 1
+    schema_version: int = SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        require_schema_version(self.schema_version)
+        self.namespace.require_colleague()
+        for value, field_name in (
+            (self.observation_id, "observation_id"),
+            (self.metric, "metric"),
+            (self.opportunity_id, "opportunity_id"),
+            (self.source, "source"),
+            (self.evidence_class, "evidence_class"),
+            (self.scenario_version, "scenario_version"),
+            (self.policy_version, "policy_version"),
+            (self.correlation_id, "correlation_id"),
+            (self.causation_id, "causation_id"),
+        ):
+            require_stable_id(value, field_name)
+        if self.metric not in {
+            "rebrief_turns",
+            "wrong_memory_rate",
+            "unnecessary_interruption_rate",
+            "human_intervention_count",
+        }:
+            raise ValueError("evaluation observation metric is unsupported")
+        if type(self.value) is not int or self.value < 0:
+            raise ValueError("evaluation observation value must be non-negative")
+        if self.metric in {"wrong_memory_rate", "unnecessary_interruption_rate"}:
+            if self.value not in {0, 1}:
+                raise ValueError("rate evaluation observation must be binary")
+        if self.evidence_class not in {"synthetic", "offline"}:
+            raise ValueError("evaluation observation evidence class is unsupported")
+        require_utc(self.observed_at, "observed_at")
+        require_revision(self.revision)
+
+
+@dataclass(frozen=True, slots=True)
+class ProposalCandidateObservation:
+    """Safe evidence that governance evaluated an unauthorized proposal candidate."""
+
+    namespace: Namespace
+    observation_id: str
+    candidate_id: str
+    boundary_id: str
+    outcome: str
+    source: str
+    evidence_class: str
+    scenario_version: str
+    policy_version: str
+    correlation_id: str
+    causation_id: str
+    observed_at: datetime
+    revision: int = 1
+    schema_version: int = SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        require_schema_version(self.schema_version)
+        self.namespace.require_colleague()
+        for value, field_name in (
+            (self.observation_id, "observation_id"),
+            (self.candidate_id, "candidate_id"),
+            (self.boundary_id, "boundary_id"),
+            (self.outcome, "outcome"),
+            (self.source, "source"),
+            (self.evidence_class, "evidence_class"),
+            (self.scenario_version, "scenario_version"),
+            (self.policy_version, "policy_version"),
+            (self.correlation_id, "correlation_id"),
+            (self.causation_id, "causation_id"),
+        ):
+            require_stable_id(value, field_name)
+        if self.outcome != "governance_rejected_before_proposal":
+            raise ValueError("proposal candidate outcome is unsupported")
+        if self.evidence_class != "synthetic":
+            raise ValueError("proposal candidate evidence must be synthetic")
+        require_utc(self.observed_at, "observed_at")
+        require_revision(self.revision)
+
+
+@dataclass(frozen=True, slots=True)
 class InitialColleagueRequest:
     display_name: str
     role_description: str
@@ -187,21 +309,43 @@ class MetricResult:
     denominator: int
     value: float | None
     reason: str | None
-    evidence_class: str = "synthetic_offline"
+    source: str
+    safe_causal_references: tuple[str, ...]
+    scenario_version: str = "p4-golden-path-v1"
+    policy_version: str = "colleague-experience-p4-v2"
+    evidence_class: str = "synthetic"
     schema_version: int = SCHEMA_VERSION
 
     def __post_init__(self) -> None:
         require_schema_version(self.schema_version)
         require_stable_id(self.metric, "metric")
-        if self.status not in {"observed", "not_applicable"}:
+        if self.status not in {"observed", "not_applicable", "not_evaluated"}:
             raise ValueError("metric status is unsupported")
         if type(self.denominator) is not int or self.denominator < 0:
             raise ValueError("metric denominator must be non-negative")
+        require_text(self.source, "metric source")
+        references = tuple(self.safe_causal_references)
+        for reference in references:
+            require_stable_id(reference, "safe_causal_reference")
+        if len(references) != len(set(references)):
+            raise ValueError("safe causal references must not contain duplicates")
+        object.__setattr__(self, "safe_causal_references", references)
+        require_stable_id(self.scenario_version, "scenario_version")
+        require_stable_id(self.policy_version, "policy_version")
+        require_stable_id(self.evidence_class, "evidence_class")
         if self.denominator == 0:
             if self.status != "not_applicable" or self.value is not None or not self.reason:
                 raise ValueError("zero denominator requires not_applicable and a reason")
-        elif self.status != "observed" or self.numerator is None or self.value is None:
-            raise ValueError("observed metric requires numerator and value")
+            if self.numerator is not None:
+                raise ValueError("not-applicable metric cannot have a numerator")
+        elif self.status == "observed":
+            if self.numerator is None or self.value is None or self.reason is not None:
+                raise ValueError("observed metric requires numerator and value")
+        elif self.status == "not_evaluated":
+            if self.numerator is not None or self.value is not None or not self.reason:
+                raise ValueError("unevaluated metric requires a reason without a value")
+        else:
+            raise ValueError("positive denominator cannot be not_applicable")
 
 
 @dataclass(frozen=True, slots=True)

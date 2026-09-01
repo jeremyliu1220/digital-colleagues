@@ -10,7 +10,10 @@ from typing import Protocol
 from digital_colleagues.application.p4_contracts import (
     AuthenticatedSession,
     BootstrapRecord,
+    EvaluationObservation,
     MutationReplay,
+    ProposalCandidateObservation,
+    ServiceRuntimeContext,
     StudioSnapshot,
 )
 from digital_colleagues.core.authority import Mandate, Profile
@@ -92,5 +95,28 @@ class StudioPersistencePort(Protocol):
     def first_principal(self, tenant_id: str, kind: PrincipalKind) -> Principal: ...
 
     def pending_namespaces(self) -> tuple[Namespace, ...]: ...
+
+    def resolve_runtime_context(
+        self,
+        *,
+        namespace: Namespace,
+        model_principal_id: str,
+        service_principal_id: str,
+        mandate_id: str,
+    ) -> ServiceRuntimeContext: ...
+
+    def record_evaluation_observation(self, observation: EvaluationObservation) -> bool: ...
+
+    def list_evaluation_observations(
+        self, namespace: Namespace
+    ) -> tuple[EvaluationObservation, ...]: ...
+
+    def record_proposal_candidate_observation(
+        self, observation: ProposalCandidateObservation
+    ) -> bool: ...
+
+    def proposal_candidate_counts(
+        self, namespace: Namespace
+    ) -> tuple[int, int, tuple[str, ...]]: ...
 
     def studio_snapshot(self, namespace: Namespace) -> StudioSnapshot: ...

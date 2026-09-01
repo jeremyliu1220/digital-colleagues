@@ -17,7 +17,7 @@ from digital_colleagues.local.security import (
     CredentialDigests,
     retrieve_bootstrap_for_operator,
 )
-from tests.p4.fixtures import NOW, build_harness
+from tests.p4.fixtures import NOW, build_harness, initial_colleague_body
 
 
 class P4AuthenticationTests(unittest.TestCase):
@@ -138,6 +138,72 @@ class P4AuthenticationTests(unittest.TestCase):
             self.assertIn("httponly", cookie)
             self.assertIn("samesite=strict", cookie)
             self.assertNotIn("session_id", response.json())
+            harness.store.close()
+
+    def test_expired_revoked_and_stale_human_sessions_fail_at_interactive_api(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="digital-colleagues-p4-api-expired-") as temporary:
+            harness = build_harness(Path(temporary) / "state.sqlite")
+            plaintext = retrieve_bootstrap_for_operator(harness.authentication)
+            grant = harness.authentication.exchange(plaintext)
+            expired = AuthenticationService(
+                store=harness.store,
+                clock=type(harness.clock)(NOW + timedelta(hours=8)),
+                tokens=harness.tokens,
+                digests=CredentialDigests(),
+                tenant_id="tenant-local",
+            )
+            harness.authentication = expired
+            client = TestClient(harness.app())
+            client.cookies.set("dc_session", grant.session_credential)
+            self.assertEqual(client.get("/auth/session").status_code, 403)
+            self.assertEqual(
+                client.post(
+                    "/colleagues/preview",
+                    headers={"Origin": "http://testserver", "X-CSRF-Token": grant.csrf_token},
+                    json=initial_colleague_body(),
+                ).status_code,
+                403,
+            )
+            harness.store.close()
+
+        with tempfile.TemporaryDirectory(prefix="digital-colleagues-p4-api-revoked-") as temporary:
+            harness = build_harness(Path(temporary) / "state.sqlite")
+            plaintext = retrieve_bootstrap_for_operator(harness.authentication)
+            grant = harness.authentication.exchange(plaintext)
+            harness.store._connection.execute(  # noqa: SLF001
+                "UPDATE p4_sessions SET revoked_at = expires_at, revision = revision + 1"
+            )
+            harness.store._connection.commit()  # noqa: SLF001
+            client = TestClient(harness.app())
+            client.cookies.set("dc_session", grant.session_credential)
+            self.assertEqual(client.get("/auth/session").status_code, 403)
+            with self.assertRaises(PermissionDeniedError):
+                harness.authentication.authorize_mutation(
+                    session_credential=grant.session_credential,
+                    origin="http://testserver",
+                    csrf_token=grant.csrf_token,
+                    expected_origin="http://testserver",
+                )
+            harness.store.close()
+
+        with tempfile.TemporaryDirectory(prefix="digital-colleagues-p4-api-stale-") as temporary:
+            harness = build_harness(Path(temporary) / "state.sqlite")
+            plaintext = retrieve_bootstrap_for_operator(harness.authentication)
+            grant = harness.authentication.exchange(plaintext)
+            client = TestClient(harness.app())
+            client.cookies.set("dc_session", grant.session_credential)
+            created = client.post(
+                "/colleagues",
+                headers={"Origin": "http://testserver", "X-CSRF-Token": grant.csrf_token},
+                json=initial_colleague_body(),
+            )
+            self.assertEqual(created.status_code, 201, created.text)
+            with self.assertRaises(ConflictError):
+                harness.store.set_active_colleague(
+                    session=grant.session,
+                    colleague_id=created.json()["namespace"]["scope_id"],
+                    occurred_at=NOW,
+                )
             harness.store.close()
 
 

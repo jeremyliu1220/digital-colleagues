@@ -8,11 +8,13 @@ Digital Colleagues is an open-source, local-first control plane and reference st
 making an AI coworker's identity, delegated authority, responsibilities, finite work,
 approvals, effects, persistence, and audit causality explicit and testable.
 
-> **Project status — P4 development complete, awaiting independent acceptance.** The local
-> Studio now exposes one bootstrap-authenticated synthetic path across initial colleague
-> creation, finite work, restart recovery, deterministic wakes, exact approvals, a reference
-> ActionResult, and safe causal audit. Real providers, production security, distributed
-> operation, measured human improvement, and a proven five-minute limit are not claimed.
+> **Project status — P4 independent acceptance remediation.** Independent acceptance found
+> gaps in worker authority, actual Compose runtime evidence, and evaluation observation
+> completeness. The branch contains focused remediation, but actual Compose
+> start/recreate/recovery/stop must pass in a Docker-capable environment before evidence may
+> be refreshed or P4 may return to independent acceptance. Real providers, production
+> security, distributed operation, measured human improvement, and a proven five-minute
+> limit are not claimed.
 
 ## What makes a digital colleague different?
 
@@ -56,10 +58,11 @@ make studio-dev
 
 `make check` resolves the exact P4 lock in an OS temporary workspace, then runs Python and
 Studio lint, type checks, tests and build plus the public-boundary, repository, provenance,
-architecture, migration, authentication, Compose, Studio, P0–P3 regression, and restart
-Golden Path gates. All test databases and package environments remain outside the
-repository. A container engine is required for an actual Compose run; when absent, the
-gate reports runtime start/restart/stop as not evaluated rather than inventing evidence.
+architecture, migration, authentication, static Compose, Studio, P0–P3 regression, and
+fresh-instance restart Golden Path gates. All test databases and package environments
+remain outside the repository. The separate `make p4-compose-runtime` target requires a
+Docker engine and performs the actual isolated start/recreate/recovery/stop Gate. Evidence
+generation requires that runtime Gate to pass; absence of Docker remains `not_evaluated`.
 
 Useful focused commands:
 
@@ -76,6 +79,7 @@ make p4-migrations
 make p4-authentication
 make p4-studio
 make p4-compose
+make p4-compose-runtime
 make p4-golden
 make p3-provenance
 make p3-architecture

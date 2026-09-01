@@ -19,7 +19,15 @@ from scripts.run_p3_unittest_suite import REQUIRED_TEST_BOUNDARIES as P3_BOUNDAR
 P4_BOUNDARIES = {
     "tests.p4.test_authentication.P4AuthenticationTests.test_bootstrap_is_strong_one_time_digest_only_and_operator_retrieval_is_atomic": "p4_bootstrap_single_use_digest",
     "tests.p4.test_authentication.P4AuthenticationTests.test_bootstrap_and_session_expiry_origin_csrf_and_principal_kind_fail_closed": "p4_session_mutation_defenses",
-    "tests.p4.test_metrics.P4MetricTests.test_unauthorized_denominator_includes_governance_rejections_and_zero_is_not_applicable": "p4_metric_denominators",
+    "tests.p4.test_authentication.P4AuthenticationTests.test_expired_revoked_and_stale_human_sessions_fail_at_interactive_api": "p4_expired_revoked_stale_sessions",
+    "tests.p4.test_evidence_gate.P4EvidenceGateTests.test_static_compose_gate_never_claims_runtime_acceptance": "p4_compose_static_runtime_separation",
+    "tests.p4.test_worker_authority.P4WorkerAuthorityTests.test_worker_uses_restricted_service_context_after_human_session_revocation": "p4_worker_service_context",
+    "tests.p4.test_worker_authority.P4WorkerAuthorityTests.test_no_session_grants_no_mandate_or_approval_authority": "p4_service_cannot_expand_or_approve",
+    "tests.p4.test_worker_authority.P4WorkerAuthorityTests.test_runtime_context_rejects_stale_kind_and_namespace_crossover": "p4_runtime_context_isolation",
+    "tests.p4.test_metrics.P4MetricTests.test_not_applicable_and_eligible_but_unevaluated_are_distinct": "p4_metric_honest_statuses",
+    "tests.p4.test_metrics.P4MetricTests.test_observed_values_come_from_durable_namespaced_observations_after_restart": "p4_metric_durable_observations",
+    "tests.p4.test_metrics.P4MetricTests.test_noop_is_not_ai_visible_and_governance_rejection_is_durable": "p4_metric_governance_denominator",
+    "tests.p4.test_metrics.P4MetricTests.test_fault_injected_escape_increments_numerator_and_fails_metric_gate": "p4_metric_escape_gate",
     "tests.p4.test_studio_golden_path.P4StudioGoldenPathTests.test_authenticated_studio_golden_path_restart_and_causal_chain": "p4_authenticated_restart_golden_path",
     "tests.p4.test_studio_golden_path.P4StudioGoldenPathTests.test_timer_noop_metrics_and_reject_create_no_effect_attempt": "p4_timer_noop_reject_metrics",
 }

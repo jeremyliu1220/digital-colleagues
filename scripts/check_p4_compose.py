@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
-"""Validate P4 Compose topology without claiming unavailable runtime evidence."""
+"""Validate only the static P4 Compose topology and config boundary."""
 
 from __future__ import annotations
 
@@ -41,8 +41,8 @@ def check_compose(root: Path) -> dict[str, object]:
         "operator:",
         "state:/state",
         "volumes:\n  state:",
-        "127.0.0.1:8000:8000",
-        "127.0.0.1:4173:8080",
+        "127.0.0.1:${DC_API_PORT:-8000}:8000",
+        "127.0.0.1:${DC_STUDIO_PORT:-4173}:8080",
         "--host",
         "0.0.0.0",
         "healthcheck:",
@@ -58,7 +58,8 @@ def check_compose(root: Path) -> dict[str, object]:
     runtime_status, command = _runtime_config(root)
     return {
         "schema_version": 1,
-        "gate": "p4_compose_clean",
+        "gate": "p4_compose_static_clean",
+        "scope": "static_and_config_only",
         "services": ["api", "worker", "studio", "operator"],
         "host_bind": "127.0.0.1",
         "container_api_bind": "0.0.0.0",
@@ -66,9 +67,8 @@ def check_compose(root: Path) -> dict[str, object]:
         "durable_database": "single_state.sqlite_on_project_named_state_volume",
         "runtime_config_status": runtime_status,
         "runtime_command": command,
-        "runtime_start_restart_stop": "not_evaluated"
-        if command is None
-        else "not_run_by_config_gate",
+        "runtime_gate": "separate_required",
+        "runtime_start_restart_stop": "not_evaluated_by_static_gate",
         "loopback_claim": "reduced_host_exposure_only",
     }
 

@@ -16,11 +16,11 @@ services:
       - "8000"
       - --no-access-log
     environment:
-      DC_EXPECTED_ORIGIN: http://127.0.0.1:4173
+      DC_EXPECTED_ORIGIN: ${DC_EXPECTED_ORIGIN:-http://127.0.0.1:4173}
       DC_STATE_DIR: /state
       PYTHONDONTWRITEBYTECODE: "1"
     ports:
-      - 127.0.0.1:8000:8000
+      - "127.0.0.1:${DC_API_PORT:-8000}:8000"
     volumes:
       - state:/state
     read_only: true
@@ -66,7 +66,7 @@ services:
       api:
         condition: service_healthy
     ports:
-      - 127.0.0.1:4173:8080
+      - "127.0.0.1:${DC_STUDIO_PORT:-4173}:8080"
     read_only: true
     tmpfs:
       - /var/cache/nginx

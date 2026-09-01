@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
 from typing import Any
 
+from scripts.check_p4_compose import check_compose
 from scripts.collect_p4_evidence import EvidenceError, validate_unittest
 from scripts.run_p4_unittest_suite import REQUIRED_TEST_BOUNDARIES
+
+ROOT = Path(__file__).resolve().parents[2]
 
 
 def passing_outcome() -> dict[str, Any]:
@@ -48,6 +52,16 @@ class P4EvidenceGateTests(unittest.TestCase):
                 outcome["gate_passed"] = False
                 with self.assertRaises(EvidenceError):
                     validate_unittest(outcome)
+
+    def test_static_compose_gate_never_claims_runtime_acceptance(self) -> None:
+        result = check_compose(ROOT)
+        self.assertEqual(result["gate"], "p4_compose_static_clean")
+        self.assertEqual(result["scope"], "static_and_config_only")
+        self.assertEqual(
+            result["runtime_start_restart_stop"],
+            "not_evaluated_by_static_gate",
+        )
+        self.assertNotEqual(result["gate"], "p4_compose_clean")
 
 
 if __name__ == "__main__":

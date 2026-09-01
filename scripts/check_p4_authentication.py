@@ -17,7 +17,7 @@ if __package__ in {None, ""}:
     sys.path.insert(0, str(root))
     sys.path.insert(0, str(root / "src"))
 
-TEST_MODULE = "tests.p4.test_authentication"
+TEST_MODULES = ("tests.p4.test_authentication", "tests.p4.test_worker_authority")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -26,7 +26,9 @@ def main(argv: list[str] | None = None) -> int:
     arguments = parser.parse_args(argv)
     root = Path(arguments.root).resolve()
     warnings.filterwarnings("ignore", message="Using `httpx` with `starlette.testclient`.*")
-    suite = unittest.defaultTestLoader.loadTestsFromName(TEST_MODULE)
+    suite = unittest.TestSuite(
+        unittest.defaultTestLoader.loadTestsFromName(module) for module in TEST_MODULES
+    )
     stream = io.StringIO()
     result = unittest.TextTestRunner(stream=stream, verbosity=2).run(suite)
     worker = (root / "src/digital_colleagues/local/worker.py").read_text(encoding="utf-8")
@@ -46,6 +48,8 @@ def main(argv: list[str] | None = None) -> int:
                 "credential_persistence": "digest_only",
                 "session_cookie": "httponly_samesite_strict_secure_in_https_mode",
                 "origin_csrf_namespace_authority": "passed",
+                "worker_authority": "restricted_durable_service_context",
+                "worker_human_session_dependency": False,
                 "api_worker_plaintext_log_calls": 0,
             },
             indent=2,

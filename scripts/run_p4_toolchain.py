@@ -307,6 +307,18 @@ def main(argv: list[str] | None = None) -> int:
                         label,
                     )
                     verified.add(gate)
+                if arguments.write_evidence:
+                    results["compose_runtime"] = _json(
+                        _run(
+                            "P4 actual Compose runtime",
+                            [str(python), "-B", "scripts/check_p4_compose_runtime.py", "."],
+                            cwd=ROOT,
+                            temporary=temporary,
+                            environment=environment,
+                        ),
+                        "P4 actual Compose runtime",
+                    )
+                    verified.add("p4_compose_runtime")
                 _run(
                     "Git diff whitespace", ["git", "diff", "--check"], cwd=ROOT, temporary=temporary
                 )

@@ -22,7 +22,13 @@ from digital_colleagues.adapters.sqlite.p4_store import SQLiteP4Store  # noqa: E
 from digital_colleagues.adapters.system.deterministic import FixedClock  # noqa: E402
 from scripts.check_p4_repository import BASE_COMMIT  # noqa: E402
 
-P4_TABLES = {"p4_bootstrap_credentials", "p4_sessions", "p4_mutation_replay"}
+P4_TABLES = {
+    "p4_bootstrap_credentials",
+    "p4_sessions",
+    "p4_mutation_replay",
+    "p4_metric_observations",
+    "p4_proposal_candidate_observations",
+}
 NAMESPACE_COLUMNS = {"schema_version", "tenant_id", "namespace_scope", "namespace_scope_id"}
 
 
@@ -51,16 +57,26 @@ def check_migrations(root: Path) -> dict[str, object]:
     manifest = json.loads((root / "migrations/manifest.json").read_text(encoding="utf-8"))
     baseline_manifest = json.loads(_baseline(root, "migrations/manifest.json"))
     entries = manifest.get("migrations") if isinstance(manifest, dict) else None
-    if not isinstance(entries, list) or [item.get("version") for item in entries] != [1, 2, 3, 4]:
-        raise MigrationError("migration manifest is not contiguous through version 4")
+    if not isinstance(entries, list) or [item.get("version") for item in entries] != [
+        1,
+        2,
+        3,
+        4,
+        5,
+    ]:
+        raise MigrationError("migration manifest is not contiguous through version 5")
     if not isinstance(baseline_manifest, dict) or entries[:3] != baseline_manifest.get(
         "migrations"
     ):
         raise MigrationError("historical migration manifest entries changed")
-    migration = root / "migrations/004_local_authentication.sql"
-    expected = "sha256:" + hashlib.sha256(migration.read_bytes()).hexdigest()
-    if entries[-1].get("file") != migration.name or entries[-1].get("checksum") != expected:
+    migration_004 = root / "migrations/004_local_authentication.sql"
+    migration_005 = root / "migrations/005_evaluation_observations.sql"
+    expected_004 = "sha256:" + hashlib.sha256(migration_004.read_bytes()).hexdigest()
+    expected_005 = "sha256:" + hashlib.sha256(migration_005.read_bytes()).hexdigest()
+    if entries[3].get("file") != migration_004.name or entries[3].get("checksum") != expected_004:
         raise MigrationError("migration 004 checksum identity is invalid")
+    if entries[4].get("file") != migration_005.name or entries[4].get("checksum") != expected_005:
+        raise MigrationError("migration 005 checksum identity is invalid")
     with tempfile.TemporaryDirectory(prefix="digital-colleagues-p4-migrations-") as temporary:
         store = SQLiteP4Store(
             Path(temporary) / "state.sqlite",
@@ -92,13 +108,14 @@ def check_migrations(root: Path) -> dict[str, object]:
                 raise MigrationError("a P4 table lacks full namespace and schema columns")
         health = store.healthcheck()
         store.close()
-    if versions != [1, 2, 3, 4]:
+    if versions != [1, 2, 3, 4, 5]:
         raise MigrationError("applied migration versions are invalid")
     return {
         "schema_version": 1,
         "gate": "p4_migrations_clean",
         "migration_versions": versions,
-        "migration_004_checksum": expected,
+        "migration_004_checksum": expected_004,
+        "migration_005_checksum": expected_005,
         "historical_migrations_unchanged": True,
         "p4_namespaced_table_count": len(P4_TABLES),
         "journal_mode": health["journal_mode"],

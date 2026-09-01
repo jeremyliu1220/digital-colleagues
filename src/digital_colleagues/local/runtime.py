@@ -15,6 +15,7 @@ from digital_colleagues.adapters.system.deterministic import StableHashIdentifie
 from digital_colleagues.api.p4_app import create_p4_app
 from digital_colleagues.application.p4_services import (
     AuthenticationService,
+    GovernedObservedIntelligence,
     InitialColleagueService,
     P4RuntimeController,
 )
@@ -66,7 +67,11 @@ def build_local_runtime(state_directory: Path) -> LocalRuntime:
     controller = P4RuntimeController(
         store=store,
         studio_store=store,
-        intelligence=DeterministicIntelligence(),
+        intelligence=GovernedObservedIntelligence(
+            inner=DeterministicIntelligence(),
+            store=store,
+            identifiers=identifiers,
+        ),
         channel=ReferenceChannel(),
         clock=clock,
         identifiers=identifiers,
