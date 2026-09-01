@@ -3,8 +3,16 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 type Phase = "checking" | "bootstrap" | "builder" | "workspace";
-type View = "identity" | "work" | "wake" | "proposals" | "audit";
-type NoticeKind = "success" | "rejection" | "stale" | "error";
+type View = "identity" | "builder" | "work" | "wake" | "proposals" | "audit";
+type NoticeKind =
+  | "success"
+  | "validation"
+  | "permission"
+  | "rejection"
+  | "stale"
+  | "conflict"
+  | "cancelled"
+  | "error";
 
 type Session = {
   authenticated: boolean;
@@ -22,6 +30,8 @@ type Work = {
   correlation_id: string;
   mandate_id: string;
   mandate_revision: number;
+  policy_id: string | null;
+  policy_revision: number | null;
 };
 
 type Proposal = {
@@ -37,6 +47,8 @@ type Proposal = {
   constraint_parameters: Record<string, unknown>;
   mandate_id: string;
   mandate_revision: number;
+  policy_id: string | null;
+  policy_revision: number | null;
   actor: { principal_id: string; kind: string };
   namespace: { tenant_id: string; scope: string; scope_id: string };
   expires_at: string;
@@ -65,24 +77,37 @@ type Wake = {
   };
 };
 
-type NamedDefinition = { description: string; responsibility_id?: string };
+type ResponsibilityData = {
+  responsibility_id: string;
+  description: string;
+  obligations: string[];
+  completion_conditions: string[];
+};
+type CapabilityData = { capability_id: string; description: string };
+type ConstraintData = { constraint_id: string; description: string };
 type ProfileData = {
   display_name: string;
   description: string;
   presentation: { working_style: string; authority_source: boolean };
 };
 type EffectBoundaryData = {
+  boundary_id: string;
   effect_kind: string;
   allowed_destination_kinds: string[];
   allowed_actions: string[];
+  constraints: Record<string, unknown>;
+  human_approval_required: boolean;
 };
 type MandateData = {
+  mandate_id: string;
   mission: string;
   service_relationship: string;
-  responsibilities: NamedDefinition[];
-  capabilities: NamedDefinition[];
-  constraints: NamedDefinition[];
+  responsibilities: ResponsibilityData[];
+  capabilities: CapabilityData[];
+  constraints: ConstraintData[];
+  working_context: Record<string, unknown>;
   effect_boundaries: EffectBoundaryData[];
+  revision: number;
 };
 type AuditRecord = {
   audit_id: string;
@@ -116,6 +141,93 @@ type State = {
   approvals?: Record<string, unknown>[];
   attempts?: Record<string, unknown>[];
   results?: Record<string, unknown>[];
+};
+
+type PolicyData = {
+  policy_id: string;
+  mandate_id: string;
+  mandate_revision: number;
+  timezone: string;
+  weekly_windows: {
+    weekday: string;
+    start_minute: number;
+    end_minute: number;
+  }[];
+  allowed_triggers: string[];
+  proactivity: string;
+  notification: string;
+  interruption: string;
+  wake_budget: { limit: number; period: string };
+  outside_hours: string;
+  stop_conditions: string[];
+  escalation_conditions: string[];
+  failure_limit: number;
+  run_state: string;
+  revision: number;
+};
+
+type DiffData = {
+  section: "profile" | "mandate" | "policy";
+  path: string;
+  classification:
+    "added" | "removed" | "changed" | "narrowed" | "expanded" | "unchanged";
+  before: { value: unknown };
+  after: { value: unknown };
+  authoritative: boolean;
+};
+
+type DraftData = {
+  draft_id: string;
+  revision: number;
+  base_profile_revision: number;
+  base_mandate_revision: number;
+  base_policy_revision: number;
+  proposed_profile: ProfileData & { profile_id: string; revision: number };
+  proposed_mandate: MandateData;
+  proposed_policy: PolicyData;
+  explicit_defaults: {
+    path: string;
+    value: { value: unknown };
+    source: string;
+  }[];
+  diff: DiffData[];
+  canonical_digest: string;
+  state: "draft" | "reviewable" | "confirmed" | "cancelled" | "stale";
+};
+
+type DraftEnvelope = {
+  draft: DraftData;
+  identity_card_preview: Record<string, unknown> & {
+    projection_only: boolean;
+    active: boolean;
+    inert_until_confirmation: boolean;
+  };
+  review_binding: Record<string, unknown>;
+};
+
+type P5State = {
+  state: "empty" | "ready";
+  active?: {
+    identity_card: Record<string, unknown>;
+    profile: ProfileData & { profile_id: string; revision: number };
+    mandate: MandateData;
+    policy: PolicyData | null;
+    policy_status: "confirmed" | "legacy_unconfirmed";
+    profile_revision: number;
+    mandate_revision: number;
+    policy_revision: number;
+  };
+  drafts?: DraftEnvelope[];
+  runtime_policy?: {
+    budget_count: number;
+    run_state: string | null;
+    outcomes: { outcome: string; stage: string; policy_revision: number }[];
+    escalations: {
+      escalation_id: string;
+      condition: string;
+      safe_summary: string;
+    }[];
+  };
 };
 
 type BuilderData = {
@@ -153,10 +265,11 @@ const initialBuilder: BuilderData = {
 
 const navigation: { id: View; label: string; index: string }[] = [
   { id: "identity", label: "Identity & authority", index: "01" },
-  { id: "work", label: "Finite work", index: "02" },
-  { id: "wake", label: "Wake cycles", index: "03" },
-  { id: "proposals", label: "Proposal inbox", index: "04" },
-  { id: "audit", label: "Causal audit", index: "05" },
+  { id: "builder", label: "Revisioned builder", index: "02" },
+  { id: "work", label: "Finite work", index: "03" },
+  { id: "wake", label: "Wake cycles", index: "04" },
+  { id: "proposals", label: "Proposal inbox", index: "05" },
+  { id: "audit", label: "Causal audit", index: "06" },
 ];
 
 function randomKey(prefix: string) {
@@ -229,7 +342,7 @@ function Bootstrap({ onReady }: { onReady: (session: Session) => void }) {
         <span className="brand-mark">DC</span>
         <div>
           <strong>Digital Colleagues</strong>
-          <span>P4 local control plane</span>
+          <span>P5 local control plane</span>
         </div>
       </header>
       <section className="entry-composition" aria-labelledby="bootstrap-title">
@@ -549,8 +662,8 @@ function Builder({
                 </dd>
                 <dt>Working-hours boundary</dt>
                 <dd>
-                  Initial confirmed data only; enforcement is not implemented in
-                  P4.
+                  Legacy display data only; P5 typed policy requires a separate
+                  revisioned confirmation.
                 </dd>
               </dl>
             </div>
@@ -578,16 +691,685 @@ function Builder({
   );
 }
 
-function Workspace({
-  session,
-  state,
+type RevisionEdit = {
+  displayName: string;
+  description: string;
+  mission: string;
+  serviceRelationship: string;
+  responsibilities: string;
+  capabilities: string;
+  constraints: string;
+  timezone: string;
+  wakeLimit: number;
+  wakePeriod: string;
+  allowedTriggers: string[];
+  proactivity: string;
+  notification: string;
+  interruption: string;
+  outsideHours: string;
+  runState: string;
+};
+
+function editFromDraft(draft: DraftData): RevisionEdit {
+  return {
+    displayName: draft.proposed_profile.display_name,
+    description: draft.proposed_profile.description,
+    mission: draft.proposed_mandate.mission,
+    serviceRelationship: draft.proposed_mandate.service_relationship,
+    responsibilities: draft.proposed_mandate.responsibilities
+      .map((item) => item.description)
+      .join("\n"),
+    capabilities: draft.proposed_mandate.capabilities
+      .map((item) => item.description)
+      .join("\n"),
+    constraints: draft.proposed_mandate.constraints
+      .map((item) => item.description)
+      .join("\n"),
+    timezone: draft.proposed_policy.timezone,
+    wakeLimit: draft.proposed_policy.wake_budget.limit,
+    wakePeriod: draft.proposed_policy.wake_budget.period,
+    allowedTriggers: draft.proposed_policy.allowed_triggers,
+    proactivity: draft.proposed_policy.proactivity,
+    notification: draft.proposed_policy.notification,
+    interruption: draft.proposed_policy.interruption,
+    outsideHours: draft.proposed_policy.outside_hours,
+    runState: draft.proposed_policy.run_state,
+  };
+}
+
+function noticeFor(error: Error): NoticeKind {
+  if (error.name === "ValidationError" || error.name === "HTTP_422")
+    return "validation";
+  if (error.name === "PermissionDeniedError" || error.name === "HTTP_403")
+    return "permission";
+  if (error.name === "ConflictError")
+    return error.message.toLowerCase().includes("stale") ? "stale" : "conflict";
+  return "error";
+}
+
+function lines(value: string) {
+  return value
+    .split("\n")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function RevisionedBuilder({
+  p5,
   csrf,
   refresh,
 }: {
-  session: Session;
-  state: State;
+  p5: P5State;
   csrf: string;
   refresh: () => Promise<void>;
+}) {
+  const drafts = p5.drafts || [];
+  const initialDraft = drafts.at(-1)?.draft;
+  const [selectedId, setSelectedId] = useState(initialDraft?.draft_id || "");
+  const selected =
+    drafts.find((item) => item.draft.draft_id === selectedId) ||
+    drafts.at(-1) ||
+    null;
+  const [edit, setEdit] = useState<RevisionEdit | null>(
+    initialDraft?.state === "draft" ? editFromDraft(initialDraft) : null,
+  );
+  const [busy, setBusy] = useState("");
+  const [notice, setNotice] = useState<{
+    kind: NoticeKind;
+    message: string;
+  } | null>(null);
+
+  async function operation(label: string, action: () => Promise<void>) {
+    setBusy(label);
+    setNotice(null);
+    try {
+      await action();
+      setNotice({ kind: "success", message: `${label} completed.` });
+    } catch (cause) {
+      const error =
+        cause instanceof Error ? cause : new Error(`${label} failed`);
+      setNotice({ kind: noticeFor(error), message: error.message });
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function createDraft() {
+    await operation("Draft creation", async () => {
+      const response = await api<DraftEnvelope>(
+        "/colleagues/drafts",
+        {
+          method: "POST",
+          body: JSON.stringify({ idempotency_key: randomKey("draft") }),
+        },
+        csrf,
+      );
+      setSelectedId(response.draft.draft_id);
+      setEdit(editFromDraft(response.draft));
+      await refresh();
+    });
+  }
+
+  function mappedDefinitions<T extends { description: string }>(
+    values: string,
+    current: T[],
+    build: (description: string, index: number, item?: T) => object,
+  ) {
+    return lines(values).map((description, index) =>
+      build(description, index, current[index]),
+    );
+  }
+
+  async function save(event: FormEvent) {
+    event.preventDefault();
+    if (!selected || !edit) return;
+    const draft = selected.draft;
+    await operation("Draft update", async () => {
+      const response = await api<DraftEnvelope>(
+        `/colleagues/drafts/${draft.draft_id}`,
+        {
+          method: "PUT",
+          body: JSON.stringify({
+            profile: {
+              display_name: edit.displayName,
+              description: edit.description,
+              presentation: draft.proposed_profile.presentation,
+            },
+            mandate: {
+              mission: edit.mission,
+              service_relationship: edit.serviceRelationship,
+              responsibilities: mappedDefinitions(
+                edit.responsibilities,
+                draft.proposed_mandate.responsibilities,
+                (description, index, current) => ({
+                  responsibility_id:
+                    current?.responsibility_id ||
+                    `responsibility-ui-${index + 1}`,
+                  description,
+                  obligations: current?.obligations || [
+                    "Own the named responsibility",
+                  ],
+                  completion_conditions: current?.completion_conditions || [
+                    "The finite work reaches a terminal state",
+                  ],
+                }),
+              ),
+              capabilities: mappedDefinitions(
+                edit.capabilities,
+                draft.proposed_mandate.capabilities,
+                (description, index, current) => ({
+                  capability_id:
+                    current?.capability_id || `capability-ui-${index + 1}`,
+                  description,
+                }),
+              ),
+              constraints: mappedDefinitions(
+                edit.constraints,
+                draft.proposed_mandate.constraints,
+                (description, index, current) => ({
+                  constraint_id:
+                    current?.constraint_id || `constraint-ui-${index + 1}`,
+                  description,
+                }),
+              ),
+              working_context: draft.proposed_mandate.working_context,
+              effect_boundaries: draft.proposed_mandate.effect_boundaries,
+            },
+            policy: {
+              timezone: edit.timezone,
+              weekly_windows: draft.proposed_policy.weekly_windows,
+              allowed_triggers: edit.allowedTriggers,
+              proactivity: edit.proactivity,
+              notification: edit.notification,
+              interruption: edit.interruption,
+              wake_limit: edit.wakeLimit,
+              wake_period: edit.wakePeriod,
+              outside_hours: edit.outsideHours,
+              stop_conditions: draft.proposed_policy.stop_conditions,
+              escalation_conditions:
+                draft.proposed_policy.escalation_conditions,
+              failure_limit: draft.proposed_policy.failure_limit,
+              run_state: edit.runState,
+            },
+            expected_draft_revision: draft.revision,
+            idempotency_key: randomKey("update-draft"),
+          }),
+        },
+        csrf,
+      );
+      setEdit(editFromDraft(response.draft));
+      await refresh();
+    });
+  }
+
+  async function transition(target: "review" | "cancel") {
+    if (!selected) return;
+    const draft = selected.draft;
+    await operation(
+      target === "review" ? "Review binding" : "Draft cancellation",
+      async () => {
+        await api(
+          `/colleagues/drafts/${draft.draft_id}/${target}`,
+          {
+            method: "POST",
+            body: JSON.stringify({
+              expected_draft_revision: draft.revision,
+              idempotency_key: randomKey(target),
+            }),
+          },
+          csrf,
+        );
+        await refresh();
+        if (target === "cancel")
+          setNotice({
+            kind: "cancelled",
+            message: "Draft cancelled. Active authority was not changed.",
+          });
+      },
+    );
+  }
+
+  async function confirm() {
+    if (!selected) return;
+    const draft = selected.draft;
+    await operation("Exact revision confirmation", async () => {
+      await api(
+        `/colleagues/drafts/${draft.draft_id}/confirm`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            expected_draft_revision: draft.revision,
+            expected_base_profile_revision: draft.base_profile_revision,
+            expected_base_mandate_revision: draft.base_mandate_revision,
+            expected_base_policy_revision: draft.base_policy_revision,
+            expected_canonical_digest: draft.canonical_digest,
+            idempotency_key: randomKey("confirm-draft"),
+          }),
+        },
+        csrf,
+      );
+      await refresh();
+    });
+  }
+
+  function toggleTrigger(trigger: string) {
+    if (!edit) return;
+    const exists = edit.allowedTriggers.includes(trigger);
+    const allowedTriggers = exists
+      ? edit.allowedTriggers.filter((item) => item !== trigger)
+      : [...edit.allowedTriggers, trigger];
+    if (allowedTriggers.length) setEdit({ ...edit, allowedTriggers });
+  }
+
+  const active = p5.active;
+  const draft = selected?.draft;
+  const changed = draft?.diff.filter(
+    (item) => item.classification !== "unchanged",
+  );
+
+  return (
+    <section
+      className="workspace-view revision-builder"
+      aria-labelledby="revision-builder-title"
+    >
+      <div className="view-heading">
+        <div>
+          <p className="section-kicker">Revisioned colleague builder</p>
+          <h1 id="revision-builder-title">Change authority safely.</h1>
+          <p>
+            Drafts are inert until an Admin confirms the exact revision and
+            canonical digest shown here.
+          </p>
+        </div>
+        <button
+          className="primary-action"
+          onClick={() => void createDraft()}
+          disabled={!!busy}
+        >
+          Create revisioned draft
+        </button>
+      </div>
+
+      {notice && <Notice {...notice} />}
+      {busy && <Notice kind="success" message={`Loading · ${busy}`} />}
+
+      <div className="revision-ledger" aria-label="Active revision ledger">
+        <div>
+          <span>PROFILE</span>
+          <strong>REV {active?.profile_revision ?? "—"}</strong>
+          <small>Descriptive only</small>
+        </div>
+        <div>
+          <span>MANDATE</span>
+          <strong>REV {active?.mandate_revision ?? "—"}</strong>
+          <small>Authority source</small>
+        </div>
+        <div>
+          <span>POLICY</span>
+          <strong>REV {active?.policy_revision ?? "—"}</strong>
+          <small>{active?.policy_status.replaceAll("_", " ")}</small>
+        </div>
+        <div>
+          <span>RUNTIME</span>
+          <strong>{p5.runtime_policy?.run_state || "LEGACY"}</strong>
+          <small>{p5.runtime_policy?.budget_count || 0} wakes in bucket</small>
+        </div>
+      </div>
+
+      {active?.policy_status === "legacy_unconfirmed" && (
+        <Notice
+          kind="validation"
+          message="Legacy P4 working-hours text is display data only. P5 will not infer typed authority from it."
+        />
+      )}
+
+      <div className="draft-index" aria-label="Draft history">
+        <header>
+          <span>DRAFT HISTORY</span>
+          <strong>{drafts.length.toString().padStart(2, "0")}</strong>
+        </header>
+        {drafts.length === 0 ? (
+          <div className="empty-state">
+            <span>EMPTY</span>
+            <h2>No colleague revisions drafted.</h2>
+            <p>
+              Create a draft to review Profile, Mandate, and policy
+              independently.
+            </p>
+          </div>
+        ) : (
+          <div
+            className="draft-tabs"
+            role="tablist"
+            aria-label="Colleague drafts"
+          >
+            {drafts.map((item) => (
+              <button
+                key={item.draft.draft_id}
+                role="tab"
+                aria-selected={item.draft.draft_id === draft?.draft_id}
+                onClick={() => {
+                  setSelectedId(item.draft.draft_id);
+                  setEdit(
+                    item.draft.state === "draft"
+                      ? editFromDraft(item.draft)
+                      : null,
+                  );
+                }}
+              >
+                <span>{item.draft.state}</span>
+                <strong>Draft rev {item.draft.revision}</strong>
+                <small>
+                  base {item.draft.base_profile_revision}/
+                  {item.draft.base_mandate_revision}/
+                  {item.draft.base_policy_revision}
+                </small>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {draft && edit && draft.state === "draft" && (
+        <form className="revision-form" onSubmit={(event) => void save(event)}>
+          <section>
+            <span className="review-type descriptive">DESCRIPTIVE PROFILE</span>
+            <h2>Presentation</h2>
+            <label>
+              Display name
+              <input
+                value={edit.displayName}
+                onChange={(event) =>
+                  setEdit({ ...edit, displayName: event.target.value })
+                }
+                required
+              />
+            </label>
+            <label>
+              Description
+              <textarea
+                value={edit.description}
+                onChange={(event) =>
+                  setEdit({ ...edit, description: event.target.value })
+                }
+                required
+              />
+            </label>
+            <p className="section-note">
+              Profile never grants runtime permission.
+            </p>
+          </section>
+          <section>
+            <span className="review-type authoritative">
+              AUTHORITATIVE MANDATE
+            </span>
+            <h2>Responsibilities & capabilities</h2>
+            <label>
+              Mission
+              <textarea
+                value={edit.mission}
+                onChange={(event) =>
+                  setEdit({ ...edit, mission: event.target.value })
+                }
+                required
+              />
+            </label>
+            <label>
+              Service relationship
+              <textarea
+                value={edit.serviceRelationship}
+                onChange={(event) =>
+                  setEdit({ ...edit, serviceRelationship: event.target.value })
+                }
+                required
+              />
+            </label>
+            <label>
+              Responsibilities · one per line
+              <textarea
+                value={edit.responsibilities}
+                onChange={(event) =>
+                  setEdit({ ...edit, responsibilities: event.target.value })
+                }
+                required
+              />
+            </label>
+            <label>
+              Capabilities · one per line
+              <textarea
+                value={edit.capabilities}
+                onChange={(event) =>
+                  setEdit({ ...edit, capabilities: event.target.value })
+                }
+                required
+              />
+            </label>
+            <label>
+              Constraints · one per line
+              <textarea
+                value={edit.constraints}
+                onChange={(event) =>
+                  setEdit({ ...edit, constraints: event.target.value })
+                }
+                required
+              />
+            </label>
+          </section>
+          <section className="policy-editor">
+            <span className="review-type authoritative">TYPED POLICY</span>
+            <h2>Wake & interruption controls</h2>
+            <div className="policy-fields">
+              <label>
+                IANA timezone
+                <input
+                  value={edit.timezone}
+                  onChange={(event) =>
+                    setEdit({ ...edit, timezone: event.target.value })
+                  }
+                  required
+                />
+              </label>
+              <label>
+                Wake limit
+                <input
+                  type="number"
+                  min="1"
+                  max="10000"
+                  value={edit.wakeLimit}
+                  onChange={(event) =>
+                    setEdit({ ...edit, wakeLimit: Number(event.target.value) })
+                  }
+                  required
+                />
+              </label>
+              {[
+                ["Proactivity", "proactivity", ["bounded", "disabled"]],
+                ["Notification", "notification", ["enabled", "suppressed"]],
+                [
+                  "Interruption",
+                  "interruption",
+                  ["allowed", "working_hours_only", "never"],
+                ],
+                [
+                  "Outside hours",
+                  "outsideHours",
+                  ["defer", "no_op", "stop", "escalate"],
+                ],
+                ["Run state", "runState", ["active", "stopped"]],
+              ].map(([label, key, values]) => (
+                <label key={key as string}>
+                  {label as string}
+                  <select
+                    value={edit[key as keyof RevisionEdit] as string}
+                    onChange={(event) =>
+                      setEdit({ ...edit, [key as string]: event.target.value })
+                    }
+                  >
+                    {(values as string[]).map((value) => (
+                      <option key={value}>{value}</option>
+                    ))}
+                  </select>
+                </label>
+              ))}
+            </div>
+            <fieldset>
+              <legend>Allowed durable triggers</legend>
+              {[
+                ["event", "Event"],
+                ["timer", "Timer"],
+              ].map(([value, label]) => (
+                <label key={value}>
+                  <input
+                    type="checkbox"
+                    checked={edit.allowedTriggers.includes(value)}
+                    onChange={() => toggleTrigger(value)}
+                  />
+                  {label}
+                </label>
+              ))}
+            </fieldset>
+          </section>
+          <footer className="revision-actions">
+            <button
+              type="button"
+              className="reject-action"
+              onClick={() => void transition("cancel")}
+              disabled={!!busy}
+            >
+              Cancel draft
+            </button>
+            <button type="submit" className="quiet-action" disabled={!!busy}>
+              Save as next draft revision
+            </button>
+            <button
+              type="button"
+              className="primary-action"
+              onClick={() => void transition("review")}
+              disabled={!!busy}
+            >
+              Review exact revision
+            </button>
+          </footer>
+        </form>
+      )}
+
+      {draft && draft.state !== "draft" && (
+        <section className="exact-review" aria-label="Exact draft review">
+          <header>
+            <div>
+              <span className={`state-label state-${draft.state}`}>
+                {draft.state}
+              </span>
+              <h2>Draft revision {draft.revision}</h2>
+              <p>
+                Base Profile {draft.base_profile_revision} · Mandate{" "}
+                {draft.base_mandate_revision} · Policy{" "}
+                {draft.base_policy_revision}
+              </p>
+            </div>
+            <code>{draft.canonical_digest}</code>
+          </header>
+          {draft.state === "reviewable" && (
+            <Notice
+              kind="validation"
+              message="Confirm binds to this exact draft revision, all three base revisions, and this digest."
+            />
+          )}
+          {draft.state === "cancelled" && (
+            <Notice
+              kind="cancelled"
+              message="Cancelled draft is terminal and remains inert."
+            />
+          )}
+          {draft.state === "stale" && (
+            <Notice
+              kind="stale"
+              message="A base revision changed. This draft cannot be rebased, retried, or confirmed."
+            />
+          )}
+          <div className="diff-list">
+            {(changed || []).map((item) => (
+              <article
+                key={`${item.section}-${item.path}`}
+                className={`diff-${item.classification}`}
+              >
+                <div>
+                  <span>{item.section}</span>
+                  <strong>{item.path}</strong>
+                </div>
+                <em>{item.classification}</em>
+                <code>{JSON.stringify(item.before.value)}</code>
+                <span aria-hidden="true">→</span>
+                <code>{JSON.stringify(item.after.value)}</code>
+              </article>
+            ))}
+          </div>
+          {draft.explicit_defaults.length > 0 && (
+            <div className="default-list">
+              <span>EXPLICIT DEFAULTS · CONFIRMED ONLY WITH THIS DRAFT</span>
+              {draft.explicit_defaults.map((item) => (
+                <div key={item.path}>
+                  <strong>{item.path}</strong>
+                  <code>{JSON.stringify(item.value.value)}</code>
+                  <small>{item.source}</small>
+                </div>
+              ))}
+            </div>
+          )}
+          {draft.state === "reviewable" && (
+            <div className="revision-actions">
+              <button
+                className="reject-action"
+                onClick={() => void transition("cancel")}
+                disabled={!!busy}
+              >
+                Cancel draft
+              </button>
+              <button
+                className="primary-action"
+                onClick={() => void confirm()}
+                disabled={!!busy}
+              >
+                Confirm exact revision & digest
+              </button>
+            </div>
+          )}
+        </section>
+      )}
+
+      {!!p5.runtime_policy?.escalations.length && (
+        <section className="escalation-ledger" aria-label="Policy escalations">
+          <span>SAFE ESCALATION RECORDS</span>
+          {p5.runtime_policy.escalations.map((item) => (
+            <div key={item.escalation_id}>
+              <strong>{item.condition}</strong>
+              <p>{item.safe_summary}</p>
+              <small>
+                No approval, authority change, or external notification was
+                created.
+              </small>
+            </div>
+          ))}
+        </section>
+      )}
+    </section>
+  );
+}
+
+function Workspace({
+  session,
+  state,
+  p5,
+  csrf,
+  refresh,
+  refreshP5,
+}: {
+  session: Session;
+  state: State;
+  p5: P5State;
+  csrf: string;
+  refresh: () => Promise<void>;
+  refreshP5: () => Promise<void>;
 }) {
   const [view, setView] = useState<View>("identity");
   const [busy, setBusy] = useState("");
@@ -680,7 +1462,7 @@ function Workspace({
           },
           csrf,
         );
-        await refresh();
+        await Promise.all([refresh(), refreshP5()]);
         setView(deterministicNoop ? "wake" : "proposals");
       },
     );
@@ -700,6 +1482,8 @@ function Workspace({
               proposal_digest: proposal.proposal_digest,
               mandate_id: proposal.mandate_id,
               mandate_revision: proposal.mandate_revision,
+              policy_id: proposal.policy_id,
+              policy_revision: proposal.policy_revision,
               choice,
               idempotency_key: randomKey(choice),
             }),
@@ -744,7 +1528,7 @@ function Workspace({
           <span className="brand-mark">DC</span>
           <div>
             <strong>Digital Colleagues</strong>
-            <span>Local reference · P4</span>
+            <span>Local reference · P5</span>
           </div>
         </div>
         <div className="runtime-status">
@@ -845,6 +1629,15 @@ function Workspace({
               <em>Human approval required</em>
             </div>
           </section>
+        )}
+        {view === "builder" && (
+          <RevisionedBuilder
+            p5={p5}
+            csrf={csrf}
+            refresh={async () => {
+              await Promise.all([refresh(), refreshP5()]);
+            }}
+          />
         )}
         {view === "work" && (
           <section className="workspace-view" aria-labelledby="work-title">
@@ -1048,6 +1841,12 @@ function Workspace({
                       <dd>
                         {proposal.mandate_id} · rev {proposal.mandate_revision}
                       </dd>
+                      <dt>Policy</dt>
+                      <dd>
+                        {proposal.policy_id
+                          ? `${proposal.policy_id} · rev ${proposal.policy_revision}`
+                          : "legacy unconfirmed"}
+                      </dd>
                       <dt>Actor</dt>
                       <dd>
                         {proposal.actor.kind} / {proposal.actor.principal_id}
@@ -1171,11 +1970,20 @@ export function App() {
   const [phase, setPhase] = useState<Phase>("checking");
   const [session, setSession] = useState<Session | null>(null);
   const [state, setState] = useState<State>({ state: "empty" });
+  const [p5, setP5] = useState<P5State>({ state: "empty" });
   const [fatal, setFatal] = useState("");
 
+  const loadP5State = useCallback(async () => {
+    const next = await api<P5State>("/p5/studio/state");
+    setP5(next);
+  }, []);
   const loadState = useCallback(async () => {
-    const next = await api<State>("/studio/state");
+    const [next, nextP5] = await Promise.all([
+      api<State>("/studio/state"),
+      api<P5State>("/p5/studio/state"),
+    ]);
     setState(next);
+    setP5(nextP5);
     setPhase(next.state === "empty" ? "builder" : "workspace");
   }, []);
   const establish = useCallback(
@@ -1242,8 +2050,10 @@ export function App() {
     <Workspace
       session={session}
       state={state}
+      p5={p5}
       csrf={session.csrf_token}
       refresh={loadState}
+      refreshP5={loadP5State}
     />
   );
 }

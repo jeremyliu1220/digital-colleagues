@@ -237,3 +237,9 @@ class ReferenceChannelPort(Protocol):
     def apply(self, effect: ChannelEffect) -> ChannelOutcome: ...
 
     def reconcile(self, effect_idempotency_key: str) -> ReconciliationOutcome: ...
+
+
+class DispatchAuthorizationPort(Protocol):
+    """Optional additive policy check performed before an attempt or channel call."""
+
+    def authorize(self, proposal: EffectProposal, approval: HumanApprovalDecision) -> None: ...

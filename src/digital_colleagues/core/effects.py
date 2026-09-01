@@ -130,6 +130,8 @@ class EffectProposal:
     schema_version: int = SCHEMA_VERSION
     mandate_id: str | None = None
     mandate_revision: int | None = None
+    policy_id: str | None = None
+    policy_revision: int | None = None
     payload_digest: str = field(init=False)
     proposal_digest: str = field(init=False)
 
@@ -168,6 +170,12 @@ class EffectProposal:
             require_stable_id(self.mandate_id, "mandate_id")
             assert self.mandate_revision is not None
             require_revision(self.mandate_revision, "mandate_revision")
+        if (self.policy_id is None) != (self.policy_revision is None):
+            raise CoreInvariantError("proposal policy identity must be complete")
+        if self.policy_id is not None:
+            require_stable_id(self.policy_id, "policy_id")
+            assert self.policy_revision is not None
+            require_revision(self.policy_revision, "policy_revision")
         payload_digest = _payload_digest(self.payload)
         object.__setattr__(self, "payload_digest", payload_digest)
         envelope = {
@@ -193,6 +201,8 @@ class EffectProposal:
             "mandate_revision": self.mandate_revision,
             "namespace": _namespace_envelope(self.namespace),
             "occurred_at": _datetime_to_canonical_z(self.occurred_at),
+            "policy_id": self.policy_id,
+            "policy_revision": self.policy_revision,
             "payload_digest": payload_digest,
             "proposal_id": self.proposal_id,
             "proposal_revision": self.revision,

@@ -38,7 +38,8 @@ body {
 }
 button,
 input,
-textarea {
+textarea,
+select {
   font: inherit;
 }
 button {
@@ -46,7 +47,8 @@ button {
 }
 button:focus-visible,
 input:focus-visible,
-textarea:focus-visible {
+textarea:focus-visible,
+select:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
@@ -110,7 +112,7 @@ dt,
   max-width: 620px;
   margin: 20px 0;
   font:
-    400 clamp(2.8rem, 7vw, 6rem)/0.96 Georgia,
+    400 clamp(2.8rem, 7vw, 6rem) / 0.96 Georgia,
     serif;
   letter-spacing: -0.05em;
 }
@@ -195,7 +197,7 @@ dt,
   max-width: 880px;
   margin-bottom: 24px;
   font:
-    400 clamp(3.2rem, 6.7vw, 7.2rem)/0.9 Georgia,
+    400 clamp(3.2rem, 6.7vw, 7.2rem) / 0.9 Georgia,
     serif;
   letter-spacing: -0.055em;
 }
@@ -222,7 +224,8 @@ dt,
   margin-top: 10px;
 }
 input,
-textarea {
+textarea,
+select {
   width: 100%;
   border: 0;
   border-bottom: 1px solid #434a43;
@@ -239,6 +242,10 @@ textarea {
   padding: 13px 14px;
   resize: vertical;
   line-height: 1.5;
+}
+select {
+  min-height: 48px;
+  padding: 0 38px 0 14px;
 }
 .token-form input {
   border: 1px solid #414841;
@@ -313,8 +320,14 @@ button:disabled {
 .notice-error {
   color: var(--accent);
 }
-.notice-stale {
+.notice-stale,
+.notice-conflict,
+.notice-validation,
+.notice-cancelled {
   color: var(--warning);
+}
+.notice-permission {
+  color: #ff9b8c;
 }
 
 .builder-shell {
@@ -359,7 +372,7 @@ button:disabled {
 .authority-review h2,
 .workspace-view h2 {
   font:
-    400 clamp(1.6rem, 3vw, 2.8rem)/1.1 Georgia,
+    400 clamp(1.6rem, 3vw, 2.8rem) / 1.1 Georgia,
     serif;
   letter-spacing: -0.03em;
 }
@@ -665,6 +678,263 @@ dd {
   font:
     normal 0.62rem "SFMono-Regular",
     monospace;
+}
+
+.revision-builder > .notice {
+  width: 100%;
+  margin: 28px 0 0;
+}
+.revision-ledger {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border-bottom: 1px solid var(--line);
+}
+.revision-ledger > div {
+  display: grid;
+  gap: 8px;
+  min-height: 126px;
+  align-content: center;
+  padding: 20px 28px;
+}
+.revision-ledger > div + div {
+  border-left: 1px solid var(--line);
+}
+.revision-ledger span,
+.revision-ledger small,
+.draft-index header,
+.draft-tabs span,
+.draft-tabs small,
+.default-list > span,
+.escalation-ledger > span {
+  color: var(--dim);
+  font:
+    0.57rem "SFMono-Regular",
+    monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.revision-ledger strong {
+  color: var(--mint);
+  font:
+    400 1.45rem Georgia,
+    serif;
+}
+.draft-index {
+  margin-top: 48px;
+  border-top: 1px solid var(--line);
+}
+.draft-index > header {
+  display: flex;
+  justify-content: space-between;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--soft-line);
+}
+.draft-index header strong {
+  color: var(--warning);
+}
+.draft-tabs {
+  display: flex;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--line);
+}
+.draft-tabs button {
+  display: grid;
+  flex: 0 0 220px;
+  gap: 8px;
+  min-height: 106px;
+  align-content: center;
+  padding: 18px 22px;
+  border: 0;
+  border-right: 1px solid var(--line);
+  color: inherit;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background 160ms ease;
+}
+.draft-tabs button[aria-selected="true"] {
+  box-shadow: inset 0 -2px var(--accent);
+  background: var(--raised);
+}
+.draft-tabs button:hover {
+  background: #191d19;
+}
+.draft-tabs button > span {
+  color: var(--warning);
+}
+.draft-tabs button > strong {
+  font-size: 0.78rem;
+}
+.revision-form {
+  display: grid;
+  grid-template-columns: 0.72fr 1fr 1fr;
+  margin-top: 42px;
+  border-block: 1px solid var(--line);
+}
+.revision-form > section {
+  padding: 38px 34px 48px 0;
+}
+.revision-form > section + section {
+  padding-left: 34px;
+  border-left: 1px solid var(--line);
+}
+.revision-form h2 {
+  margin-bottom: 30px;
+}
+.revision-form label {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 20px;
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+.policy-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 18px;
+}
+.policy-editor fieldset {
+  display: flex;
+  gap: 24px;
+  padding: 18px 0 0;
+  border: 0;
+  border-top: 1px solid var(--soft-line);
+}
+.policy-editor legend {
+  padding: 0 0 14px;
+  color: var(--dim);
+  font:
+    0.57rem "SFMono-Regular",
+    monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.policy-editor fieldset label {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+}
+.policy-editor input[type="checkbox"] {
+  width: 16px;
+  min-height: 16px;
+  accent-color: var(--accent);
+}
+.revision-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  padding: 24px 0;
+  border-top: 1px solid var(--line);
+}
+.exact-review {
+  margin-top: 42px;
+  border-top: 1px solid var(--line);
+}
+.exact-review > header {
+  display: grid;
+  grid-template-columns: 0.7fr 1.3fr;
+  gap: 40px;
+  align-items: center;
+  padding: 32px 0;
+  border-bottom: 1px solid var(--line);
+}
+.exact-review > header p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+.exact-review > header code {
+  color: var(--warning);
+  font-size: 0.68rem;
+  overflow-wrap: anywhere;
+}
+.state-confirmed {
+  color: var(--mint);
+}
+.state-stale,
+.state-cancelled {
+  color: var(--warning);
+}
+.diff-list article {
+  display: grid;
+  grid-template-columns: 180px 90px 1fr 24px 1fr;
+  gap: 18px;
+  align-items: center;
+  min-height: 76px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--soft-line);
+}
+.diff-list article > div {
+  display: grid;
+  gap: 5px;
+}
+.diff-list article > div span {
+  color: var(--dim);
+  font:
+    0.55rem "SFMono-Regular",
+    monospace;
+  text-transform: uppercase;
+}
+.diff-list article > div strong {
+  font-size: 0.72rem;
+}
+.diff-list article > em {
+  color: var(--warning);
+  font:
+    normal 0.58rem "SFMono-Regular",
+    monospace;
+  text-transform: uppercase;
+}
+.diff-list article > code {
+  max-height: 84px;
+  overflow: auto;
+  color: #afb6ae;
+  font-size: 0.62rem;
+  overflow-wrap: anywhere;
+}
+.diff-expanded > em,
+.diff-added > em {
+  color: var(--accent) !important;
+}
+.diff-narrowed > em,
+.diff-removed > em {
+  color: var(--mint) !important;
+}
+.default-list,
+.escalation-ledger {
+  margin-top: 36px;
+  border-top: 2px solid var(--warning);
+}
+.default-list > span,
+.escalation-ledger > span {
+  display: block;
+  padding: 16px 0;
+  color: var(--warning);
+}
+.default-list > div,
+.escalation-ledger > div {
+  display: grid;
+  grid-template-columns: 220px 1fr auto;
+  gap: 22px;
+  padding: 15px 0;
+  border-top: 1px solid var(--soft-line);
+  font-size: 0.7rem;
+}
+.default-list code {
+  color: #c5cbc3;
+  overflow-wrap: anywhere;
+}
+.default-list small,
+.escalation-ledger small {
+  color: var(--dim);
+}
+.escalation-ledger > div {
+  grid-template-columns: 160px 1fr 1fr;
+}
+.escalation-ledger p {
+  margin: 0;
+  color: #c5cbc3;
 }
 
 .empty-state {
@@ -1048,6 +1318,19 @@ dd {
   .identity-ledger {
     grid-template-columns: 1fr;
   }
+  .revision-ledger,
+  .revision-form {
+    grid-template-columns: 1fr 1fr;
+  }
+  .revision-form > section:nth-child(3) {
+    grid-column: 1 / -1;
+    padding-left: 0;
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+  .diff-list article {
+    grid-template-columns: 150px 80px 1fr 18px 1fr;
+  }
   .identity-ledger article + article {
     padding-left: 0;
     border-top: 1px solid var(--line);
@@ -1113,6 +1396,30 @@ dd {
   .workspace-view {
     width: calc(100% - 32px);
     padding-top: 38px;
+  }
+  .revision-ledger,
+  .revision-form,
+  .policy-fields,
+  .exact-review > header,
+  .diff-list article,
+  .default-list > div,
+  .escalation-ledger > div {
+    grid-template-columns: 1fr;
+  }
+  .revision-ledger > div + div,
+  .revision-form > section + section {
+    padding-left: 0;
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+  .revision-form > section:nth-child(3) {
+    grid-column: auto;
+  }
+  .diff-list article > span[aria-hidden="true"] {
+    display: none;
+  }
+  .revision-actions {
+    flex-direction: column;
   }
   .view-heading {
     display: grid;

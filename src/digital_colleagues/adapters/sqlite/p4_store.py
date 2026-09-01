@@ -42,7 +42,11 @@ from digital_colleagues.core.runtime import (
     TimerOccurrence,
     WakeCycle,
 )
-from digital_colleagues.core.serialization import datetime_from_z, datetime_to_z
+from digital_colleagues.core.serialization import (
+    contract_to_public_data,
+    datetime_from_z,
+    datetime_to_z,
+)
 from digital_colleagues.core.work import FiniteWork
 
 
@@ -351,7 +355,7 @@ class SQLiteP4Store(SQLiteRuntimeStore):
                         idempotency_key,
                         replay.request_digest,
                         json.dumps(
-                            dict(replay.result.items()),
+                            contract_to_public_data(replay.result),
                             ensure_ascii=False,
                             separators=(",", ":"),
                             sort_keys=True,

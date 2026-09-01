@@ -30,6 +30,7 @@ from digital_colleagues.application.errors import (
 from digital_colleagues.application.ports import (
     CheckpointPort,
     ClockPort,
+    DispatchAuthorizationPort,
     IdentifierPort,
     IntelligencePort,
     ReferenceChannelPort,
@@ -126,6 +127,8 @@ class EventService:
             causation_id=request.causation_id,
             occurred_at=self._clock.now(),
             revision=1,
+            policy_id=request.policy_id,
+            policy_revision=request.policy_revision,
         )
         trigger_id = self._identifiers.derive("trigger", request.event_id, idempotency_key)
         return self._store.ingest_event(
@@ -170,6 +173,8 @@ class TimerService:
             causation_id=request.causation_id,
             occurred_at=occurred_at,
             revision=1,
+            policy_id=request.policy_id,
+            policy_revision=request.policy_revision,
         )
         trigger_id = self._identifiers.derive(
             "timer-trigger",
@@ -202,6 +207,8 @@ def _deterministic_noop(request: IntelligenceRequest) -> SemanticDecision | None
         causation_id=request.agenda_item.agenda_item_id,
         occurred_at=request.occurred_at,
         revision=1,
+        policy_id=request.policy_id,
+        policy_revision=request.policy_revision,
     )
     return SemanticDecision(SemanticOutcome.NO_OP, decision, None, request.request_id)
 
@@ -302,6 +309,8 @@ class WakeService:
                 effect_idempotency_key=self._identifiers.derive("effect", request_id),
                 occurred_at=now,
                 proposal_valid_until=now + timedelta(hours=1),
+                policy_id=wake.policy_id,
+                policy_revision=wake.policy_revision,
             )
             try:
                 semantic = _deterministic_noop(request)
@@ -431,6 +440,7 @@ class DispatchService:
         mandate_id: str,
         lease_duration: timedelta = timedelta(seconds=30),
         checkpoint: CheckpointPort | None = None,
+        policy_authorizer: DispatchAuthorizationPort | None = None,
     ) -> None:
         if result_actor.kind is not PrincipalKind.SERVICE:
             raise ValidationError("result actor must be a service principal")
@@ -443,6 +453,7 @@ class DispatchService:
         self._mandate_id = mandate_id
         self._lease_duration = lease_duration
         self._checkpoint = checkpoint or _NoopCheckpoint()
+        self._policy_authorizer = policy_authorizer
 
     def _validate_exact_effect(self, namespace: Namespace, claim: OutboxClaim) -> DispatchBundle:
         bundle = self._store.load_dispatch_bundle(claim, mandate_id=self._mandate_id)
@@ -465,6 +476,8 @@ class DispatchService:
             bundle.approval,
             evaluated_at=self._clock.now(),
         )
+        if self._policy_authorizer is not None:
+            self._policy_authorizer.authorize(bundle.proposal, bundle.approval)
         if bundle.attempt.attempt_number > bundle.maximum_attempts:
             raise PermissionDeniedError("effect attempt limit was exceeded")
         return bundle

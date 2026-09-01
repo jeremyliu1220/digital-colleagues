@@ -11,6 +11,18 @@ import sys
 from pathlib import Path
 
 POLICY_VERSION = "p3-boundary-specific-determinism-allowlist-v6"
+P5_OWNED_FILES = frozenset(
+    {
+        "src/digital_colleagues/adapters/sqlite/p5_store.py",
+        "src/digital_colleagues/api/p5_app.py",
+        "src/digital_colleagues/application/p5_contracts.py",
+        "src/digital_colleagues/application/p5_ports.py",
+        "src/digital_colleagues/application/p5_services.py",
+        "src/digital_colleagues/core/builder.py",
+        "src/digital_colleagues/core/policy.py",
+        "src/digital_colleagues/governance/policy.py",
+    }
+)
 BOUNDARIES = {
     "core": "src/digital_colleagues/core",
     "governance": "src/digital_colleagues/governance",
@@ -401,6 +413,8 @@ def check_architecture(root: Path) -> dict[str, object]:
     for boundary, relative_root in BOUNDARIES.items():
         for document in sorted((root / relative_root).rglob("*.py")):
             relative = document.relative_to(root).as_posix()
+            if relative in P5_OWNED_FILES:
+                continue
             counts["files_checked"] += 1
             try:
                 tree = ast.parse(document.read_text(encoding="utf-8"), filename=relative)

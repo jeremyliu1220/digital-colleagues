@@ -18,6 +18,7 @@ from digital_colleagues.core.authority import (
     Profile,
     ResponsibilityDefinition,
 )
+from digital_colleagues.core.builder import ColleagueDraft, DraftDiffItem, ExplicitDefault
 from digital_colleagues.core.common import FrozenJsonObject, require_utc
 from digital_colleagues.core.effects import (
     ActionResult,
@@ -29,6 +30,13 @@ from digital_colleagues.core.effects import (
 )
 from digital_colleagues.core.errors import CoreInvariantError
 from digital_colleagues.core.namespace import Namespace
+from digital_colleagues.core.policy import (
+    ColleaguePolicy,
+    EscalationRecord,
+    PolicyEnforcementRecord,
+    WakeBudget,
+    WeeklyWindow,
+)
 from digital_colleagues.core.principals import Principal
 from digital_colleagues.core.runtime import (
     AgendaItem,
@@ -104,6 +112,108 @@ def _contract_items(value: object) -> tuple[tuple[str, object], ...] | None:
             ("effective_at", value.effective_at),
             ("schema_version", value.schema_version),
         )
+    if isinstance(value, WeeklyWindow):
+        return (
+            ("weekday", value.weekday),
+            ("start_minute", value.start_minute),
+            ("end_minute", value.end_minute),
+        )
+    if isinstance(value, WakeBudget):
+        return (("limit", value.limit), ("period", value.period))
+    if isinstance(value, ColleaguePolicy):
+        return (
+            ("namespace", value.namespace),
+            ("policy_id", value.policy_id),
+            ("mandate_id", value.mandate_id),
+            ("mandate_revision", value.mandate_revision),
+            ("timezone", value.timezone),
+            ("weekly_windows", value.weekly_windows),
+            ("allowed_triggers", value.allowed_triggers),
+            ("proactivity", value.proactivity),
+            ("notification", value.notification),
+            ("interruption", value.interruption),
+            ("wake_budget", value.wake_budget),
+            ("outside_hours", value.outside_hours),
+            ("stop_conditions", value.stop_conditions),
+            ("escalation_conditions", value.escalation_conditions),
+            ("failure_limit", value.failure_limit),
+            ("run_state", value.run_state),
+            ("revision", value.revision),
+            ("issued_by", value.issued_by),
+            ("effective_at", value.effective_at),
+            ("schema_version", value.schema_version),
+        )
+    if isinstance(value, PolicyEnforcementRecord):
+        return (
+            ("namespace", value.namespace),
+            ("outcome_id", value.outcome_id),
+            ("policy_id", value.policy_id),
+            ("policy_revision", value.policy_revision),
+            ("mandate_id", value.mandate_id),
+            ("mandate_revision", value.mandate_revision),
+            ("stage", value.stage),
+            ("outcome", value.outcome),
+            ("trigger_class", value.trigger_class),
+            ("source_id", value.source_id),
+            ("actor", value.actor),
+            ("correlation_id", value.correlation_id),
+            ("causation_id", value.causation_id),
+            ("occurred_at", value.occurred_at),
+            ("safe_projection", value.safe_projection),
+            ("payload_digest", value.payload_digest),
+            ("schema_version", value.schema_version),
+        )
+    if isinstance(value, EscalationRecord):
+        return (
+            ("namespace", value.namespace),
+            ("escalation_id", value.escalation_id),
+            ("policy_id", value.policy_id),
+            ("policy_revision", value.policy_revision),
+            ("condition", value.condition),
+            ("safe_summary", value.safe_summary),
+            ("actor", value.actor),
+            ("correlation_id", value.correlation_id),
+            ("causation_id", value.causation_id),
+            ("occurred_at", value.occurred_at),
+            ("revision", value.revision),
+            ("schema_version", value.schema_version),
+        )
+    if isinstance(value, ExplicitDefault):
+        return (("path", value.path), ("value", value.value), ("source", value.source))
+    if isinstance(value, DraftDiffItem):
+        return (
+            ("section", value.section),
+            ("path", value.path),
+            ("classification", value.classification),
+            ("before", value.before),
+            ("after", value.after),
+            ("authoritative", value.authoritative),
+        )
+    if isinstance(value, ColleagueDraft):
+        return (
+            ("namespace", value.namespace),
+            ("draft_id", value.draft_id),
+            ("revision", value.revision),
+            ("base_profile_id", value.base_profile_id),
+            ("base_profile_revision", value.base_profile_revision),
+            ("base_mandate_id", value.base_mandate_id),
+            ("base_mandate_revision", value.base_mandate_revision),
+            ("base_policy_id", value.base_policy_id),
+            ("base_policy_revision", value.base_policy_revision),
+            ("proposed_profile", value.proposed_profile),
+            ("proposed_mandate", value.proposed_mandate),
+            ("proposed_policy", value.proposed_policy),
+            ("explicit_defaults", value.explicit_defaults),
+            ("diff", value.diff),
+            ("canonical_digest", value.canonical_digest),
+            ("state", value.state),
+            ("author", value.author),
+            ("created_at", value.created_at),
+            ("updated_at", value.updated_at),
+            ("correlation_id", value.correlation_id),
+            ("causation_id", value.causation_id),
+            ("schema_version", value.schema_version),
+        )
     if isinstance(value, IdentityCard):
         return (
             ("namespace", value.namespace),
@@ -170,6 +280,8 @@ def _contract_items(value: object) -> tuple[tuple[str, object], ...] | None:
             ("schema_version", value.schema_version),
             ("mandate_id", value.mandate_id),
             ("mandate_revision", value.mandate_revision),
+            ("policy_id", value.policy_id),
+            ("policy_revision", value.policy_revision),
             ("payload_digest", value.payload_digest),
             ("proposal_digest", value.proposal_digest),
         )
@@ -251,6 +363,8 @@ def _contract_items(value: object) -> tuple[tuple[str, object], ...] | None:
             ("occurred_at", value.occurred_at),
             ("revision", value.revision),
             ("schema_version", value.schema_version),
+            ("policy_id", value.policy_id),
+            ("policy_revision", value.policy_revision),
         )
     if isinstance(value, TimerOccurrence):
         return (
@@ -266,6 +380,8 @@ def _contract_items(value: object) -> tuple[tuple[str, object], ...] | None:
             ("occurred_at", value.occurred_at),
             ("revision", value.revision),
             ("schema_version", value.schema_version),
+            ("policy_id", value.policy_id),
+            ("policy_revision", value.policy_revision),
         )
     if isinstance(value, WakeCycle):
         return (
@@ -283,6 +399,8 @@ def _contract_items(value: object) -> tuple[tuple[str, object], ...] | None:
             ("fencing_token", value.fencing_token),
             ("checkpoint_generation", value.checkpoint_generation),
             ("trigger_timer_occurrence_ids", value.trigger_timer_occurrence_ids),
+            ("policy_id", value.policy_id),
+            ("policy_revision", value.policy_revision),
         )
     if isinstance(value, AgendaItem):
         return (
@@ -305,6 +423,8 @@ def _contract_items(value: object) -> tuple[tuple[str, object], ...] | None:
             ("handled_generation", value.handled_generation),
             ("cause_ids", value.cause_ids),
             ("source_timer_occurrence_id", value.source_timer_occurrence_id),
+            ("policy_id", value.policy_id),
+            ("policy_revision", value.policy_revision),
         )
     if isinstance(value, Decision):
         return (
@@ -321,6 +441,8 @@ def _contract_items(value: object) -> tuple[tuple[str, object], ...] | None:
             ("occurred_at", value.occurred_at),
             ("revision", value.revision),
             ("schema_version", value.schema_version),
+            ("policy_id", value.policy_id),
+            ("policy_revision", value.policy_revision),
         )
     if isinstance(value, CompletionEvidence):
         return (

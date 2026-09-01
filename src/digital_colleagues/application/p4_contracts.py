@@ -119,6 +119,8 @@ class ServiceRuntimeContext:
     mandate_id: str
     mandate_revision: int
     schema_version: int = SCHEMA_VERSION
+    policy_id: str | None = None
+    policy_revision: int | None = None
 
     def __post_init__(self) -> None:
         require_schema_version(self.schema_version)
@@ -133,6 +135,12 @@ class ServiceRuntimeContext:
             raise ValueError("runtime principals cannot carry human roles")
         require_stable_id(self.mandate_id, "mandate_id")
         require_revision(self.mandate_revision, "mandate_revision")
+        if (self.policy_id is None) != (self.policy_revision is None):
+            raise ValueError("runtime policy binding must be complete")
+        if self.policy_id is not None:
+            require_stable_id(self.policy_id, "policy_id")
+            assert self.policy_revision is not None
+            require_revision(self.policy_revision, "policy_revision")
 
 
 @dataclass(frozen=True, slots=True)

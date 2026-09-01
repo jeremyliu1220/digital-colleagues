@@ -18,6 +18,12 @@ describe("P4 Studio workflow", () => {
       "Bootstrap token",
       "Descriptive Profile",
       "Authoritative Mandate",
+      "Revisioned colleague builder",
+      "Typed policy",
+      "Explicit defaults",
+      "Review exact revision",
+      "Confirm exact revision & digest",
+      "Cancel draft",
       "Finite work",
       "Wake-cycle inspector",
       "Proposal inbox",
@@ -33,9 +39,24 @@ describe("P4 Studio workflow", () => {
       "loading",
       "empty",
       "success",
+      "validation",
+      "permission",
       "rejection",
       "stale",
+      "conflict",
+      "cancelled",
       "error",
+    ]);
+  });
+
+  it("declares every authority diff classification used by P5 review", () => {
+    expect(studioContract.diffClassifications).toEqual([
+      "added",
+      "removed",
+      "changed",
+      "narrowed",
+      "expanded",
+      "unchanged",
     ]);
   });
 });

@@ -44,6 +44,15 @@ def _validate_causal_record(
     require_revision(revision)
 
 
+def _validate_policy_binding(policy_id: str | None, policy_revision: int | None) -> None:
+    if (policy_id is None) != (policy_revision is None):
+        raise CoreInvariantError("runtime policy identity must be complete")
+    if policy_id is not None:
+        require_stable_id(policy_id, "policy_id")
+        assert policy_revision is not None
+        require_revision(policy_revision, "policy_revision")
+
+
 class InputEventState(StrEnum):
     RECEIVED = "received"
     ACCEPTED = "accepted"
@@ -64,6 +73,8 @@ class InputEvent:
     occurred_at: datetime
     revision: int
     schema_version: int = SCHEMA_VERSION
+    policy_id: str | None = None
+    policy_revision: int | None = None
 
     def __post_init__(self) -> None:
         require_stable_id(self.event_id, "event_id")
@@ -82,6 +93,7 @@ class InputEvent:
             revision=self.revision,
             schema_version=self.schema_version,
         )
+        _validate_policy_binding(self.policy_id, self.policy_revision)
 
 
 class TimerOccurrenceState(StrEnum):
@@ -105,6 +117,8 @@ class TimerOccurrence:
     occurred_at: datetime
     revision: int
     schema_version: int = SCHEMA_VERSION
+    policy_id: str | None = None
+    policy_revision: int | None = None
 
     def __post_init__(self) -> None:
         require_stable_id(self.timer_id, "timer_id")
@@ -123,6 +137,7 @@ class TimerOccurrence:
             revision=self.revision,
             schema_version=self.schema_version,
         )
+        _validate_policy_binding(self.policy_id, self.policy_revision)
 
 
 class WakeCycleState(StrEnum):
@@ -149,6 +164,8 @@ class WakeCycle:
     fencing_token: int = 1
     checkpoint_generation: int = 1
     trigger_timer_occurrence_ids: tuple[str, ...] = ()
+    policy_id: str | None = None
+    policy_revision: int | None = None
 
     def __post_init__(self) -> None:
         require_stable_id(self.wake_cycle_id, "wake_cycle_id")
@@ -180,6 +197,7 @@ class WakeCycle:
             raise CoreInvariantError("wake cycle causation must name one trigger source")
         require_revision(self.fencing_token, "fencing_token")
         require_revision(self.checkpoint_generation, "checkpoint_generation")
+        _validate_policy_binding(self.policy_id, self.policy_revision)
 
 
 class AgendaItemState(StrEnum):
@@ -211,6 +229,8 @@ class AgendaItem:
     handled_generation: int = 0
     cause_ids: tuple[str, ...] = ()
     source_timer_occurrence_id: str | None = None
+    policy_id: str | None = None
+    policy_revision: int | None = None
 
     def __post_init__(self) -> None:
         require_stable_id(self.agenda_item_id, "agenda_item_id")
@@ -259,6 +279,7 @@ class AgendaItem:
         if source_id not in causes:
             raise CoreInvariantError("Agenda causes must retain the trigger source")
         object.__setattr__(self, "cause_ids", causes)
+        _validate_policy_binding(self.policy_id, self.policy_revision)
 
 
 def agenda_order_key(item: AgendaItem) -> tuple[int, int, str, str]:
@@ -291,6 +312,8 @@ class Decision:
     occurred_at: datetime
     revision: int
     schema_version: int = SCHEMA_VERSION
+    policy_id: str | None = None
+    policy_revision: int | None = None
 
     def __post_init__(self) -> None:
         require_stable_id(self.decision_id, "decision_id")
@@ -318,6 +341,7 @@ class Decision:
         )
         if self.causation_id != self.agenda_item_id:
             raise CoreInvariantError("decision causation must name its agenda item")
+        _validate_policy_binding(self.policy_id, self.policy_revision)
 
 
 def validate_event_wake_agenda_chain(

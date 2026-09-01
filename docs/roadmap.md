@@ -12,7 +12,8 @@ Current checkpoint:
   `259e5627c0a4d713934263efe18caf8c675a1669`.
 - Historical P0–P4 acceptance, artifacts, evidence, receipts, and migrations remain
   unchanged.
-- P5 starts from that baseline and has not been accepted or merged.
+- P5 development is complete, awaiting independent acceptance; it has not been accepted or
+  merged.
 
 Rebaseline boundary:
 
@@ -103,6 +104,13 @@ descriptive and separate from Mandate permissions and prohibitions. Every change
 explicit revision, reviewable diff, confirmation, and stale-revision rejection.
 
 Exit: stale drafts and ambiguous authority changes are rejected and evidenced.
+
+Current development result: P5 development complete, awaiting independent acceptance. The
+branch implements inert Profile/Mandate/policy drafts, explicit defaults, classified diffs,
+exact atomic confirmation, stale-race evidence, migration 006, revision-bound deterministic
+policy enforcement, Studio review, synthetic/offline metrics, and an isolated actual Compose
+Golden Path. This is not acceptance, merge, production readiness, or evidence that colleague
+experience improved.
 
 ## P6 — Governance hardening
 

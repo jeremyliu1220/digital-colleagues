@@ -8,13 +8,11 @@ Digital Colleagues is an open-source, local-first control plane and reference st
 making an AI coworker's identity, delegated authority, responsibilities, finite work,
 approvals, effects, persistence, and audit causality explicit and testable.
 
-> **Project status — P4 independent acceptance remediation.** Independent acceptance found
-> gaps in worker authority, actual Compose runtime evidence, and evaluation observation
-> completeness. The branch contains focused remediation, but actual Compose
-> start/recreate/recovery/stop must pass in a Docker-capable environment before evidence may
-> be refreshed or P4 may return to independent acceptance. Real providers, production
-> security, distributed operation, measured human improvement, and a proven five-minute
-> limit are not claimed.
+> **Project status — P5 development complete, awaiting independent acceptance.** The
+> revisioned colleague builder, typed policy enforcement, additive migration 006, and
+> isolated Compose Golden Path are implemented on the P5 development branch. P5 is not
+> accepted or merged. Real providers, production security, distributed operation, measured
+> human improvement, and a proven five-minute limit are not claimed.
 
 ## What makes a digital colleague different?
 
@@ -37,17 +35,17 @@ The target is a local deterministic reference implementation—not enterprise IA
 production tenancy isolation, high availability, compliance certification, or a hosted
 service.
 
-## The five-minute Golden Path
+## The revisioned-builder Golden Path
 
-The P4 Golden Path adds a local Compose topology and Studio to the accepted P3 semantics.
-A local operator retrieves a short-lived bootstrap token exactly once, Studio establishes
-a server-side Admin session, and the user creates a colleague, assigns finite work,
-restarts, inspects a deterministic wake, decides an exact proposal, reads a reference
-ActionResult, and follows its safe causal chain. See the
-[P4 operator guide](docs/p4/golden-path.md), [roadmap](docs/roadmap.md), and
+P5 retains the accepted P4 local Compose and Studio path and adds an inert, revisioned
+Profile/Mandate/policy draft. A local Admin reviews explicit defaults and a classified
+before/after diff, confirms the exact base revisions and digest, and then exercises
+working-hours, trigger, proactivity, notification/interruption, wake-budget, stop, resume,
+escalation, stale-draft, and stale-proposal behavior. See the
+[P5 operator guide](docs/p5/golden-path.md), [roadmap](docs/roadmap.md), and
 [product brief](docs/product/v0.1-product-brief.md).
 
-## Verify P4
+## Verify P5
 
 Prerequisites are Python 3.12+, Node.js 22.12+, npm, and Make.
 
@@ -56,13 +54,13 @@ make check
 make studio-dev
 ```
 
-`make check` resolves the exact P4 lock in an OS temporary workspace, then runs Python and
+`make check` resolves the exact lock in an OS temporary workspace, then runs Python and
 Studio lint, type checks, tests and build plus the public-boundary, repository, provenance,
-architecture, migration, authentication, static Compose, Studio, P0–P3 regression, and
-fresh-instance restart Golden Path gates. All test databases and package environments
-remain outside the repository. The separate `make p4-compose-runtime` target requires a
-Docker engine and performs the actual isolated start/recreate/recovery/stop Gate. Evidence
-generation requires that runtime Gate to pass; absence of Docker remains `not_evaluated`.
+architecture, migration, builder, policy, static Compose, Studio, and all retained P0–P4
+regression gates. All test databases and package environments remain outside the repository.
+The separate `make p5-compose-runtime` target requires Docker and performs the actual
+isolated start/recreate/recovery/policy/dispatch/stop/cleanup Gate. Evidence generation
+requires that runtime Gate to pass.
 
 Useful focused commands:
 
@@ -81,6 +79,16 @@ make p4-studio
 make p4-compose
 make p4-compose-runtime
 make p4-golden
+make p5-repository
+make p5-provenance
+make p5-architecture
+make p5-migrations
+make p5-builder
+make p5-policy
+make p5-studio
+make p5-compose
+make p5-compose-runtime
+make p5-golden
 make p3-provenance
 make p3-architecture
 make p3-migrations
@@ -88,12 +96,12 @@ make p3-persistence
 make p3-runtime
 make p3-golden
 make bootstrap
-make evidence-p4
+make evidence-p5
 ```
 
 No command requires provider credentials or live data. Do not put either in this tree.
 See [local development](docs/development.md) for exact commands and troubleshooting. The
-accepted P0–P3 evidence remains historical and must not be rebuilt from the P4 tree.
+accepted P0–P4 evidence remains historical and must not be rebuilt from the P5 tree.
 
 ## Repository map
 
@@ -109,6 +117,7 @@ tests/architecture/      dependency, determinism, and milestone boundaries
 tests/p2/                P2 evidence and summary gates
 tests/p3/                restart Golden Path and synthetic fixtures
 tests/p4/                authentication, metrics, Studio API, and recovery fixtures
+tests/p5/                revisioned builder, typed policy, migration, and recovery fixtures
 tests/persistence/       SQLite migration, namespace, transaction, and fencing tests
 tests/runtime/           Agenda, authorization, outbox, ambiguity, and crash tests
 tests/api/               in-process typed FastAPI mapping tests
@@ -118,9 +127,9 @@ provenance/              fixed-revision source and scanner manifests
 artifacts/               machine-readable milestone summaries
 ```
 
-The private parent research repository remains read-only. P4 is new work from public
-documents and the accepted public P3 implementation; its provenance receipt records zero
-transformed source files and covers the complete P4 change inventory.
+The private parent research repository remains read-only. P5 is new work from public
+documents and the accepted public P4 implementation; its provenance receipt records zero
+transformed source files and covers the complete P5 change inventory.
 
 ## Contributing and security
 

@@ -92,6 +92,8 @@ class ApprovalMutation(_StrictMutation):
     proposal_digest: str = Field(pattern="^sha256:[0-9a-f]{64}$")
     mandate_id: str = Field(min_length=1, max_length=128)
     mandate_revision: int = Field(gt=0)
+    policy_id: str | None = Field(default=None, min_length=1, max_length=128)
+    policy_revision: int | None = Field(default=None, gt=0)
     choice: ApprovalChoice
     idempotency_key: str = Field(min_length=1, max_length=128)
 
@@ -152,6 +154,8 @@ def _proposal_data(snapshot: StudioSnapshot) -> list[dict[str, object]]:
             "constraint_parameters": dict(proposal.constraints.parameters.items()),
             "mandate_id": proposal.mandate_id,
             "mandate_revision": proposal.mandate_revision,
+            "policy_id": proposal.policy_id,
+            "policy_revision": proposal.policy_revision,
             "actor": {
                 "principal_id": proposal.actor.principal_id,
                 "kind": proposal.actor.kind.value,
@@ -406,17 +410,19 @@ def create_p4_app(
     @app.post("/runtime/triggers", status_code=201)
     def trigger(body: TriggerMutation, request: Request) -> dict[str, object]:
         resolved = _mutation_session(request)
-        correlation_id = runtime.submit_trigger(
+        trigger_result = runtime.submit_trigger(
             session=resolved,
             work_id=body.work_id,
             trigger_class=body.trigger_class,
             deterministic_noop=body.deterministic_noop,
             idempotency_key=body.idempotency_key,
         )
+        if isinstance(trigger_result, dict):
+            return trigger_result
         return {
             "accepted": True,
             "trigger_class": body.trigger_class,
-            "correlation_id": correlation_id,
+            "correlation_id": trigger_result,
         }
 
     @app.post("/runtime/process")
@@ -454,6 +460,8 @@ def create_p4_app(
             expected_proposal_digest=body.proposal_digest,
             expected_mandate_id=body.mandate_id,
             expected_mandate_revision=body.mandate_revision,
+            expected_policy_id=body.policy_id,
+            expected_policy_revision=body.policy_revision,
         )
         return {
             "approval_decision_id": decision.approval_decision_id,

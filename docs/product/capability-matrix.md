@@ -20,12 +20,12 @@ deferred capabilities are described only as a non-committing
 | Reference channel and ActionResult | Yes | P3 synthetic adapter | No network, real provider, account, workspace, or message |
 | Audit causality | Yes | P3 immutable safe records | Payload bytes become digests or safe projections in audit |
 | Single `state.sqlite` | Yes | P3 implemented | Injectable path, WAL, foreign keys, immutable migration checksums |
-| Typed headless HTTP edge | Yes | P3 minimal mapping | Injected server context; P4 authentication explicitly absent |
-| Local Studio and Compose Golden Path | Yes | P4 independent acceptance remediation | Local UI, bootstrap Admin, builder, work, recovery, approval, and audit only; actual Compose runtime revalidation is required |
-| Wake reason and trigger-class views | Yes | P4 independent acceptance remediation | Explains existing durable Event/Timer causality and deterministic no-op; background work uses a restricted SERVICE context |
-| Exact-effect proposal inbox | Yes | P4 independent acceptance remediation | Displays and decides the exact `EffectProposal` revision and digests; human approval remains required |
-| Colleague-experience evaluation points | Yes | P4 independent acceptance remediation | Durable sources distinguish observed, not applicable, and not evaluated; five-minute and human-improvement claims remain unevaluated |
-| Revisioned policy builder | Yes | P5 planned | Working hours, allowed triggers, proactivity, interruptions, budgets, stop, and escalation; Profile remains separate from Mandate |
+| Typed headless HTTP edge | Yes | P4 accepted main baseline | Session-derived authority with Pydantic restricted to the HTTP mapping edge |
+| Local Studio and Compose Golden Path | Yes | P4 accepted main baseline | Local UI, bootstrap Admin, builder, work, recovery, approval, and audit only |
+| Wake reason and trigger-class views | Yes | P4 accepted main baseline | Explains existing durable Event/Timer causality and deterministic no-op; background work uses a restricted SERVICE context |
+| Exact-effect proposal inbox | Yes | P4 accepted main baseline | Displays and decides the exact `EffectProposal` revision and digests; human approval remains required |
+| Colleague-experience evaluation points | Yes | P4 accepted main baseline | Durable sources distinguish observed, not applicable, and not evaluated; five-minute and human-improvement claims remain unevaluated |
+| Revisioned policy builder | Yes | P5 development complete, awaiting independent acceptance | Inert exact-revision Profile/Mandate/policy drafts; typed deterministic working hours, triggers, proactivity, notification/interruption, budgets, stop, and escalation |
 | Semantic Memory | No | Post-v0.1 outlook only | Not a v0.1 commitment and never an authority source |
 | Skill Learning or governed Skill system | No | Post-v0.1 outlook only | Requires an independent gate, provenance, permissions, versioning, and rollback |
 | Shared knowledge or multi-person collaboration | No | Post-v0.1 outlook only | Requires namespace, ownership, authorization, revocation, and abuse testing |

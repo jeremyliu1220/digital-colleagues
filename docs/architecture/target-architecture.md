@@ -16,7 +16,8 @@ FastAPI HTTP mappings (Pydantic at this edge only)
 Application services and governance policies
      |
 Pure core: namespace, principals, Profile, Mandate, work, events,
-           agenda, wake cycles, effect proposals, approvals, results
+           revisioned policy/drafts, agenda, wake cycles, proposals,
+           approvals, results
      |
 Stable ports
      +-- SQLite repositories and outbox
@@ -190,6 +191,28 @@ durable work, trigger, proposal, approval, and result records. Eligible scenario
 evaluator coverage remain `not_evaluated`; they are never converted into observed zeros.
 Static Compose validation and the isolated actual start/recreate/recovery/stop Gate are
 separate results.
+
+## P5 revisioned builder and policy topology
+
+P5 adds a pure frozen `ColleagueDraft` aggregate over complete proposed Profile, Mandate,
+and independent `ColleaguePolicy` values. Profile remains descriptive. Mandate owns mission,
+responsibility, capability, constraint, and effect authority. Policy is bound to one exact
+Mandate revision and may narrow runtime timing and attention, but cannot grant an effect.
+The active identity card remains a projection of confirmed Profile and Mandate only.
+
+Draft create, update, review, cancel, and confirm flow through framework-neutral services
+and a P5 persistence port. A canonical digest covers the complete proposed values, base
+identities/revisions, typed defaults, and classified diff. Confirmation uses one SQLite
+`BEGIN IMMEDIATE` compare-and-swap transaction across all three bases; same-base races leave
+one confirmed draft and durable stale evidence for the loser. Migration 006 persists draft
+history, confirmations, policy outcomes, budget consumption, run state, and escalation.
+
+The runtime binds policy ID/revision to accepted triggers, wakes, agenda, decisions,
+proposals, approvals, and dispatch. It checks the current policy before wake admission,
+after deterministic model output and before proposal persistence, and before approval and
+dispatch. Durable namespaced counters prevent restart, replay, duplicate-event, or alternate
+trigger-class budget evasion. Typed stop state requires an explicit confirmed revision to
+resume; escalation is a safe local record, not approval or an external effect.
 
 ## Causal audit chain
 

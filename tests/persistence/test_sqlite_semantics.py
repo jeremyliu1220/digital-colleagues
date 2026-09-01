@@ -72,15 +72,20 @@ class SQLiteSemanticsTests(unittest.TestCase):
             database = root / "state.sqlite"
             store = SQLiteRuntimeStore(database, migrations_path=migrations, clock=FixedClock(T0))
             store.close()
-            bad = migrations / "006_atomic_failure.sql"
+            current_manifest = json.loads(
+                (migrations / "manifest.json").read_text(encoding="utf-8")
+            )
+            current_versions = [item["version"] for item in current_manifest["migrations"]]
+            next_version = len(current_manifest["migrations"]) + 1
+            bad = migrations / f"{next_version:03d}_atomic_failure.sql"
             bad.write_text(
                 "CREATE TABLE must_rollback(value TEXT);\nTHIS IS NOT SQL;\n",
                 encoding="utf-8",
             )
-            manifest = json.loads((migrations / "manifest.json").read_text(encoding="utf-8"))
+            manifest = current_manifest
             manifest["migrations"].append(
                 {
-                    "version": 6,
+                    "version": next_version,
                     "name": "atomic_failure",
                     "file": bad.name,
                     "checksum": "sha256:" + hashlib.sha256(bad.read_bytes()).hexdigest(),
@@ -102,7 +107,7 @@ class SQLiteSemanticsTests(unittest.TestCase):
             ]
             connection.close()
             self.assertNotIn("must_rollback", tables)
-            self.assertEqual(versions, [1, 2, 3, 4, 5])
+            self.assertEqual(versions, current_versions)
 
     def test_v2_database_upgrades_to_timer_schema_without_losing_durable_records(self) -> None:
         with tempfile.TemporaryDirectory(prefix="digital-colleagues-p3-v2-upgrade-") as temporary:
@@ -129,11 +134,8 @@ class SQLiteSemanticsTests(unittest.TestCase):
             )
             v2.close()
 
-            for filename in (
-                "003_timer_triggers.sql",
-                "004_local_authentication.sql",
-                "005_evaluation_observations.sql",
-            ):
+            for entry in current_manifest["migrations"][2:]:
+                filename = entry["file"]
                 shutil.copy2(ROOT / "migrations" / filename, migrations / filename)
             (migrations / "manifest.json").write_text(
                 json.dumps(current_manifest), encoding="utf-8"
@@ -153,7 +155,10 @@ class SQLiteSemanticsTests(unittest.TestCase):
                     "SELECT name FROM sqlite_master WHERE type = 'table'"
                 )
             }
-            self.assertEqual(versions, [1, 2, 3, 4, 5])
+            self.assertEqual(
+                versions,
+                [item["version"] for item in current_manifest["migrations"]],
+            )
             self.assertIn("timer_triggers", tables)
             self.assertIn("p4_sessions", tables)
             self.assertEqual(upgraded.get_profile(namespace(), "profile-synthetic"), profile())

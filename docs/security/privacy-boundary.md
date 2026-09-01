@@ -109,3 +109,17 @@ evidence records only environment versions, a synthetic project label, timestamp
 checkpoint booleans, metric readouts, and cleanup counts; the operator token, session
 credential, and CSRF value remain in process memory and are checked absent from service
 logs and evidence output.
+
+## P5 draft, policy, and evidence boundary
+
+P5 public fixtures contain only synthetic colleague content. Draft audit stores the exact
+canonical digest plus safe paths, classifications, revisions, lifecycle state, and default
+sources; it does not copy private proposed payloads into causal history. Policy outcome and
+escalation evidence contains typed outcomes, exact Mandate/policy revisions, safe summaries,
+and digests. Budget rows contain only namespaced occurrence identities and counters.
+
+The actual Compose Gate uses a unique project label, unused loopback ports, and a temporary
+project-scoped volume, then verifies zero container, network, and volume residue. Bootstrap,
+session, and CSRF plaintext stay process-local and are checked absent from service logs and
+the P5 summary. Revision-bound synthetic/offline metrics do not represent human or live
+provider observations and establish no colleague-experience improvement.

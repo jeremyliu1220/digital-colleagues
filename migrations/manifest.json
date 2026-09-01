@@ -30,6 +30,12 @@
       "name": "evaluation_observations",
       "file": "005_evaluation_observations.sql",
       "checksum": "sha256:6649985cf92d9efd378b8b69447357193fdb98eead7d3d23f9bbec1db02b2a61"
+    },
+    {
+      "version": 6,
+      "name": "revisioned_colleague_builder",
+      "file": "006_revisioned_colleague_builder.sql",
+      "checksum": "sha256:7909da4b0b3eb514222f1fd1068c19eb6e8b98d466a786b76c20ae7999e26bcd"
     }
   ]
 }

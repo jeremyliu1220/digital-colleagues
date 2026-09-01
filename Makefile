@@ -2,11 +2,11 @@
 
 PYTHON ?= python3
 
-.PHONY: help bootstrap lint typecheck test build check boundary scaffold p2-repository p2-provenance p2-architecture p2-core p3-repository p3-provenance p3-architecture p3-migrations p3-persistence p3-runtime p3-golden p4-repository p4-provenance p4-architecture p4-migrations p4-authentication p4-studio p4-compose p4-compose-runtime p4-golden evidence-p1 evidence-p2 evidence-p3 evidence-p4 studio-dev
+.PHONY: help bootstrap lint typecheck test build check boundary scaffold p2-repository p2-provenance p2-architecture p2-core p3-repository p3-provenance p3-architecture p3-migrations p3-persistence p3-runtime p3-golden p4-repository p4-provenance p4-architecture p4-migrations p4-authentication p4-studio p4-compose p4-compose-runtime p4-golden p5-repository p5-provenance p5-architecture p5-migrations p5-builder p5-policy p5-studio p5-compose p5-compose-runtime p5-golden evidence-p1 evidence-p2 evidence-p3 evidence-p4 evidence-p5 studio-dev
 
 help:
 	@echo "bootstrap    Resolve locked tools in an isolated temporary workspace"
-	@echo "check        Run every current P4 gate plus retained P0-P3 regressions"
+	@echo "check        Run every current P5 gate plus retained P0-P4 regressions"
 	@echo "lint         Run Python and Studio lint/format checks"
 	@echo "typecheck    Run Python and Studio type checking"
 	@echo "test         Run Python and Studio tests"
@@ -32,29 +32,40 @@ help:
 	@echo "p4-compose   Validate static local Compose topology and config"
 	@echo "p4-compose-runtime Run isolated actual start/recreate/recovery/stop Gate"
 	@echo "p4-golden    Run the authenticated fresh-instance Golden Path"
+	@echo "p5-repository Validate the fixed P5 branch, base, files, and residue"
+	@echo "p5-provenance Validate complete P5 implementation provenance"
+	@echo "p5-architecture Validate P5 dependencies, authority, and determinism"
+	@echo "p5-migrations Validate migration 006 fresh and version-5 upgrade"
+	@echo "p5-builder   Validate revisioned draft lifecycle and exact confirmation"
+	@echo "p5-policy    Validate typed policy enforcement and restart semantics"
+	@echo "p5-studio    Validate the revisioned Studio workflow and states"
+	@echo "p5-compose   Validate static local P5 topology and composition root"
+	@echo "p5-compose-runtime Run actual isolated P5 start/restart/fault/cleanup Gate"
+	@echo "p5-golden    Run the authenticated P5 builder and policy Golden Path"
 	@echo "evidence-p1  Run all gates and rebuild the P1 evidence summary"
 	@echo "evidence-p2  Run all gates and atomically rebuild P2 evidence"
 	@echo "evidence-p3  Run all gates and atomically write P3 evidence"
 	@echo "evidence-p4  Run all gates and atomically write P4 evidence"
+	@echo "evidence-p5  Run all gates and atomically write P5 evidence"
 	@echo "studio-dev   Start an isolated preview of the static Studio shell"
 
 bootstrap:
-	$(PYTHON) -B -m scripts.run_p4_toolchain --scope bootstrap
+	$(PYTHON) -B -m scripts.run_p5_toolchain --scope bootstrap
 
 lint:
-	$(PYTHON) -B -m scripts.run_p4_toolchain --scope lint
+	$(PYTHON) -B -m scripts.run_p5_toolchain --scope lint
 
 typecheck:
-	$(PYTHON) -B -m scripts.run_p4_toolchain --scope typecheck
+	$(PYTHON) -B -m scripts.run_p5_toolchain --scope typecheck
 
 test:
-	$(PYTHON) -B -m scripts.run_p4_toolchain --scope test
+	$(PYTHON) -B -m scripts.run_p5_toolchain --scope test
 
 build:
-	$(PYTHON) -B -m scripts.run_p4_toolchain --scope build
+	$(PYTHON) -B -m scripts.run_p5_toolchain --scope build
 
 check:
-	$(PYTHON) -B -m scripts.run_p4_toolchain --scope all
+	$(PYTHON) -B -m scripts.run_p5_toolchain --scope all
 
 boundary:
 	$(PYTHON) -B scripts/check_public_boundary.py .
@@ -122,6 +133,36 @@ p4-compose-runtime:
 p4-golden:
 	PYTHONPATH=src $(PYTHON) -B scripts/check_p4_golden_path.py
 
+p5-repository:
+	$(PYTHON) -B scripts/check_p5_repository.py .
+
+p5-provenance:
+	$(PYTHON) -B scripts/check_p5_provenance.py .
+
+p5-architecture:
+	$(PYTHON) -B scripts/check_p5_architecture.py .
+
+p5-migrations:
+	PYTHONPATH=src $(PYTHON) -B scripts/check_p5_migrations.py .
+
+p5-builder:
+	$(PYTHON) -B -m scripts.run_p5_toolchain --scope builder
+
+p5-policy:
+	$(PYTHON) -B -m scripts.run_p5_toolchain --scope policy
+
+p5-studio:
+	$(PYTHON) -B scripts/check_p5_studio.py .
+
+p5-compose:
+	$(PYTHON) -B scripts/check_p5_compose.py .
+
+p5-compose-runtime:
+	$(PYTHON) -B scripts/check_p5_compose_runtime.py .
+
+p5-golden:
+	$(PYTHON) -B -m scripts.run_p5_toolchain --scope golden
+
 evidence-p1:
 	$(PYTHON) -B scripts/run_p1_toolchain.py --scope all --write-evidence
 
@@ -134,5 +175,8 @@ evidence-p3:
 evidence-p4:
 	$(PYTHON) -B -m scripts.run_p4_toolchain --scope all --write-evidence
 
+evidence-p5:
+	$(PYTHON) -B -m scripts.run_p5_toolchain --scope all --write-evidence
+
 studio-dev:
-	$(PYTHON) -B -m scripts.run_p4_toolchain --studio-dev
+	$(PYTHON) -B -m scripts.run_p5_toolchain --studio-dev

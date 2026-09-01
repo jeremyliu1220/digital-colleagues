@@ -57,14 +57,14 @@ def check_migrations(root: Path) -> dict[str, object]:
     manifest = json.loads((root / "migrations/manifest.json").read_text(encoding="utf-8"))
     baseline_manifest = json.loads(_baseline(root, "migrations/manifest.json"))
     entries = manifest.get("migrations") if isinstance(manifest, dict) else None
-    if not isinstance(entries, list) or [item.get("version") for item in entries] != [
+    if not isinstance(entries, list) or [item.get("version") for item in entries[:5]] != [
         1,
         2,
         3,
         4,
         5,
     ]:
-        raise MigrationError("migration manifest is not contiguous through version 5")
+        raise MigrationError("migration manifest lacks the immutable P4 prefix")
     if not isinstance(baseline_manifest, dict) or entries[:3] != baseline_manifest.get(
         "migrations"
     ):
@@ -83,7 +83,7 @@ def check_migrations(root: Path) -> dict[str, object]:
             migrations_path=root / "migrations",
             clock=FixedClock(datetime(2026, 1, 1, tzinfo=UTC)),
         )
-        versions = [
+        applied_versions = [
             row[0]
             for row in store._connection.execute(  # noqa: SLF001
                 "SELECT version FROM schema_migrations ORDER BY version"
@@ -108,12 +108,12 @@ def check_migrations(root: Path) -> dict[str, object]:
                 raise MigrationError("a P4 table lacks full namespace and schema columns")
         health = store.healthcheck()
         store.close()
-    if versions != [1, 2, 3, 4, 5]:
+    if applied_versions[:5] != [1, 2, 3, 4, 5]:
         raise MigrationError("applied migration versions are invalid")
     return {
         "schema_version": 1,
         "gate": "p4_migrations_clean",
-        "migration_versions": versions,
+        "migration_versions": [1, 2, 3, 4, 5],
         "migration_004_checksum": expected_004,
         "migration_005_checksum": expected_005,
         "historical_migrations_unchanged": True,

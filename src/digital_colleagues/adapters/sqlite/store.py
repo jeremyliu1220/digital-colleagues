@@ -47,6 +47,7 @@ from digital_colleagues.core.effects import (
     HumanApprovalDecision,
 )
 from digital_colleagues.core.namespace import Namespace, NamespaceScope
+from digital_colleagues.core.policy import ColleaguePolicy
 from digital_colleagues.core.principals import Principal, PrincipalKind
 from digital_colleagues.core.runtime import (
     AgendaItem,
@@ -74,6 +75,7 @@ _RECORD_IDENTITIES: dict[type[object], tuple[str, str, bool]] = {
     Principal: ("principal", "principal_id", False),
     Profile: ("profile", "profile_id", False),
     Mandate: ("mandate", "mandate_id", False),
+    ColleaguePolicy: ("colleague_policy", "policy_id", False),
     FiniteWork: ("finite_work", "work_id", False),
     InputEvent: ("input_event", "event_id", True),
     TimerOccurrence: ("timer_occurrence", "occurrence_id", True),
@@ -975,6 +977,8 @@ class SQLiteRuntimeStore:
                 fencing_token=claim.fencing_token,
                 checkpoint_generation=generation,
                 trigger_timer_occurrence_ids=trigger_timer_ids,
+                policy_id=source.policy_id,
+                policy_revision=source.policy_revision,
             )
             self._insert_record(connection, wake)
             if existing is None:
@@ -997,6 +1001,8 @@ class SQLiteRuntimeStore:
                     handled_generation=0,
                     cause_ids=tuple(causes),
                     source_timer_occurrence_id=source_timer_id,
+                    policy_id=source.policy_id,
+                    policy_revision=source.policy_revision,
                 )
                 self._insert_record(connection, agenda)
                 connection.execute(
@@ -1043,6 +1049,8 @@ class SQLiteRuntimeStore:
                     revision=existing_agenda.revision + 1,
                     generation=generation,
                     cause_ids=tuple(causes),
+                    policy_id=source.policy_id,
+                    policy_revision=source.policy_revision,
                 )
                 self._update_record(connection, agenda, expected_revision=existing_agenda.revision)
                 connection.execute(

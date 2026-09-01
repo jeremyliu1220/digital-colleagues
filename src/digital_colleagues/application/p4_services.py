@@ -41,6 +41,7 @@ from digital_colleagues.application.p4_ports import (
 )
 from digital_colleagues.application.ports import (
     ClockPort,
+    DispatchAuthorizationPort,
     IdentifierPort,
     IntelligencePort,
     PersistencePort,
@@ -745,6 +746,7 @@ class P4RuntimeController:
         clock: ClockPort,
         identifiers: IdentifierPort,
         digests: CredentialDigestPort,
+        dispatch_authorizer: DispatchAuthorizationPort | None = None,
     ) -> None:
         self._store = store
         self._studio_store = studio_store
@@ -753,6 +755,7 @@ class P4RuntimeController:
         self._clock = clock
         self._identifiers = identifiers
         self._digests = digests
+        self._dispatch_authorizer = dispatch_authorizer
 
     @staticmethod
     def _context(session: AuthenticatedSession) -> RequestPrincipalContext:
@@ -783,6 +786,8 @@ class P4RuntimeController:
         trigger_class: str,
         deterministic_noop: bool,
         idempotency_key: str,
+        policy_id: str | None = None,
+        policy_revision: int | None = None,
     ) -> str:
         context = self._context(session)
         work = self._store.get_work(context.namespace, work_id)
@@ -807,6 +812,8 @@ class P4RuntimeController:
                     payload_digest=self._digests.digest("event-payload", work.work_id),
                     correlation_id=correlation_id,
                     causation_id=work.work_id,
+                    policy_id=policy_id,
+                    policy_revision=policy_revision,
                 ),
                 idempotency_key=idempotency_key,
             )
@@ -826,6 +833,8 @@ class P4RuntimeController:
                     correlation_id=correlation_id,
                     causation_id=work.work_id,
                     idempotency_key=idempotency_key,
+                    policy_id=policy_id,
+                    policy_revision=policy_revision,
                 ),
             )
         else:
@@ -857,6 +866,7 @@ class P4RuntimeController:
             result_actor=context.service_principal,
             owner_id="worker:p4-dispatch",
             mandate_id=context.mandate_id,
+            policy_authorizer=self._dispatch_authorizer,
         ).dispatch_once(namespace)
         return {
             "trigger_materialized": materialized is not None,
@@ -879,6 +889,8 @@ class P4RuntimeController:
         expected_proposal_digest: str,
         expected_mandate_id: str,
         expected_mandate_revision: int,
+        expected_policy_id: str | None = None,
+        expected_policy_revision: int | None = None,
     ) -> tuple[HumanApprovalDecision, str | None, bool]:
         context = self._context(session)
         runtime_context = self.service_context(context.namespace)
@@ -895,6 +907,8 @@ class P4RuntimeController:
             or proposal.mandate_id != expected_mandate_id
             or proposal.mandate_revision != expected_mandate_revision
             or mandate_id != expected_mandate_id
+            or proposal.policy_id != expected_policy_id
+            or proposal.policy_revision != expected_policy_revision
         ):
             raise ConflictError("exact proposal or Mandate binding is stale")
         decision, attempt_id, created = ApprovalService(

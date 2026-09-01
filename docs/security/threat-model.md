@@ -4,16 +4,16 @@
 
 ## Scope and claim boundary
 
-This model defines requirements for the v0.1 local reference topology. P4 mechanically
-tests a narrow local bootstrap/session boundary plus the P3 namespace, authority, replay,
-deterministic execution, SQLite, outbox, and safe-audit controls. Those results do not
+This model defines requirements for the v0.1 local reference topology. P5 mechanically
+tests the local P4 bootstrap/session boundary plus revisioned draft, policy, namespace,
+authority, replay, deterministic execution, SQLite, outbox, and safe-audit controls. Those results do not
 establish product security or privacy effectiveness. Encryption at rest,
 OIDC, SSO, SCIM, distributed isolation, and high availability remain gaps.
 
 ## Assets
 
 - Durable human, model, and service identities and role assignments.
-- Revisioned Mandates and responsibility assignments.
+- Revisioned Profile, Mandate, colleague policy, draft, and confirmation records.
 - Work, events, agenda, wake-cycle, proposal, approval, and result records.
 - Sessions, bootstrap and enrollment credentials, and recovery authority.
 - Namespaced SQLite state, migrations, audit records, and exports.
@@ -38,6 +38,12 @@ OIDC, SSO, SCIM, distributed isolation, and high availability remain gaps.
 | Model self-approval | Principal-kind invariant and human-only approval authoring |
 | Human identity simulated by service identity | Durable disjoint principal kinds; no kind conversion |
 | Prompt injection expands authority | Mandate and policy checks after model output; typed exact effects |
+| Draft silently changes active authority | Inert draft state; exact digest/base confirmation; atomic three-head compare-and-swap |
+| Concurrent draft overwrites newer authority | One-winner compare-and-swap; durable terminal stale evidence; no auto-rebase |
+| Hidden or ambiguous policy default expands authority | Typed visible defaults and classified diff; unknown fields and invalid combinations fail closed |
+| Restart or alternate trigger evades wake budget | Namespaced policy-revision counter plus unique occurrence consumption in one transaction |
+| Policy revision retroactively authorizes old work | Exact Mandate/policy binding and revalidation before proposal, approval, and dispatch |
+| Stop or escalation becomes an effect | Finite typed conditions; durable local state/record only; explicit revisioned resume |
 | Insecure direct object reference | Namespace every record and every repository query |
 | Stale or partially rebound approval | Expected revision plus complete canonical proposal-digest checks |
 | Duplicate mutation or approval | Idempotency key, one-time consumption, and replay ledger |

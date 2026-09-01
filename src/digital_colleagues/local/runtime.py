@@ -10,14 +10,22 @@ from pathlib import Path
 
 from digital_colleagues.adapters.channel.reference import ReferenceChannel
 from digital_colleagues.adapters.intelligence.deterministic import DeterministicIntelligence
-from digital_colleagues.adapters.sqlite.p4_store import SQLiteP4Store
+from digital_colleagues.adapters.sqlite.p5_store import SQLiteP5Store
 from digital_colleagues.adapters.system.deterministic import StableHashIdentifier
 from digital_colleagues.api.p4_app import create_p4_app
+from digital_colleagues.api.p5_app import install_p5_routes
 from digital_colleagues.application.p4_services import (
     AuthenticationService,
     GovernedObservedIntelligence,
     InitialColleagueService,
+    P4EvaluationService,
     P4RuntimeController,
+)
+from digital_colleagues.application.p5_services import (
+    P5DispatchAuthorizer,
+    P5RuntimeController,
+    PolicyGovernedIntelligence,
+    RevisionedColleagueBuilderService,
 )
 from digital_colleagues.local.security import (
     CredentialDigests,
@@ -29,12 +37,13 @@ from digital_colleagues.local.security import (
 @dataclass(slots=True)
 class LocalRuntime:
     state_directory: Path
-    store: SQLiteP4Store
+    store: SQLiteP5Store
     clock: UtcClock
     digests: CredentialDigests
     authentication: AuthenticationService
     colleagues: InitialColleagueService
-    controller: P4RuntimeController
+    builder: RevisionedColleagueBuilderService
+    controller: P5RuntimeController
 
     def close(self) -> None:
         self.store.close()
@@ -43,7 +52,7 @@ class LocalRuntime:
 def build_local_runtime(state_directory: Path) -> LocalRuntime:
     state_directory.mkdir(mode=0o700, parents=True, exist_ok=True)
     clock = UtcClock()
-    store = SQLiteP4Store(
+    store = SQLiteP5Store(
         state_directory / "state.sqlite",
         migrations_path=Path(__file__).resolve().parents[3] / "migrations",
         clock=clock,
@@ -64,18 +73,36 @@ def build_local_runtime(state_directory: Path) -> LocalRuntime:
         identifiers=identifiers,
         clock=clock,
     )
-    controller = P4RuntimeController(
+    builder = RevisionedColleagueBuilderService(
+        store=store,
+        clock=clock,
+        identifiers=identifiers,
+    )
+    governed = GovernedObservedIntelligence(
+        inner=DeterministicIntelligence(),
+        store=store,
+        identifiers=identifiers,
+    )
+    inner_controller = P4RuntimeController(
         store=store,
         studio_store=store,
-        intelligence=GovernedObservedIntelligence(
-            inner=DeterministicIntelligence(),
+        intelligence=PolicyGovernedIntelligence(
+            inner=governed,
             store=store,
             identifiers=identifiers,
+            digests=digests,
         ),
         channel=ReferenceChannel(),
         clock=clock,
         identifiers=identifiers,
         digests=digests,
+        dispatch_authorizer=P5DispatchAuthorizer(store),
+    )
+    controller = P5RuntimeController(
+        inner=inner_controller,
+        store=store,
+        clock=clock,
+        identifiers=identifiers,
     )
     return LocalRuntime(
         state_directory=state_directory,
@@ -84,6 +111,7 @@ def build_local_runtime(state_directory: Path) -> LocalRuntime:
         digests=digests,
         authentication=authentication,
         colleagues=colleagues,
+        builder=builder,
         controller=controller,
     )
 
@@ -96,11 +124,21 @@ def build_app_from_environment() -> object:
     app = create_p4_app(
         authentication=runtime.authentication,
         colleagues=runtime.colleagues,
-        runtime=runtime.controller,
+        runtime=runtime.controller,  # type: ignore[arg-type]
         store=runtime.store,
         studio_store=runtime.store,
         expected_origin=expected_origin,
         secure_cookie=secure_cookie,
+    )
+    app.title = "Digital Colleagues P5 revisioned builder API"
+    app.version = "0.0.0-p5"
+    install_p5_routes(
+        app,
+        authentication=runtime.authentication,
+        builder=runtime.builder,
+        p5_store=runtime.store,
+        expected_origin=expected_origin,
+        evaluation=P4EvaluationService(runtime.store),
     )
     app.state.local_runtime = runtime
     return app

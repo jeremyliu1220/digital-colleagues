@@ -11,7 +11,6 @@ from digital_colleagues.application.contracts import (
     SemanticDecision,
     SemanticOutcome,
 )
-from digital_colleagues.core.authority import EffectKind
 from digital_colleagues.core.common import FrozenJsonObject
 from digital_colleagues.core.effects import (
     EffectConstraints,
@@ -32,8 +31,6 @@ class DeterministicIntelligence:
             raise ValueError("deterministic intelligence requires a model principal")
         self.call_count += 1
         boundary = request.mandate.effect_boundaries[0]
-        if boundary.effect_kind is not EffectKind.REFERENCE_MESSAGE:
-            raise ValueError("deterministic reference path requires a reference-message boundary")
         decision = Decision(
             namespace=request.namespace,
             decision_id=request.decision_id,
@@ -47,14 +44,19 @@ class DeterministicIntelligence:
             causation_id=request.agenda_item.agenda_item_id,
             occurred_at=request.occurred_at,
             revision=1,
+            policy_id=request.policy_id,
+            policy_revision=request.policy_revision,
         )
         proposal = EffectProposal(
             namespace=request.namespace,
             proposal_id=request.proposal_id,
             decision_id=request.decision_id,
-            effect_kind=EffectKind.REFERENCE_MESSAGE,
-            destination=EffectDestination(kind="reference_channel", target="synthetic-target"),
-            action="record_message",
+            effect_kind=boundary.effect_kind,
+            destination=EffectDestination(
+                kind=boundary.allowed_destination_kinds[0],
+                target="synthetic-target",
+            ),
+            action=boundary.allowed_actions[0],
             payload=FrozenJsonObject.from_mapping({"body": "Synthetic deterministic work update."}),
             safe_projection=FrozenJsonObject.from_mapping(
                 {"content_class": "synthetic_update", "work_id": request.agenda_item.work_id}
@@ -74,5 +76,7 @@ class DeterministicIntelligence:
             revision=1,
             mandate_id=request.mandate.mandate_id,
             mandate_revision=request.mandate.revision,
+            policy_id=request.policy_id,
+            policy_revision=request.policy_revision,
         )
         return SemanticDecision(SemanticOutcome.PROPOSAL, decision, proposal, request.request_id)

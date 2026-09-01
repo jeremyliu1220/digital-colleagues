@@ -29,6 +29,15 @@ from digital_colleagues.core.principals import Principal
 from digital_colleagues.core.runtime import AgendaItem, Decision, WakeCycle
 
 
+def _require_policy_binding(policy_id: str | None, policy_revision: int | None) -> None:
+    if (policy_id is None) != (policy_revision is None):
+        raise ValueError("policy binding must be complete")
+    if policy_id is not None:
+        require_stable_id(policy_id, "policy_id")
+        assert policy_revision is not None
+        require_revision(policy_revision, "policy_revision")
+
+
 @dataclass(frozen=True, slots=True)
 class RequestPrincipalContext:
     """Authority supplied by the server-side request boundary, never a mutation body."""
@@ -54,6 +63,8 @@ class InputEventRequest:
     correlation_id: str
     causation_id: str | None
     schema_version: int = SCHEMA_VERSION
+    policy_id: str | None = None
+    policy_revision: int | None = None
 
     def __post_init__(self) -> None:
         require_schema_version(self.schema_version)
@@ -65,6 +76,7 @@ class InputEventRequest:
         require_stable_id(self.correlation_id, "correlation_id")
         if self.causation_id is not None:
             require_stable_id(self.causation_id, "causation_id")
+        _require_policy_binding(self.policy_id, self.policy_revision)
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,6 +114,8 @@ class TimerScheduleRequest:
     causation_id: str | None
     idempotency_key: str
     schema_version: int = SCHEMA_VERSION
+    policy_id: str | None = None
+    policy_revision: int | None = None
 
     def __post_init__(self) -> None:
         require_schema_version(self.schema_version)
@@ -114,6 +128,7 @@ class TimerScheduleRequest:
         if self.causation_id is not None:
             require_stable_id(self.causation_id, "causation_id")
         require_stable_id(self.idempotency_key, "idempotency_key")
+        _require_policy_binding(self.policy_id, self.policy_revision)
 
 
 @dataclass(frozen=True, slots=True)
@@ -187,6 +202,8 @@ class IntelligenceRequest:
     occurred_at: datetime
     proposal_valid_until: datetime
     schema_version: int = SCHEMA_VERSION
+    policy_id: str | None = None
+    policy_revision: int | None = None
 
     def __post_init__(self) -> None:
         require_schema_version(self.schema_version)
@@ -205,6 +222,12 @@ class IntelligenceRequest:
         require_utc(self.proposal_valid_until, "proposal_valid_until")
         if self.proposal_valid_until <= self.occurred_at:
             raise ValueError("proposal validity must follow request time")
+        _require_policy_binding(self.policy_id, self.policy_revision)
+        if (self.wake_cycle.policy_id, self.wake_cycle.policy_revision) != (
+            self.policy_id,
+            self.policy_revision,
+        ):
+            raise ValueError("intelligence policy binding must match its wake")
 
 
 @dataclass(frozen=True, slots=True)

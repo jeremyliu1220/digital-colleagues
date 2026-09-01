@@ -20,6 +20,15 @@ from digital_colleagues.core.authority import (
     Profile,
     ResponsibilityDefinition,
 )
+from digital_colleagues.core.builder import (
+    ColleagueDraft,
+    DefaultSource,
+    DiffClassification,
+    DiffSection,
+    DraftDiffItem,
+    DraftLifecycle,
+    ExplicitDefault,
+)
 from digital_colleagues.core.common import FrozenJsonObject
 from digital_colleagues.core.effects import (
     ActionResult,
@@ -34,6 +43,26 @@ from digital_colleagues.core.effects import (
     HumanApprovalDecision,
 )
 from digital_colleagues.core.namespace import Namespace, NamespaceScope
+from digital_colleagues.core.policy import (
+    ColleaguePolicy,
+    DurableTriggerKind,
+    EscalationCondition,
+    EscalationRecord,
+    InterruptionMode,
+    NotificationMode,
+    OutsideHoursOutcome,
+    PolicyEnforcementRecord,
+    PolicyOutcomeKind,
+    PolicyRunState,
+    PolicyStage,
+    PolicyStatus,
+    ProactivityMode,
+    StopCondition,
+    WakeBudget,
+    WakeBudgetPeriod,
+    Weekday,
+    WeeklyWindow,
+)
 from digital_colleagues.core.principals import HumanRole, Principal, PrincipalKind
 from digital_colleagues.core.runtime import (
     AgendaItem,
@@ -67,6 +96,14 @@ _DATACLASSES: tuple[type[object], ...] = (
     EffectBoundary,
     Profile,
     Mandate,
+    WeeklyWindow,
+    WakeBudget,
+    ColleaguePolicy,
+    PolicyEnforcementRecord,
+    EscalationRecord,
+    ExplicitDefault,
+    DraftDiffItem,
+    ColleagueDraft,
     CompletionEvidence,
     FiniteWork,
     Responsibility,
@@ -100,6 +137,23 @@ _ENUMS: tuple[type[Enum], ...] = (
     ApprovalChoice,
     EffectAttemptState,
     ActionResultState,
+    Weekday,
+    DurableTriggerKind,
+    ProactivityMode,
+    NotificationMode,
+    InterruptionMode,
+    WakeBudgetPeriod,
+    OutsideHoursOutcome,
+    StopCondition,
+    EscalationCondition,
+    PolicyRunState,
+    PolicyStatus,
+    PolicyStage,
+    PolicyOutcomeKind,
+    DraftLifecycle,
+    DiffSection,
+    DiffClassification,
+    DefaultSource,
 )
 _DATACLASS_REGISTRY = {value.__name__: value for value in _DATACLASSES}
 _ENUM_REGISTRY = {value.__name__: value for value in _ENUMS}
