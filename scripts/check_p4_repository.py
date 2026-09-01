@@ -17,6 +17,13 @@ from typing import cast
 BASE_COMMIT = "660a191b03472ab090fcc19c1e9fffda6b6ca9fd"
 BRANCH = "codex/p4-studio-golden-path"
 ACCEPTED_P4_COMMIT = "36244121736d4aac93d03c1ffecc69c07596ca04"
+ACCEPTED_P4_IMMUTABLE_PATHS = (
+    "artifacts/p4/summary.json",
+    "docs/p4/acceptance.md",
+    "migrations/004_local_authentication.sql",
+    "migrations/005_evaluation_observations.sql",
+    "provenance/p4-migration-receipt.json",
+)
 REQUIRED_FILES = {
     ".dockerignore",
     "Dockerfile",
@@ -138,6 +145,18 @@ def _require_history_unchanged(root: Path) -> int:
     return len(protected)
 
 
+def _require_accepted_p4_unchanged(root: Path) -> int:
+    for path in ACCEPTED_P4_IMMUTABLE_PATHS:
+        document = root / path
+        if not document.is_file():
+            raise RepositoryError("an accepted P4 immutable file is missing")
+        baseline = _git(root, "show", f"{ACCEPTED_P4_COMMIT}:{path}", text=False)
+        assert isinstance(baseline, bytes)
+        if document.read_bytes() != baseline:
+            raise RepositoryError("an accepted P4 immutable file changed")
+    return len(ACCEPTED_P4_IMMUTABLE_PATHS)
+
+
 def check_repository(root: Path) -> dict[str, object]:
     root = root.resolve()
     top = _git(root, "rev-parse", "--show-toplevel")
@@ -152,6 +171,7 @@ def check_repository(root: Path) -> dict[str, object]:
     if missing:
         raise RepositoryError("required P4 files are missing")
     protected_count = _require_history_unchanged(root)
+    accepted_p4_immutable_count = _require_accepted_p4_unchanged(root)
     residue: list[str] = []
     for document in root.rglob("*"):
         relative = document.relative_to(root)
@@ -174,6 +194,7 @@ def check_repository(root: Path) -> dict[str, object]:
         "gate": "p4_repository_clean",
         "accepted_p4_commit": ACCEPTED_P4_COMMIT,
         "accepted_p4_ancestor": True,
+        "accepted_p4_immutable_file_count": accepted_p4_immutable_count,
         "branch": branch.strip(),
         "head_commit": head.strip(),
         "historical_base_commit": BASE_COMMIT,

@@ -84,9 +84,13 @@ class P4RepositoryGateTests(unittest.TestCase):
             "baseline",
         )
         base = git(root, "rev-parse", "HEAD")
+        for relative in repository_gate.ACCEPTED_P4_IMMUTABLE_PATHS:
+            document = root / relative
+            document.parent.mkdir(parents=True, exist_ok=True)
+            document.write_text(f"accepted {relative}\n", encoding="utf-8")
         (root / "required-p4.txt").write_text("accepted P4\n", encoding="utf-8")
         (root / "compose.yaml").write_text("services: {}\n", encoding="utf-8")
-        git(root, "add", "required-p4.txt", "compose.yaml")
+        git(root, "add", ".")
         git(
             root,
             "-c",
@@ -157,6 +161,33 @@ class P4RepositoryGateTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(RepositoryError, "not an ancestor"):
             self.check(root, base, accepted)
+
+    def test_unavailable_accepted_p4_commit_fails_closed(self) -> None:
+        root, base, _ = self.repository()
+        with self.assertRaisesRegex(RepositoryError, "Git history inspection failed"):
+            self.check(root, base, "f" * 40)
+
+    def test_accepted_p4_immutable_file_deletion_fails_closed(self) -> None:
+        root, base, accepted = self.repository()
+        for relative in repository_gate.ACCEPTED_P4_IMMUTABLE_PATHS:
+            with self.subTest(relative=relative):
+                document = root / relative
+                baseline = document.read_bytes()
+                document.unlink()
+                with self.assertRaisesRegex(RepositoryError, "immutable file is missing"):
+                    self.check(root, base, accepted)
+                document.write_bytes(baseline)
+
+    def test_accepted_p4_immutable_file_modification_fails_closed(self) -> None:
+        root, base, accepted = self.repository()
+        for relative in repository_gate.ACCEPTED_P4_IMMUTABLE_PATHS:
+            with self.subTest(relative=relative):
+                document = root / relative
+                baseline = document.read_bytes()
+                document.write_text("changed\n", encoding="utf-8")
+                with self.assertRaisesRegex(RepositoryError, "immutable file changed"):
+                    self.check(root, base, accepted)
+                document.write_bytes(baseline)
 
     def test_historical_file_change_fails_closed(self) -> None:
         root, base, accepted = self.repository()
@@ -239,7 +270,11 @@ class P4EvidenceGateTests(unittest.TestCase):
         results = summary["results"]
         with tempfile.TemporaryDirectory(prefix="p4-evidence-guard-") as temporary:
             evidence_path = Path(temporary) / "summary.json"
-            for branch, merge_base in (("main", BASE_COMMIT), (BRANCH, "d" * 40)):
+            for branch, merge_base in (
+                ("main", BASE_COMMIT),
+                ("codex/not-p4-acceptance", BASE_COMMIT),
+                (BRANCH, "d" * 40),
+            ):
                 with self.subTest(branch=branch, merge_base=merge_base):
                     with self.assertRaisesRegex(EvidenceError, "accepted P3 commit"):
                         write_p4_evidence(
