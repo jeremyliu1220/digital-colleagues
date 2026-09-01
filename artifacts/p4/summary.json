@@ -1,13 +1,13 @@
 {
   "claim_scope": "P4 local synthetic/offline Studio reference workflow only.",
-  "completed_date": "2026-08-31",
+  "completed_date": "2026-09-01",
   "evaluated_tree": {
     "base_commit": "660a191b03472ab090fcc19c1e9fffda6b6ca9fd",
     "branch": "codex/p4-studio-golden-path",
     "evidence_commit_target": "the subsequent commit containing these exact summary bytes",
-    "implementation_commit": "aacdbaace274e3a1d4eb82a02166e553d6e7303e",
+    "implementation_commit": "efe1171cadca4bce6a93158093db364ab5d646ac",
     "merge_base": "660a191b03472ab090fcc19c1e9fffda6b6ca9fd",
-    "public_tree_digest_excluding_summary": "sha256:b2b6c8602153d780afc68115fa197d4a7666bbead77e009e38449c53ef62ad55",
+    "public_tree_digest_excluding_summary": "sha256:65cc62ac803f8bedf46683b870e6b354eea4b19b2aabf2b096ee6430917d2e14",
     "summary_exclusion_rule": "exclude_exact_artifacts/p4/summary.json_path_only"
   },
   "evidence_class": [
@@ -34,69 +34,145 @@
   "metric_observations": {
     "ai_initiated_rate": {
       "denominator": 2,
-      "numerator": 1,
-      "status": "observed"
+      "evidence_class": "synthetic",
+      "metric": "ai_initiated_rate",
+      "numerator": 2,
+      "policy_version": "colleague-experience-p4-v2",
+      "reason": null,
+      "safe_causal_references": [
+        "correlation:1adbe6de5b27c82e090c6f56d1297029",
+        "correlation:5b8204ec8176cf5d0ec75adaef7c1c3e"
+      ],
+      "scenario_version": "p4-golden-path-v1",
+      "schema_version": 1,
+      "source": "durable accepted InputEvent/TimerOccurrence denominator and correlated EffectProposal inbox output numerator",
+      "status": "observed",
+      "value": 1.0
     },
     "completion_rate": {
       "denominator": 1,
+      "evidence_class": "synthetic",
+      "metric": "completion_rate",
       "numerator": 0,
-      "status": "observed"
+      "policy_version": "colleague-experience-p4-v2",
+      "reason": null,
+      "safe_causal_references": [
+        "correlation:0eb162f3b9fde0825ef7e5909cdab795"
+      ],
+      "scenario_version": "p4-golden-path-v1",
+      "schema_version": 1,
+      "source": "durable namespaced FiniteWork lifecycle state",
+      "status": "observed",
+      "value": 0.0
     },
     "human_intervention_count": {
       "denominator": 1,
-      "numerator": 0,
-      "status": "observed"
+      "evidence_class": "offline",
+      "metric": "human_intervention_count",
+      "numerator": null,
+      "policy_version": "colleague-experience-p4-v2",
+      "reason": "eligible opportunities exist but durable evaluator coverage is incomplete",
+      "safe_causal_references": [
+        "correlation:0eb162f3b9fde0825ef7e5909cdab795"
+      ],
+      "scenario_version": "p4-golden-path-v1",
+      "schema_version": 1,
+      "source": "durable FiniteWork scenarios requiring offline intervention review; evaluator source required in p4_metric_observations",
+      "status": "not_evaluated",
+      "value": null
     },
-    "interpretation": "synthetic/offline only; a higher AI-initiated rate is not inherently better",
     "proactive_suggestion_acceptance_rate": {
-      "denominator": 1,
-      "numerator": 0,
-      "status": "observed"
+      "denominator": 2,
+      "evidence_class": "synthetic",
+      "metric": "proactive_suggestion_acceptance_rate",
+      "numerator": 1,
+      "policy_version": "colleague-experience-p4-v2",
+      "reason": null,
+      "safe_causal_references": [
+        "correlation:1adbe6de5b27c82e090c6f56d1297029",
+        "correlation:5b8204ec8176cf5d0ec75adaef7c1c3e"
+      ],
+      "scenario_version": "p4-golden-path-v1",
+      "schema_version": 1,
+      "source": "durable exact HumanApprovalDecision records",
+      "status": "observed",
+      "value": 0.5
     },
     "rebrief_turns": {
       "denominator": 1,
-      "numerator": 0,
-      "status": "observed"
-    },
-    "unauthorized_denominator_formula_control": {
-      "claim_limit": "not an operational governance observation",
-      "denominator": 7,
-      "numerator": 0,
-      "status": "calculation_fixture_passed"
+      "evidence_class": "offline",
+      "metric": "rebrief_turns",
+      "numerator": null,
+      "policy_version": "colleague-experience-p4-v2",
+      "reason": "eligible opportunities exist but durable evaluator coverage is incomplete",
+      "safe_causal_references": [
+        "correlation:0eb162f3b9fde0825ef7e5909cdab795"
+      ],
+      "scenario_version": "p4-golden-path-v1",
+      "schema_version": 1,
+      "source": "durable FiniteWork scenarios requiring offline resumption review; evaluator source required in p4_metric_observations",
+      "status": "not_evaluated",
+      "value": null
     },
     "unauthorized_proposal_escape_rate": {
       "denominator": 0,
-      "numerator": 0,
-      "reason": "the Golden Path evaluated no unauthorized proposal candidate",
+      "evidence_class": "synthetic",
+      "metric": "unauthorized_proposal_escape_rate",
+      "numerator": null,
+      "policy_version": "colleague-experience-p4-v2",
+      "reason": "no unauthorized proposal candidate was evaluated by governance",
+      "safe_causal_references": [],
+      "scenario_version": "p4-golden-path-v1",
+      "schema_version": 1,
+      "source": "durable p4_proposal_candidate_observations",
       "status": "not_applicable",
-      "target": 0
+      "value": null
     },
     "unnecessary_interruption_rate": {
-      "denominator": 1,
-      "numerator": 0,
-      "status": "observed"
+      "denominator": 2,
+      "evidence_class": "offline",
+      "metric": "unnecessary_interruption_rate",
+      "numerator": null,
+      "policy_version": "colleague-experience-p4-v2",
+      "reason": "eligible opportunities exist but durable evaluator coverage is incomplete",
+      "safe_causal_references": [
+        "correlation:1adbe6de5b27c82e090c6f56d1297029",
+        "correlation:5b8204ec8176cf5d0ec75adaef7c1c3e"
+      ],
+      "scenario_version": "p4-golden-path-v1",
+      "schema_version": 1,
+      "source": "durable EffectProposal inbox interactions requiring review; evaluator source required in p4_metric_observations",
+      "status": "not_evaluated",
+      "value": null
     },
     "wrong_memory_rate": {
       "denominator": 1,
-      "numerator": 0,
-      "status": "observed"
-    },
-    "zero_denominator_control": {
-      "denominator": 0,
-      "reason": "no eligible observation opportunity in the zero-input fixture",
-      "status": "not_applicable"
+      "evidence_class": "offline",
+      "metric": "wrong_memory_rate",
+      "numerator": null,
+      "policy_version": "colleague-experience-p4-v2",
+      "reason": "eligible opportunities exist but durable evaluator coverage is incomplete",
+      "safe_causal_references": [
+        "correlation:0eb162f3b9fde0825ef7e5909cdab795"
+      ],
+      "scenario_version": "p4-golden-path-v1",
+      "schema_version": 1,
+      "source": "durable FiniteWork scenarios requiring offline context review; evaluator source required in p4_metric_observations",
+      "status": "not_evaluated",
+      "value": null
     }
   },
   "migration_versions": [
     1,
     2,
     3,
-    4
+    4,
+    5
   ],
   "milestone": "P4",
   "policy_versions": {
-    "architecture": "p4-session-derived-authority-and-edge-isolation-v1",
-    "metric_definition": "colleague-experience-p4-v1",
+    "architecture": "p4-session-and-service-runtime-authority-v2",
+    "metric_definition": "colleague-experience-p4-v2",
     "public_boundary": "p0-v1",
     "scenario": "p4-golden-path-v1"
   },
@@ -107,7 +183,7 @@
       "gate": "p4_architecture_clean",
       "injected_capability_violations": 0,
       "p3_policy_version": "p3-boundary-specific-determinism-allowlist-v6",
-      "policy_version": "p4-session-derived-authority-and-edge-isolation-v1",
+      "policy_version": "p4-session-and-service-runtime-authority-v2",
       "pydantic_edge_leaks": 0,
       "schema_version": 1
     },
@@ -121,12 +197,14 @@
       "origin_csrf_namespace_authority": "passed",
       "schema_version": 1,
       "session_cookie": "httponly_samesite_strict_secure_in_https_mode",
-      "tests_run": 3
+      "tests_run": 7,
+      "worker_authority": "restricted_durable_service_context",
+      "worker_human_session_dependency": false
     },
     "boundary": {
-      "bytes_scanned": 1324830,
+      "bytes_scanned": 1439201,
       "exceptions_applied": 0,
-      "files_scanned": 216,
+      "files_scanned": 220,
       "gate": "public_boundary_clean",
       "policy_version": "p0-v1",
       "schema_version": 1
@@ -135,19 +213,207 @@
       "container_api_bind": "0.0.0.0",
       "container_studio_bind": "0.0.0.0",
       "durable_database": "single_state.sqlite_on_project_named_state_volume",
-      "gate": "p4_compose_clean",
+      "gate": "p4_compose_static_clean",
       "host_bind": "127.0.0.1",
       "loopback_claim": "reduced_host_exposure_only",
-      "runtime_command": null,
-      "runtime_config_status": "not_evaluated_no_container_engine",
-      "runtime_start_restart_stop": "not_evaluated",
+      "runtime_command": "docker compose",
+      "runtime_config_status": "config_validated",
+      "runtime_gate": "separate_required",
+      "runtime_start_restart_stop": "not_evaluated_by_static_gate",
       "schema_version": 1,
+      "scope": "static_and_config_only",
       "services": [
         "api",
         "worker",
         "studio",
         "operator"
       ]
+    },
+    "compose_runtime": {
+      "cleanup": {
+        "containers_remaining": 0,
+        "down_exit_code": 0,
+        "networks_remaining": 0,
+        "passed": true,
+        "volumes_remaining": 0
+      },
+      "command": "python3 -B scripts/check_p4_compose_runtime.py .",
+      "compose_actions": [
+        "up --build --detach api worker studio",
+        "build operator",
+        "run --rm --no-deps -T operator",
+        "stop api worker studio",
+        "up --detach --force-recreate api worker studio",
+        "stop api worker studio",
+        "down --volumes --remove-orphans"
+      ],
+      "compose_project": "dc-p4-runtime-64524-088df2e5",
+      "credentials_absent_from_service_logs": true,
+      "durable_recovery": {
+        "causal_history": true,
+        "identity": true,
+        "mandate": true,
+        "runtime_state": true,
+        "work": true
+      },
+      "ended_at": "2026-09-01T03:37:57.700734Z",
+      "environment": {
+        "api_host_port": 54947,
+        "compose_version": "5.4.0",
+        "docker_server_version": "29.7.2",
+        "host": "darwin",
+        "published_bind": "127.0.0.1",
+        "python": "3.13.5",
+        "studio_host_port": 54948
+      },
+      "exact_approval_rejection_control": {
+        "action_result": true,
+        "causal_audit": true,
+        "exact_approval": true,
+        "exact_rejection": true
+      },
+      "five_minute_objective": "not_evaluated",
+      "fresh_containers_after_checkpoint": true,
+      "gate": "p4_compose_runtime_clean",
+      "metric_observations": {
+        "ai_initiated_rate": {
+          "denominator": 2,
+          "evidence_class": "synthetic",
+          "metric": "ai_initiated_rate",
+          "numerator": 2,
+          "policy_version": "colleague-experience-p4-v2",
+          "reason": null,
+          "safe_causal_references": [
+            "correlation:1adbe6de5b27c82e090c6f56d1297029",
+            "correlation:5b8204ec8176cf5d0ec75adaef7c1c3e"
+          ],
+          "scenario_version": "p4-golden-path-v1",
+          "schema_version": 1,
+          "source": "durable accepted InputEvent/TimerOccurrence denominator and correlated EffectProposal inbox output numerator",
+          "status": "observed",
+          "value": 1.0
+        },
+        "completion_rate": {
+          "denominator": 1,
+          "evidence_class": "synthetic",
+          "metric": "completion_rate",
+          "numerator": 0,
+          "policy_version": "colleague-experience-p4-v2",
+          "reason": null,
+          "safe_causal_references": [
+            "correlation:0eb162f3b9fde0825ef7e5909cdab795"
+          ],
+          "scenario_version": "p4-golden-path-v1",
+          "schema_version": 1,
+          "source": "durable namespaced FiniteWork lifecycle state",
+          "status": "observed",
+          "value": 0.0
+        },
+        "human_intervention_count": {
+          "denominator": 1,
+          "evidence_class": "offline",
+          "metric": "human_intervention_count",
+          "numerator": null,
+          "policy_version": "colleague-experience-p4-v2",
+          "reason": "eligible opportunities exist but durable evaluator coverage is incomplete",
+          "safe_causal_references": [
+            "correlation:0eb162f3b9fde0825ef7e5909cdab795"
+          ],
+          "scenario_version": "p4-golden-path-v1",
+          "schema_version": 1,
+          "source": "durable FiniteWork scenarios requiring offline intervention review; evaluator source required in p4_metric_observations",
+          "status": "not_evaluated",
+          "value": null
+        },
+        "proactive_suggestion_acceptance_rate": {
+          "denominator": 2,
+          "evidence_class": "synthetic",
+          "metric": "proactive_suggestion_acceptance_rate",
+          "numerator": 1,
+          "policy_version": "colleague-experience-p4-v2",
+          "reason": null,
+          "safe_causal_references": [
+            "correlation:1adbe6de5b27c82e090c6f56d1297029",
+            "correlation:5b8204ec8176cf5d0ec75adaef7c1c3e"
+          ],
+          "scenario_version": "p4-golden-path-v1",
+          "schema_version": 1,
+          "source": "durable exact HumanApprovalDecision records",
+          "status": "observed",
+          "value": 0.5
+        },
+        "rebrief_turns": {
+          "denominator": 1,
+          "evidence_class": "offline",
+          "metric": "rebrief_turns",
+          "numerator": null,
+          "policy_version": "colleague-experience-p4-v2",
+          "reason": "eligible opportunities exist but durable evaluator coverage is incomplete",
+          "safe_causal_references": [
+            "correlation:0eb162f3b9fde0825ef7e5909cdab795"
+          ],
+          "scenario_version": "p4-golden-path-v1",
+          "schema_version": 1,
+          "source": "durable FiniteWork scenarios requiring offline resumption review; evaluator source required in p4_metric_observations",
+          "status": "not_evaluated",
+          "value": null
+        },
+        "unauthorized_proposal_escape_rate": {
+          "denominator": 0,
+          "evidence_class": "synthetic",
+          "metric": "unauthorized_proposal_escape_rate",
+          "numerator": null,
+          "policy_version": "colleague-experience-p4-v2",
+          "reason": "no unauthorized proposal candidate was evaluated by governance",
+          "safe_causal_references": [],
+          "scenario_version": "p4-golden-path-v1",
+          "schema_version": 1,
+          "source": "durable p4_proposal_candidate_observations",
+          "status": "not_applicable",
+          "value": null
+        },
+        "unnecessary_interruption_rate": {
+          "denominator": 2,
+          "evidence_class": "offline",
+          "metric": "unnecessary_interruption_rate",
+          "numerator": null,
+          "policy_version": "colleague-experience-p4-v2",
+          "reason": "eligible opportunities exist but durable evaluator coverage is incomplete",
+          "safe_causal_references": [
+            "correlation:1adbe6de5b27c82e090c6f56d1297029",
+            "correlation:5b8204ec8176cf5d0ec75adaef7c1c3e"
+          ],
+          "scenario_version": "p4-golden-path-v1",
+          "schema_version": 1,
+          "source": "durable EffectProposal inbox interactions requiring review; evaluator source required in p4_metric_observations",
+          "status": "not_evaluated",
+          "value": null
+        },
+        "wrong_memory_rate": {
+          "denominator": 1,
+          "evidence_class": "offline",
+          "metric": "wrong_memory_rate",
+          "numerator": null,
+          "policy_version": "colleague-experience-p4-v2",
+          "reason": "eligible opportunities exist but durable evaluator coverage is incomplete",
+          "safe_causal_references": [
+            "correlation:0eb162f3b9fde0825ef7e5909cdab795"
+          ],
+          "scenario_version": "p4-golden-path-v1",
+          "schema_version": 1,
+          "source": "durable FiniteWork scenarios requiring offline context review; evaluator source required in p4_metric_observations",
+          "status": "not_evaluated",
+          "value": null
+        }
+      },
+      "normal_stop": true,
+      "restart_checkpoint": "after_finite_work_before_trigger",
+      "runtime_start_restart_stop": "passed",
+      "schema_version": 1,
+      "started_at": "2026-09-01T03:37:34.996026Z",
+      "state_volume": "isolated_project_scoped_temporary_volume",
+      "status": "passed",
+      "synthetic_only": true
     },
     "golden_path": {
       "causal_chain": "passed",
@@ -167,13 +433,15 @@
       "historical_migrations_unchanged": true,
       "journal_mode": "wal",
       "migration_004_checksum": "sha256:dfe550129f32128eadc685cb54b70feed276ceb3274dbcbd76e214053d77e58b",
+      "migration_005_checksum": "sha256:6649985cf92d9efd378b8b69447357193fdb98eead7d3d23f9bbec1db02b2a61",
       "migration_versions": [
         1,
         2,
         3,
-        4
+        4,
+        5
       ],
-      "p4_namespaced_table_count": 3,
+      "p4_namespaced_table_count": 5,
       "schema_version": 1
     },
     "p2_core": {
@@ -233,14 +501,16 @@
         "sha256:9a9a9c031bd27072333ee30603bcd6c7e2f33f60e7920f3a69ff251836093c02",
         "sha256:b0728e3e910e0f0921271b2121308518945968874a667c340d9dc007cbfea11f",
         "sha256:98325116ff022277aee6ee9038083a3866e912c907d08afeb0da4c48f97d7e98",
-        "sha256:dfe550129f32128eadc685cb54b70feed276ceb3274dbcbd76e214053d77e58b"
+        "sha256:dfe550129f32128eadc685cb54b70feed276ceb3274dbcbd76e214053d77e58b",
+        "sha256:6649985cf92d9efd378b8b69447357193fdb98eead7d3d23f9bbec1db02b2a61"
       ],
-      "migration_count": 4,
+      "migration_count": 5,
       "migration_versions": [
         1,
         2,
         3,
-        4
+        4,
+        5
       ],
       "namespaced_table_count": 7,
       "schema_version": 1
@@ -256,7 +526,7 @@
     },
     "p3_provenance": {
       "gate": "p3_provenance_clean",
-      "implementation_tree_digest": "sha256:80ad9837e7cf38f704cf44e4b3ed406e640e76113239eaee320f1bc6f047ac20",
+      "implementation_tree_digest": "sha256:9223e8158a8f816499fa1accd864e469dc277789c7b1002a5843d97bc5369e98",
       "new_implementation_count": 27,
       "receipt_digest": "sha256:1eea8c4697e82a2c01c52170e7a4c1dc2e0acde9e8325cd36a6dea626641bbd0",
       "schema_version": 1,
@@ -288,9 +558,9 @@
     },
     "provenance": {
       "gate": "p4_provenance_clean",
-      "implementation_tree_digest": "sha256:0ef5e605b5b351c8e04729b9d952de0d08c67ed12836ef5380135b4c59830d49",
-      "new_implementation_count": 53,
-      "receipt_digest": "sha256:7dbaf755dd570a0901b61abcfe7c74edcf9deaa0194adebf9cad1bdb0b17d362",
+      "implementation_tree_digest": "sha256:69bf9602fe712f16662816de6e04bc6a8f11b1530df07f6b6e6b38fed2374b98",
+      "new_implementation_count": 56,
+      "receipt_digest": "sha256:d7ae33feb18ccc355d475c169e6e8b2d6744d78fe23f7b74698f4d3daacb6a29",
       "schema_version": 1,
       "transformed_migration_count": 0
     },
@@ -303,10 +573,10 @@
     "repository": {
       "base_commit": "660a191b03472ab090fcc19c1e9fffda6b6ca9fd",
       "branch": "codex/p4-studio-golden-path",
-      "compose_digest": "sha256:444baf05eb0d237f4efb710ff7b33428907cf997777d922f029e6ef101842836",
+      "compose_digest": "sha256:4c2c79fdb480f72f53d70e5274e1a68e872f1239d2356f2ea42821eecc3e7751",
       "gate": "p4_repository_clean",
       "historical_file_count": 24,
-      "required_file_count": 32,
+      "required_file_count": 37,
       "residue_count": 0,
       "schema_version": 1
     },
@@ -367,9 +637,17 @@
         "p2_effect_field_regression",
         "p4_authenticated_restart_golden_path",
         "p4_bootstrap_single_use_digest",
-        "p4_metric_denominators",
+        "p4_compose_static_runtime_separation",
+        "p4_expired_revoked_stale_sessions",
+        "p4_metric_durable_observations",
+        "p4_metric_escape_gate",
+        "p4_metric_governance_denominator",
+        "p4_metric_honest_statuses",
+        "p4_runtime_context_isolation",
+        "p4_service_cannot_expand_or_approve",
         "p4_session_mutation_defenses",
         "p4_timer_noop_reject_metrics",
+        "p4_worker_service_context",
         "principal_separation",
         "restart_golden_path",
         "server_approval_time_authority",
@@ -515,13 +793,21 @@
         "tests.p3.test_golden_path.GoldenPathTests.test_headless_restart_golden_path_is_recoverable_and_byte_equivalent",
         "tests.p4.test_authentication.P4AuthenticationTests.test_bootstrap_and_session_expiry_origin_csrf_and_principal_kind_fail_closed",
         "tests.p4.test_authentication.P4AuthenticationTests.test_bootstrap_is_strong_one_time_digest_only_and_operator_retrieval_is_atomic",
+        "tests.p4.test_authentication.P4AuthenticationTests.test_expired_revoked_and_stale_human_sessions_fail_at_interactive_api",
         "tests.p4.test_authentication.P4AuthenticationTests.test_https_mode_sets_secure_cookie_without_exposing_server_session_identity",
         "tests.p4.test_evidence_gate.P4EvidenceGateTests.test_complete_zero_exception_identity_is_accepted",
         "tests.p4.test_evidence_gate.P4EvidenceGateTests.test_missing_required_p4_identity_fails_closed",
         "tests.p4.test_evidence_gate.P4EvidenceGateTests.test_skip_or_nonzero_failure_cannot_be_evidence",
-        "tests.p4.test_metrics.P4MetricTests.test_unauthorized_denominator_includes_governance_rejections_and_zero_is_not_applicable",
+        "tests.p4.test_evidence_gate.P4EvidenceGateTests.test_static_compose_gate_never_claims_runtime_acceptance",
+        "tests.p4.test_metrics.P4MetricTests.test_fault_injected_escape_increments_numerator_and_fails_metric_gate",
+        "tests.p4.test_metrics.P4MetricTests.test_noop_is_not_ai_visible_and_governance_rejection_is_durable",
+        "tests.p4.test_metrics.P4MetricTests.test_not_applicable_and_eligible_but_unevaluated_are_distinct",
+        "tests.p4.test_metrics.P4MetricTests.test_observed_values_come_from_durable_namespaced_observations_after_restart",
         "tests.p4.test_studio_golden_path.P4StudioGoldenPathTests.test_authenticated_studio_golden_path_restart_and_causal_chain",
         "tests.p4.test_studio_golden_path.P4StudioGoldenPathTests.test_timer_noop_metrics_and_reject_create_no_effect_attempt",
+        "tests.p4.test_worker_authority.P4WorkerAuthorityTests.test_no_session_grants_no_mandate_or_approval_authority",
+        "tests.p4.test_worker_authority.P4WorkerAuthorityTests.test_runtime_context_rejects_stale_kind_and_namespace_crossover",
+        "tests.p4.test_worker_authority.P4WorkerAuthorityTests.test_worker_uses_restricted_service_context_after_human_session_revocation",
         "tests.persistence.test_sqlite_semantics.SQLiteSemanticsTests.test_every_store_connection_enables_wal_foreign_keys_and_busy_handling",
         "tests.persistence.test_sqlite_semantics.SQLiteSemanticsTests.test_migration_failure_rolls_back_without_partial_schema_or_metadata",
         "tests.persistence.test_sqlite_semantics.SQLiteSemanticsTests.test_migration_order_checksum_tampering_and_future_schema_fail_closed",
@@ -546,14 +832,13 @@
         "tests.runtime.test_p3_runtime.RuntimeSemanticsTests.test_wake_cycle_bounds_preserve_pending_work_and_agenda_takeover_fences_stale_owner",
         "tests.runtime.test_timer_runtime.TimerRuntimeTests.test_durable_timer_due_replay_restart_fencing_causation_and_namespace_isolation"
       ],
-      "tests_run": 165,
+      "tests_run": 173,
       "unexpected_successes": 0
     }
   },
   "schema_version": 1,
   "status": "development_complete_awaiting_independent_acceptance",
   "unevaluated": {
-    "compose_runtime_start_restart_stop": "not_evaluated",
     "five_minute_limit": "not_evaluated",
     "human_study": "not_evaluated",
     "live_provider": "not_evaluated",
@@ -569,6 +854,7 @@
     "PYTHONPATH=src python3 -B scripts/check_p4_authentication.py .",
     "python3 -B scripts/check_p4_studio.py .",
     "python3 -B scripts/check_p4_compose.py .",
+    "python3 -B scripts/check_p4_compose_runtime.py .",
     "PYTHONPATH=src python3 -B scripts/check_p4_golden_path.py",
     "make check",
     "make evidence-p4"
