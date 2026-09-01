@@ -12,8 +12,11 @@ import sys
 from pathlib import Path
 from typing import cast
 
+# The evidence writer imports these fixed acceptance-boundary values. General repository
+# health checks use the accepted P4 commit below and do not enforce a branch name.
 BASE_COMMIT = "660a191b03472ab090fcc19c1e9fffda6b6ca9fd"
 BRANCH = "codex/p4-studio-golden-path"
+ACCEPTED_P4_COMMIT = "36244121736d4aac93d03c1ffecc69c07596ca04"
 REQUIRED_FILES = {
     ".dockerignore",
     "Dockerfile",
@@ -54,14 +57,19 @@ REQUIRED_FILES = {
     "tests/p4/test_worker_authority.py",
 }
 FORBIDDEN_PARTS = {
+    ".cache",
     ".mypy_cache",
     ".pytest_cache",
     ".ruff_cache",
     ".venv",
+    ".vite",
     "__pycache__",
+    "build",
     "coverage",
     "dist",
+    "logs",
     "node_modules",
+    "volumes",
 }
 FORBIDDEN_SUFFIXES = (".sqlite", ".sqlite-wal", ".sqlite-shm", ".db", ".log", ".coverage")
 
@@ -82,6 +90,19 @@ def _git(root: Path, *arguments: str, text: bool = True) -> str | bytes:
     if completed.returncode != 0:
         raise RepositoryError("Git history inspection failed")
     return cast(str | bytes, completed.stdout)
+
+
+def _is_ancestor(root: Path, ancestor: str, descendant: str) -> bool:
+    completed = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", ancestor, descendant],
+        cwd=root,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    if completed.returncode not in {0, 1}:
+        raise RepositoryError("Git history inspection failed")
+    return completed.returncode == 0
 
 
 def _historical_paths(root: Path) -> tuple[str, ...]:
@@ -121,12 +142,12 @@ def check_repository(root: Path) -> dict[str, object]:
     root = root.resolve()
     top = _git(root, "rev-parse", "--show-toplevel")
     branch = _git(root, "branch", "--show-current")
-    base = _git(root, "rev-parse", "main")
-    assert isinstance(top, str) and isinstance(branch, str) and isinstance(base, str)
+    head = _git(root, "rev-parse", "HEAD")
+    assert isinstance(top, str) and isinstance(branch, str) and isinstance(head, str)
     if Path(top.strip()).resolve() != root:
         raise RepositoryError("P4 repository root is not exact")
-    if branch.strip() != BRANCH or base.strip() != BASE_COMMIT:
-        raise RepositoryError("P4 branch or accepted base commit drifted")
+    if not _is_ancestor(root, ACCEPTED_P4_COMMIT, "HEAD"):
+        raise RepositoryError("the accepted P4 commit is not an ancestor of HEAD")
     missing = sorted(path for path in REQUIRED_FILES if not (root / path).is_file())
     if missing:
         raise RepositoryError("required P4 files are missing")
@@ -138,6 +159,11 @@ def check_repository(root: Path) -> dict[str, object]:
             continue
         if any(part in FORBIDDEN_PARTS for part in relative.parts):
             residue.append(relative.as_posix())
+        elif document.is_file() and (
+            document.name == ".env"
+            or (document.name.startswith(".env.") and document.name != ".env.example")
+        ):
+            residue.append(relative.as_posix())
         elif document.is_file() and document.name.endswith(FORBIDDEN_SUFFIXES):
             residue.append(relative.as_posix())
     if residue:
@@ -146,8 +172,11 @@ def check_repository(root: Path) -> dict[str, object]:
     return {
         "schema_version": 1,
         "gate": "p4_repository_clean",
-        "base_commit": BASE_COMMIT,
-        "branch": BRANCH,
+        "accepted_p4_commit": ACCEPTED_P4_COMMIT,
+        "accepted_p4_ancestor": True,
+        "branch": branch.strip(),
+        "head_commit": head.strip(),
+        "historical_base_commit": BASE_COMMIT,
         "historical_file_count": protected_count,
         "required_file_count": len(REQUIRED_FILES),
         "residue_count": 0,
