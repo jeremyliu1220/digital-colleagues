@@ -172,9 +172,9 @@ def write_p6_evidence(
         compose.get("status") != "passed"
         or not isinstance(cleanup, dict)
         or cleanup.get("passed") is not True
-        or cleanup.get("containers") != 0
-        or cleanup.get("networks") != 0
-        or cleanup.get("volumes") != 0
+        or cleanup.get("containers_remaining") != 0
+        or cleanup.get("networks_remaining") != 0
+        or cleanup.get("volumes_remaining") != 0
     ):
         raise EvidenceError("P6 actual Compose runtime or cleanup is incomplete")
     summary: dict[str, Any] = {

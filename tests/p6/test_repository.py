@@ -5,10 +5,13 @@ from __future__ import annotations
 import subprocess
 import tempfile
 import unittest
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 from scripts import check_p6_repository as repository_gate
+from scripts import collect_p6_evidence as evidence_gate
 from tests.p6.fixtures import ROOT
 
 
@@ -132,6 +135,83 @@ class P6RepositoryGateTests(unittest.TestCase):
         current = repository_gate.check_repository(ROOT)
         self.assertTrue(current["trusted_p6_ancestor"])
         self.assertEqual(current["merge_base"], repository_gate.BASE_COMMIT)
+
+    def test_evidence_writer_requires_exact_branch_gates_and_zero_cleanup(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="p6-evidence-gate-") as name:
+            root = Path(name)
+            evidence_path = root / "artifacts/p6/summary.json"
+            unittest_outcome: dict[str, Any] = {
+                "tests_run": 1,
+                "failures": 0,
+                "errors": 0,
+                "skipped": 0,
+                "expected_failures": 0,
+                "unexpected_successes": 0,
+                "gate_passed": True,
+                "test_ids": ["synthetic:test"],
+                "fault_boundaries": ["synthetic:boundary"],
+            }
+            cleanup: dict[str, Any] = {
+                "passed": True,
+                "containers_remaining": 0,
+                "networks_remaining": 0,
+                "volumes_remaining": 0,
+            }
+            clean_results: dict[str, dict[str, Any]] = {
+                "compose_runtime": {"status": "passed", "cleanup": cleanup}
+            }
+
+            def write(
+                *,
+                branch: str = repository_gate.BRANCH,
+                verified_gates: set[str] | None = None,
+                results: dict[str, dict[str, Any]] | None = None,
+            ) -> None:
+                evidence_gate.write_p6_evidence(
+                    evidence_path=evidence_path,
+                    root=root,
+                    results=clean_results if results is None else results,
+                    unittest_outcome=unittest_outcome,
+                    verified_gates=(
+                        set(evidence_gate.REQUIRED_GATES)
+                        if verified_gates is None
+                        else verified_gates
+                    ),
+                    branch=branch,
+                    implementation_commit="a" * 40,
+                    merge_base=repository_gate.BASE_COMMIT,
+                    tree_digest="sha256:" + "b" * 64,
+                    migration_digest="sha256:" + "c" * 64,
+                )
+
+            write()
+            accepted = evidence_path.read_bytes()
+
+            attempts: tuple[Callable[[], None], ...] = (
+                lambda: write(branch="main"),
+                lambda: write(verified_gates=set()),
+                lambda: write(
+                    results={
+                        "compose_runtime": {
+                            "status": "passed",
+                            "cleanup": {**cleanup, "volumes_remaining": 1},
+                        }
+                    }
+                ),
+                lambda: write(
+                    results={
+                        "compose_runtime": {
+                            "status": "passed",
+                            "cleanup": cleanup,
+                        },
+                        "unsafe": {"token": "forbidden-material"},
+                    }
+                ),
+            )
+            for attempt in attempts:
+                with self.assertRaises(evidence_gate.EvidenceError):
+                    attempt()
+                self.assertEqual(evidence_path.read_bytes(), accepted)
 
 
 if __name__ == "__main__":
