@@ -25,7 +25,8 @@ deferred capabilities are described only as a non-committing
 | Wake reason and trigger-class views | Yes | P4 accepted main baseline | Explains existing durable Event/Timer causality and deterministic no-op; background work uses a restricted SERVICE context |
 | Exact-effect proposal inbox | Yes | P4 accepted main baseline | Displays and decides the exact `EffectProposal` revision and digests; human approval remains required |
 | Colleague-experience evaluation points | Yes | P4 accepted main baseline | Durable sources distinguish observed, not applicable, and not evaluated; five-minute and human-improvement claims remain unevaluated |
-| Revisioned policy builder | Yes | P5 development complete, awaiting independent acceptance | Inert exact-revision Profile/Mandate/policy drafts; typed deterministic working hours, triggers, proactivity, notification/interruption, budgets, stop, and escalation |
+| Revisioned policy builder | Yes | P5 accepted main baseline | Inert exact-revision Profile/Mandate/policy drafts; typed deterministic working hours, triggers, proactivity, notification/interruption, budgets, stop, and escalation |
+| Local multi-user governance | Yes | P6 contract fixed; implementation not yet gated | Typed RBAC, enrollment/recovery, two-person authority change, approval expiry, scoped audit export, and abuse coverage; no enterprise-IAM or production-security claim |
 | Semantic Memory | No | Post-v0.1 outlook only | Not a v0.1 commitment and never an authority source |
 | Skill Learning or governed Skill system | No | Post-v0.1 outlook only | Requires an independent gate, provenance, permissions, versioning, and rollback |
 | Shared knowledge or multi-person collaboration | No | Post-v0.1 outlook only | Requires namespace, ownership, authorization, revocation, and abuse testing |

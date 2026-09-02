@@ -5,9 +5,12 @@
 ## Scope and claim boundary
 
 This model defines requirements for the v0.1 local reference topology. P5 mechanically
-tests the local P4 bootstrap/session boundary plus revisioned draft, policy, namespace,
-authority, replay, deterministic execution, SQLite, outbox, and safe-audit controls. Those results do not
-establish product security or privacy effectiveness. Encryption at rest,
+tested the local P4 bootstrap/session boundary plus revisioned draft, policy, namespace,
+authority, replay, deterministic execution, SQLite, outbox, and safe-audit controls. P6 is
+required to test typed RBAC, versioned membership, enrollment/recovery, proposer/approver
+separation, approval expiry, scoped export, and abuse cases. Until its Gate passes those
+are requirements, not verified controls. Neither milestone establishes product security or
+privacy effectiveness. Encryption at rest,
 OIDC, SSO, SCIM, distributed isolation, and high availability remain gaps.
 
 ## Assets
@@ -53,6 +56,12 @@ OIDC, SSO, SCIM, distributed isolation, and high availability remain gaps.
 | Cross-site mutation | Origin validation and CSRF defense on every mutation |
 | Bootstrap credential disclosure | Strong random value, one display, digest-only storage, short expiry, one use |
 | Enrollment privilege escalation | Admin-issued scoped token; server selects durable role |
+| One-Admin bootstrap deadlock | One fixed, audited second-Admin transition; closes permanently after atomic success |
+| Self-approved authority change | Exact proposal and a different current Admin approver; revalidate again at apply |
+| Recovery becomes a backdoor | Admin-authorized one-use operator credential; no role/scope change; rotate and revoke sessions |
+| Revoked role retained by session | Session binds current role/membership revisions; every request re-resolves and compares |
+| Approval outlives authority | Proposal/decision expiry and dispatch-time Mandate/policy/role/membership revalidation |
+| Audit export leaks or escalates | Admin/Auditor only, exact scope, explicit bounds/limit, deterministic safe schema and redaction |
 | Audit tampering or gaps | P3 transactional immutable safe audit rows; local operator tampering remains possible |
 | Unsupported zero-valued evaluation claim | Durable evaluator/governance observations; eligible unobserved scenarios remain not evaluated |
 | Outbox double delivery | Transactional claim/lease/fence, idempotent effect key, attempt/result records, bounded retry |
@@ -71,7 +80,8 @@ subset: one-time local bootstrap retrieval, digest-only short-lived bootstrap st
 atomic exchange, server-created HUMAN `tenant_admin` and session, strict cookie behavior,
 session expiry, Origin and CSRF validation, namespace derivation, role injection refusal,
 and principal-kind separation. General enrollment, session recovery, and complete RBAC
-hardening remain P6 work.
+hardening have a fixed P6 contract. They remain unverified until the P6 security Gate and
+evidence pass.
 
 ## Residual risks
 

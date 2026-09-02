@@ -214,6 +214,30 @@ dispatch. Durable namespaced counters prevent restart, replay, duplicate-event, 
 trigger-class budget evasion. Typed stop state requires an explicit confirmed revision to
 resume; escalation is a safe local record, not approval or an external effect.
 
+## P6 planned local governance topology
+
+The fixed P6 contract adds a centralized typed action matrix, independently revisioned
+HUMAN membership, and session bindings to the current role and membership revisions.
+Every HTTP, application-service, and store boundary must re-resolve kind, action, complete
+namespace, membership, and revisions. MODEL and SERVICE receive no human role; a restricted
+SERVICE context continues to operate without a HUMAN session.
+
+Enrollment and recovery use Admin-authorized permits plus a one-shot local operator
+delivery boundary. Plaintext credentials are high-entropy, short-lived, single-use, and
+never returned by the API or persisted; only purpose-framed digests are stored. Recovery
+revokes old sessions and rotates the server-created session and CSRF binding.
+
+Authority-affecting P5 drafts become exact change proposals bound to the draft revision and
+digest, all three active base heads, proposer, revisions, namespace, and expiry. A different
+current Admin decides, and apply revalidates and consumes that exact authority in one
+transaction. One narrow, auditable second-Admin bootstrap transition resolves the initial
+two-person deadlock and closes permanently after successful use.
+
+Audit export is a bounded read port with explicit namespace, UTC range, record types,
+limit, deterministic ordering, versioned safe records, and redaction. These are P6 design
+requirements until the P6 Gate passes; they are not a production-security or tenant-
+isolation claim.
+
 ## Causal audit chain
 
 The minimum inspectable chain is:

@@ -6,14 +6,16 @@ Each milestone stops at its gate. A later milestone must not begin automatically
 
 Current checkpoint:
 
-- P4 has been accepted and fast-forward merged into `main`.
-- The P4 post-merge Gate hotfix has been merged.
+- P5 has been accepted and fast-forward merged into `main`.
+- The P5 post-merge Gate hotfix has been merged.
 - The accepted `main` baseline is
-  `259e5627c0a4d713934263efe18caf8c675a1669`.
-- Historical P0–P4 acceptance, artifacts, evidence, receipts, and migrations remain
+  `f1dff72c3fb15b2fc7b3c7d989aa85e275cb31ac`.
+- Historical P0–P5 acceptance, artifacts, evidence, receipts, and migrations remain
   unchanged.
-- P5 development is complete, awaiting independent acceptance; it has not been accepted or
-  merged.
+- P6 governance hardening starts from that fixed base. Its acceptance contract is fixed,
+  but implementation has not passed the P6 Gate and must not be described as complete,
+  accepted, or production-secure.
+- P7 has not started.
 
 Rebaseline boundary:
 
@@ -105,12 +107,12 @@ explicit revision, reviewable diff, confirmation, and stale-revision rejection.
 
 Exit: stale drafts and ambiguous authority changes are rejected and evidenced.
 
-Current development result: P5 development complete, awaiting independent acceptance. The
-branch implements inert Profile/Mandate/policy drafts, explicit defaults, classified diffs,
-exact atomic confirmation, stale-race evidence, migration 006, revision-bound deterministic
-policy enforcement, Studio review, synthetic/offline metrics, and an isolated actual Compose
-Golden Path. This is not acceptance, merge, production readiness, or evidence that colleague
-experience improved.
+Accepted result: P5 is accepted and merged. It implements inert Profile/Mandate/policy
+drafts, explicit defaults, classified diffs, exact atomic confirmation, stale-race
+evidence, migration 006, revision-bound deterministic policy enforcement, Studio review,
+synthetic/offline metrics, and an isolated actual Compose Golden Path. Its historical
+acceptance, artifacts, evidence, migration, and receipt remain unchanged. Acceptance does
+not establish production readiness or colleague-experience improvement.
 
 ## P6 — Governance hardening
 
@@ -124,6 +126,10 @@ without implementing capabilities that do not exist in v0.1.
 
 Exit: the documented local security test suite passes; production security is still not
 claimed.
+
+Current development status: the P6 acceptance contract, ADR 0005, and security Golden Path
+are fixed from the accepted P5 base. Product implementation and P6 evidence must pass the
+documented Gates before P6 may be described as development complete. P7 remains unstarted.
 
 ## P7 — Optional adapters
 

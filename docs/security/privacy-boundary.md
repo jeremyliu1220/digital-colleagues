@@ -123,3 +123,20 @@ project-scoped volume, then verifies zero container, network, and volume residue
 session, and CSRF plaintext stay process-local and are checked absent from service logs and
 the P5 summary. Revision-bound synthetic/offline metrics do not represent human or live
 provider observations and establish no colleague-experience improvement.
+
+## P6 governance credential and export boundary
+
+P6 enrollment and recovery plaintext may exist only in the invoked local operator process.
+Browser-facing API responses, Studio state, worker context, SQLite, audit, logs, errors,
+fixtures, and evidence receive no plaintext token, session credential, cookie, or CSRF
+value. Persistence uses only purpose-framed credential digests; audit and evidence use safe
+lifecycle identifiers and outcomes without credential digests.
+
+Audit export requires an exact authorized namespace, explicit UTC range, allowlisted record
+types, and bounded limit. Its versioned rows contain safe causal identifiers, revisions,
+results, and required non-credential digests only. Private payloads, local absolute paths,
+provider identifiers, raw diagnostics, secrets, and live/personal data are prohibited.
+
+P6 public evidence remains synthetic/offline. It cannot be labeled human or live-provider
+evidence and does not establish production privacy, security, compliance, tenant isolation,
+or enterprise IAM. These are contract requirements until the P6 Gate passes.

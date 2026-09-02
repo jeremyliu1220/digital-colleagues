@@ -8,11 +8,12 @@ Digital Colleagues is an open-source, local-first control plane and reference st
 making an AI coworker's identity, delegated authority, responsibilities, finite work,
 approvals, effects, persistence, and audit causality explicit and testable.
 
-> **Project status — P5 development complete, awaiting independent acceptance.** The
-> revisioned colleague builder, typed policy enforcement, additive migration 006, and
-> isolated Compose Golden Path are implemented on the P5 development branch. P5 is not
-> accepted or merged. Real providers, production security, distributed operation, measured
-> human improvement, and a proven five-minute limit are not claimed.
+> **Project status — P5 accepted; P6 governance hardening is in development.** P5 and its
+> post-merge Gate hotfix are merged in `main` at the fixed P6 base
+> `f1dff72c3fb15b2fc7b3c7d989aa85e275cb31ac`. P6 has a fixed acceptance contract but has
+> not passed its Gate and is not accepted or secure-by-claim. P7 has not started. Real
+> providers, production security, distributed operation, measured human improvement, and
+> a proven five-minute limit are not claimed.
 
 ## What makes a digital colleague different?
 
@@ -35,15 +36,17 @@ The target is a local deterministic reference implementation—not enterprise IA
 production tenancy isolation, high availability, compliance certification, or a hosted
 service.
 
-## The revisioned-builder Golden Path
+## Accepted P5 baseline and P6 contract
 
-P5 retains the accepted P4 local Compose and Studio path and adds an inert, revisioned
+P5 retained the accepted P4 local Compose and Studio path and added an inert, revisioned
 Profile/Mandate/policy draft. A local Admin reviews explicit defaults and a classified
 before/after diff, confirms the exact base revisions and digest, and then exercises
 working-hours, trigger, proactivity, notification/interruption, wake-budget, stop, resume,
 escalation, stale-draft, and stale-proposal behavior. See the
-[P5 operator guide](docs/p5/golden-path.md), [roadmap](docs/roadmap.md), and
-[product brief](docs/product/v0.1-product-brief.md).
+[P5 operator guide](docs/p5/golden-path.md). P6 now fixes the local multi-user governance
+requirements in its [acceptance contract](docs/p6/acceptance.md) and
+[security Golden Path](docs/p6/security-golden-path.md). These are development contracts,
+not evidence that P6 has passed.
 
 ## Verify P5
 
@@ -127,9 +130,9 @@ provenance/              fixed-revision source and scanner manifests
 artifacts/               machine-readable milestone summaries
 ```
 
-The private parent research repository remains read-only. P5 is new work from public
-documents and the accepted public P4 implementation; its provenance receipt records zero
-transformed source files and covers the complete P5 change inventory.
+The private parent research repository remains read-only. P5 history, acceptance,
+artifacts, evidence, migration 006, and its provenance receipt remain unchanged. P6 starts
+from the accepted public P5 baseline and may migrate no parent working-tree content.
 
 ## Contributing and security
 
