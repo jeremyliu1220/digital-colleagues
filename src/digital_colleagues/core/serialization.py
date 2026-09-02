@@ -29,6 +29,14 @@ from digital_colleagues.core.effects import (
     HumanApprovalDecision,
 )
 from digital_colleagues.core.errors import CoreInvariantError
+from digital_colleagues.core.governance import (
+    AuditExportQuery,
+    AuditExportRecord,
+    ChangeDecision,
+    ChangeProposal,
+    GovernanceCredential,
+    Membership,
+)
 from digital_colleagues.core.namespace import Namespace
 from digital_colleagues.core.policy import (
     ColleaguePolicy,
@@ -64,6 +72,120 @@ def datetime_from_z(value: str) -> datetime:
 
 
 def _contract_items(value: object) -> tuple[tuple[str, object], ...] | None:
+    if isinstance(value, AuditExportQuery):
+        return (
+            ("namespace", value.namespace),
+            ("start_at", value.start_at),
+            ("end_at", value.end_at),
+            ("record_types", value.record_types),
+            ("limit", value.limit),
+            ("schema_version", value.schema_version),
+        )
+    if isinstance(value, Membership):
+        return (
+            ("namespace", value.namespace),
+            ("membership_id", value.membership_id),
+            ("principal_id", value.principal_id),
+            ("roles", value.roles),
+            ("colleague_ids", value.colleague_ids),
+            ("status", value.status),
+            ("role_revision", value.role_revision),
+            ("membership_revision", value.membership_revision),
+            ("issued_by", value.issued_by),
+            ("created_at", value.created_at),
+            ("updated_at", value.updated_at),
+            ("correlation_id", value.correlation_id),
+            ("causation_id", value.causation_id),
+            ("revision", value.revision),
+            ("schema_version", value.schema_version),
+        )
+    if isinstance(value, GovernanceCredential):
+        return (
+            ("namespace", value.namespace),
+            ("credential_id", value.credential_id),
+            ("kind", value.kind),
+            ("state", value.state),
+            ("target_principal_id", value.target_principal_id),
+            ("target_role_revision", value.target_role_revision),
+            ("target_membership_revision", value.target_membership_revision),
+            ("target_role", value.target_role),
+            ("colleague_ids", value.colleague_ids),
+            ("bootstrap_transition", value.bootstrap_transition),
+            ("issued_by_principal_id", value.issued_by_principal_id),
+            ("issued_at", value.issued_at),
+            ("expires_at", value.expires_at),
+            ("change_decision_id", value.change_decision_id),
+            ("retrieved_at", value.retrieved_at),
+            ("consumed_at", value.consumed_at),
+            ("revoked_at", value.revoked_at),
+            ("consumed_principal_id", value.consumed_principal_id),
+            ("revision", value.revision),
+            ("schema_version", value.schema_version),
+        )
+    if isinstance(value, ChangeProposal):
+        return (
+            ("namespace", value.namespace),
+            ("proposal_id", value.proposal_id),
+            ("change_kind", value.change_kind),
+            ("target_id", value.target_id),
+            ("target_revision", value.target_revision),
+            ("canonical_digest", value.canonical_digest),
+            ("base_profile_revision", value.base_profile_revision),
+            ("base_mandate_revision", value.base_mandate_revision),
+            ("base_policy_revision", value.base_policy_revision),
+            ("proposed_role", value.proposed_role),
+            ("proposed_status", value.proposed_status),
+            ("proposed_colleague_ids", value.proposed_colleague_ids),
+            ("proposer_principal_id", value.proposer_principal_id),
+            ("proposer_role_revision", value.proposer_role_revision),
+            ("proposer_membership_revision", value.proposer_membership_revision),
+            ("issued_at", value.issued_at),
+            ("expires_at", value.expires_at),
+            ("state", value.state),
+            ("decision_id", value.decision_id),
+            ("consumed_at", value.consumed_at),
+            ("revision", value.revision),
+            ("correlation_id", value.correlation_id),
+            ("causation_id", value.causation_id),
+            ("schema_version", value.schema_version),
+        )
+    if isinstance(value, ChangeDecision):
+        return (
+            ("namespace", value.namespace),
+            ("decision_id", value.decision_id),
+            ("proposal_id", value.proposal_id),
+            ("proposal_revision", value.proposal_revision),
+            ("proposal_digest", value.proposal_digest),
+            ("choice", value.choice),
+            ("approver_principal_id", value.approver_principal_id),
+            ("approver_role_revision", value.approver_role_revision),
+            ("approver_membership_revision", value.approver_membership_revision),
+            ("occurred_at", value.occurred_at),
+            ("valid_until", value.valid_until),
+            ("consumed_at", value.consumed_at),
+            ("revision", value.revision),
+            ("correlation_id", value.correlation_id),
+            ("causation_id", value.causation_id),
+            ("schema_version", value.schema_version),
+        )
+    if isinstance(value, AuditExportRecord):
+        return (
+            ("namespace", value.namespace),
+            ("record_type", value.record_type),
+            ("record_id", value.record_id),
+            ("record_revision", value.record_revision),
+            ("action", value.action),
+            ("result", value.result),
+            ("actor_principal_id", value.actor_principal_id),
+            ("actor_kind", value.actor_kind),
+            ("authority_revision", value.authority_revision),
+            ("correlation_id", value.correlation_id),
+            ("causation_id", value.causation_id),
+            ("occurred_at", value.occurred_at),
+            ("safe_digest", value.safe_digest),
+            ("safe_projection", value.safe_projection),
+            ("schema_version", value.schema_version),
+        )
     if isinstance(value, Profile):
         return (
             ("namespace", value.namespace),

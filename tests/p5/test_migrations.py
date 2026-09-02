@@ -39,7 +39,8 @@ class P5MigrationTests(unittest.TestCase):
                 json.loads((ROOT / "migrations/manifest.json").read_text(encoding="utf-8")),
             )
             entries = cast(list[dict[str, Any]], manifest["migrations"])
-            self.assertEqual([item["version"] for item in entries], [1, 2, 3, 4, 5, 6])
+            self.assertGreaterEqual(len(entries), 6)
+            self.assertEqual([item["version"] for item in entries[:6]], [1, 2, 3, 4, 5, 6])
             migration = ROOT / "migrations/006_revisioned_colleague_builder.sql"
             checksum = "sha256:" + hashlib.sha256(migration.read_bytes()).hexdigest()
             self.assertEqual(entries[5]["checksum"], checksum)
@@ -48,6 +49,18 @@ class P5MigrationTests(unittest.TestCase):
             (v5_migrations / "manifest.json").write_text(
                 json.dumps(
                     {"schema_version": 1, "migrations": entries[:5]},
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            p5_migrations = temporary / "p5-migrations"
+            p5_migrations.mkdir()
+            for entry in entries[:6]:
+                shutil.copy2(ROOT / "migrations" / cast(str, entry["file"]), p5_migrations)
+            (p5_migrations / "manifest.json").write_text(
+                json.dumps(
+                    {"schema_version": 1, "migrations": entries[:6]},
                     indent=2,
                 )
                 + "\n",
@@ -67,12 +80,12 @@ class P5MigrationTests(unittest.TestCase):
             v5.close()
             upgraded = SQLiteP5Store(
                 upgraded_path,
-                migrations_path=ROOT / "migrations",
+                migrations_path=p5_migrations,
                 clock=FixedClock(NOW),
             )
             fresh = SQLiteP5Store(
                 temporary / "fresh.sqlite",
-                migrations_path=ROOT / "migrations",
+                migrations_path=p5_migrations,
                 clock=FixedClock(NOW),
             )
             self.assertEqual(

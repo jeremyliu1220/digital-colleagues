@@ -1312,6 +1312,18 @@ class SQLiteRuntimeStore:
         ).fetchone()
         return cast(int, row["count"])
 
+    def _bind_effect_approval_authority(
+        self,
+        connection: sqlite3.Connection,
+        *,
+        namespace: Namespace,
+        proposal: EffectProposal,
+        decision: HumanApprovalDecision,
+        approver: Principal,
+        occurred_at: datetime,
+    ) -> None:
+        del connection, namespace, proposal, decision, approver, occurred_at
+
     def commit_approval_and_attempt(
         self,
         *,
@@ -1388,6 +1400,14 @@ class SQLiteRuntimeStore:
                 raise PermissionDeniedError("proposal names a different Mandate")
             if proposal.mandate_revision != mandate.revision:
                 raise PermissionDeniedError("proposal Mandate revision is stale")
+            self._bind_effect_approval_authority(
+                connection,
+                namespace=namespace,
+                proposal=proposal,
+                decision=decision,
+                approver=approver,
+                occurred_at=occurred_at,
+            )
             authorize_effect_proposal(
                 proposal,
                 mandate,

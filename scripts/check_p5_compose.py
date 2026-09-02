@@ -23,14 +23,14 @@ def check_compose(root: Path) -> dict[str, object]:
     prior = check_p4_compose(root)
     runtime = (root / "src/digital_colleagues/local/runtime.py").read_text(encoding="utf-8")
     required = (
-        "SQLiteP5Store",
         "RevisionedColleagueBuilderService",
         "PolicyGovernedIntelligence",
         "P5DispatchAuthorizer",
         "P5RuntimeController",
         "install_p5_routes",
     )
-    if any(value not in runtime for value in required):
+    supported_store = "SQLiteP5Store" in runtime or "SQLiteP6Store" in runtime
+    if not supported_store or any(value not in runtime for value in required):
         raise ComposeError("the local composition root does not wire the complete P5 path")
     return {
         "schema_version": 1,

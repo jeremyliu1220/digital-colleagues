@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
-"""Validate complete P5 change coverage with zero transformed parent source."""
+"""Validate complete P6 change provenance with zero parent-source migration."""
 
 from __future__ import annotations
 
@@ -15,16 +15,16 @@ from typing import Any
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from scripts.check_p5_repository import ACCEPTED_P5_COMMIT, BASE_COMMIT
+from scripts.check_p6_repository import BASE_COMMIT
 
-RECEIPT = "provenance/p5-migration-receipt.json"
-EXCLUDED = {RECEIPT, "artifacts/p5/summary.json"}
+RECEIPT = "provenance/p6-migration-receipt.json"
+EXCLUDED = {RECEIPT, "artifacts/p6/summary.json"}
 FIELDS = {"destination", "classification", "implementation_basis", "gate_result"}
-BASIS = "public_documents_and_accepted_p4_implementation"
+BASIS = "public_documents_and_accepted_p5_implementation"
 
 
 class ProvenanceError(RuntimeError):
-    """P5 provenance coverage is incomplete or unsafe."""
+    """P6 provenance coverage is incomplete or unsafe."""
 
 
 def _git(root: Path, *arguments: str) -> tuple[str, ...]:
@@ -37,7 +37,7 @@ def _git(root: Path, *arguments: str) -> tuple[str, ...]:
         check=False,
     )
     if completed.returncode != 0:
-        raise ProvenanceError("Git P5 change inventory failed")
+        raise ProvenanceError("Git P6 change inventory failed")
     return tuple(line for line in completed.stdout.splitlines() if line)
 
 
@@ -50,24 +50,19 @@ def _safe_path(value: object) -> str:
     return path.as_posix()
 
 
-def _changed_files(root: Path) -> set[str]:
-    changed = set(_git(root, "diff", "--name-only", BASE_COMMIT, ACCEPTED_P5_COMMIT, "--"))
+def changed_files(root: Path) -> set[str]:
+    changed = set(_git(root, "diff", "--name-only", BASE_COMMIT, "--"))
+    changed.update(_git(root, "ls-files", "--others", "--exclude-standard"))
     return {path for path in changed if path not in EXCLUDED}
 
 
-def _framed_digest(root: Path, paths: set[str]) -> str:
+def framed_digest(root: Path, paths: set[str]) -> str:
     aggregate = hashlib.sha256()
     for relative in sorted(paths):
-        completed = subprocess.run(
-            ["git", "show", f"{ACCEPTED_P5_COMMIT}:{relative}"],
-            cwd=root,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            check=False,
-        )
-        if completed.returncode != 0:
-            raise ProvenanceError("a P5 implementation destination is missing")
-        for value in (relative.encode(), hashlib.sha256(completed.stdout).digest()):
+        document = root / relative
+        if not document.is_file():
+            raise ProvenanceError("a P6 implementation destination is missing")
+        for value in (relative.encode(), hashlib.sha256(document.read_bytes()).digest()):
             aggregate.update(len(value).to_bytes(8, "big"))
             aggregate.update(value)
     return "sha256:" + aggregate.hexdigest()
@@ -78,7 +73,7 @@ def check_provenance(root: Path) -> dict[str, object]:
     try:
         receipt: Any = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
-        raise ProvenanceError("P5 receipt is unreadable") from exc
+        raise ProvenanceError("P6 receipt is unreadable") from exc
     if not isinstance(receipt, dict) or set(receipt) != {
         "schema_version",
         "milestone",
@@ -86,49 +81,50 @@ def check_provenance(root: Path) -> dict[str, object]:
         "transformed_entries",
         "new_implementations",
     }:
-        raise ProvenanceError("P5 receipt shape is unsupported")
-    if receipt["schema_version"] != 1 or receipt["milestone"] != "P5":
-        raise ProvenanceError("P5 receipt identity is unsupported")
+        raise ProvenanceError("P6 receipt shape is unsupported")
+    if receipt["schema_version"] != 1 or receipt["milestone"] != "P6":
+        raise ProvenanceError("P6 receipt identity is unsupported")
     if receipt["source_basis"] != BASIS or receipt["transformed_entries"] != []:
-        raise ProvenanceError("P5 implementation source classification drifted")
+        raise ProvenanceError("P6 source classification drifted")
     entries = receipt["new_implementations"]
     if not isinstance(entries, list):
-        raise ProvenanceError("P5 implementation entries must be a list")
+        raise ProvenanceError("P6 implementation entries must be a list")
     destinations: set[str] = set()
     for entry in entries:
         if not isinstance(entry, dict) or set(entry) != FIELDS:
-            raise ProvenanceError("a P5 implementation entry has unsafe fields")
+            raise ProvenanceError("a P6 implementation entry has unsafe fields")
         if (
             entry["classification"] != "new_implementation"
             or entry["implementation_basis"] != BASIS
             or entry["gate_result"] != "not_a_source_migration"
         ):
-            raise ProvenanceError("a P5 implementation classification is invalid")
+            raise ProvenanceError("a P6 implementation classification is invalid")
         destination = _safe_path(entry["destination"])
         if destination in destinations:
-            raise ProvenanceError("P5 receipt destinations are duplicated")
+            raise ProvenanceError("P6 receipt destinations are duplicated")
         destinations.add(destination)
-    actual = _changed_files(root)
+    actual = changed_files(root)
     if destinations != actual:
-        raise ProvenanceError("P5 receipt does not cover the complete change inventory")
+        raise ProvenanceError("P6 receipt does not cover the complete change inventory")
     return {
         "schema_version": 1,
-        "gate": "p5_provenance_clean",
+        "gate": "p6_provenance_clean",
         "transformed_migration_count": 0,
         "new_implementation_count": len(destinations),
+        "source_basis": BASIS,
         "receipt_digest": "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest(),
-        "implementation_tree_digest": _framed_digest(root, actual),
+        "implementation_tree_digest": framed_digest(root, actual),
     }
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Validate complete P5 provenance.")
+    parser = argparse.ArgumentParser(description="Validate complete P6 provenance.")
     parser.add_argument("root", nargs="?", default=".")
     arguments = parser.parse_args(argv)
     try:
         result = check_provenance(Path(arguments.root).resolve())
     except (OSError, ProvenanceError) as exc:
-        print(f"P5 provenance check failed: {exc}", file=sys.stderr)
+        print(f"P6 provenance check failed: {exc}", file=sys.stderr)
         return 2
     print(json.dumps(result, indent=2, sort_keys=True))
     return 0

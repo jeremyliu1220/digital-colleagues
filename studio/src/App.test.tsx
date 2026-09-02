@@ -30,6 +30,16 @@ describe("P4 Studio workflow", () => {
       "Approve exact revision",
       "Reject exact revision",
       "Causal audit",
+      "Governance & access",
+      "Session role and membership revision",
+      "Enrollment status without plaintext",
+      "Recovery status without plaintext",
+      "Credential lifecycle status",
+      "Pending exact change approval",
+      "Reviewed exact change diff",
+      "Separate proposer and approver",
+      "Role-filtered navigation",
+      "Bounded safe audit export",
       "ACTIONRESULT",
     ]);
   });
@@ -46,7 +56,20 @@ describe("P4 Studio workflow", () => {
       "conflict",
       "cancelled",
       "error",
+      "expired",
+      "revoked",
+      "read-only",
     ]);
+  });
+
+  it("declares P6 governance controls without treating the UI as authority", () => {
+    expect(studioContract.controls).toContain("Governance & access");
+    expect(studioContract.controls).toContain("Pending exact change approval");
+    expect(studioContract.controls).toContain("Reviewed exact change diff");
+    expect(studioContract.controls).toContain("Role-filtered navigation");
+    expect(studioContract.controls).toContain("Bounded safe audit export");
+    expect(studioContract.states).toContain("revoked");
+    expect(studioContract.states).toContain("read-only");
   });
 
   it("declares every authority diff classification used by P5 review", () => {

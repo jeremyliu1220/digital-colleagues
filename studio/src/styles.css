@@ -274,6 +274,69 @@ button:disabled {
 .entry-ledger {
   border-top: 3px solid var(--accent);
 }
+
+.governance-view {
+  display: grid;
+  gap: 36px;
+}
+.governance-ledger article {
+  min-width: 0;
+}
+.governance-section {
+  display: grid;
+  gap: 18px;
+  padding-top: 28px;
+  border-top: 1px solid var(--line);
+}
+.governance-section > p {
+  max-width: 720px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.read-only-note {
+  color: var(--dim);
+  font-size: 0.7rem;
+}
+.credential-status-list {
+  display: grid;
+  gap: 1px;
+  padding: 0;
+  background: var(--line);
+  list-style: none;
+}
+.credential-status-list li {
+  display: grid;
+  grid-template-columns: 90px 100px 1fr;
+  gap: 12px;
+  padding: 12px;
+  background: var(--surface);
+  font-size: 0.68rem;
+}
+.credential-status-list span,
+.credential-status-list strong {
+  text-transform: uppercase;
+}
+.credential-status-list small {
+  color: var(--dim);
+}
+.governance-section .diff-list {
+  margin-top: 18px;
+  border-top: 1px solid var(--soft-line);
+}
+.governance-section .diff-list > div {
+  display: grid;
+  grid-template-columns: 90px 1fr 90px;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--soft-line);
+  font-size: 0.66rem;
+}
+.governance-section .diff-list span,
+.governance-section .diff-list em {
+  color: var(--dim);
+  font-style: normal;
+  text-transform: uppercase;
+}
 .entry-ledger div {
   display: grid;
   grid-template-columns: 90px 1fr;

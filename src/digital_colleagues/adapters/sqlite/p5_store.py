@@ -67,6 +67,17 @@ def _safe_json(value: object) -> str:
 
 
 class SQLiteP5Store(SQLiteP4Store):
+    def _authorize_draft_confirmation(
+        self,
+        connection: sqlite3.Connection,
+        *,
+        draft: ColleagueDraft,
+        actor: Principal,
+        change_decision_id: str | None,
+        occurred_at: datetime,
+    ) -> None:
+        del connection, draft, actor, change_decision_id, occurred_at
+
     def _require_admin(self, connection: sqlite3.Connection, actor: Principal) -> None:
         if actor.kind is not PrincipalKind.HUMAN or HumanRole.TENANT_ADMIN not in actor.roles:
             raise PermissionDeniedError("P5 builder mutation requires a durable tenant Admin")
@@ -736,6 +747,7 @@ class SQLiteP5Store(SQLiteP4Store):
         request_digest: str,
         confirmation_id: str,
         occurred_at: datetime,
+        change_decision_id: str | None = None,
     ) -> ConfirmationResult:
         stale = False
         result: ConfirmationResult | None = None
@@ -786,6 +798,13 @@ class SQLiteP5Store(SQLiteP4Store):
                 self._mark_stale(connection, draft, actor=actor, occurred_at=occurred_at)
                 stale = True
             else:
+                self._authorize_draft_confirmation(
+                    connection,
+                    draft=draft,
+                    actor=actor,
+                    change_decision_id=change_decision_id,
+                    occurred_at=occurred_at,
+                )
                 current_profile = self._get_record(
                     connection,
                     namespace,

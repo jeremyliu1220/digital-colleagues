@@ -128,8 +128,11 @@ def _session_data(session: AuthenticatedSession, csrf_token: str) -> dict[str, o
             "principal_id": session.principal.principal_id,
             "kind": session.principal.kind.value,
             "roles": [role.value for role in session.principal.roles],
+            "role_revision": session.role_revision,
         },
         "namespace": _namespace_data(session),
+        "membership_revision": session.membership_revision,
+        "session_revision": session.revision,
         "expires_at": datetime_to_z(session.expires_at),
         "csrf_token": csrf_token,
     }

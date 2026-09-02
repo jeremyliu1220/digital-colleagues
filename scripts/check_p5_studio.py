@@ -20,7 +20,8 @@ def check_studio(root: Path) -> dict[str, object]:
     contract = (root / "studio/src/studioContract.ts").read_text(encoding="utf-8")
     tests = (root / "studio/src/App.test.tsx").read_text(encoding="utf-8")
     required_app = (
-        'type View = "identity" | "builder"',
+        "type View =",
+        '"builder"',
         "Revisioned colleague builder",
         "DESCRIPTIVE PROFILE",
         "AUTHORITATIVE MANDATE",

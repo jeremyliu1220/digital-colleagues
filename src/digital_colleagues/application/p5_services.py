@@ -781,6 +781,7 @@ class RevisionedColleagueBuilderService:
         session: AuthenticatedSession,
         draft_id: str,
         request: ConfirmDraftRequest,
+        change_decision_id: str | None = None,
     ) -> ConfirmationResult:
         self._require_admin(session)
         binding = {
@@ -807,6 +808,7 @@ class RevisionedColleagueBuilderService:
                 "confirmation", draft_id, request.idempotency_key
             ),
             occurred_at=self._clock.now(),
+            change_decision_id=change_decision_id,
         )
 
 

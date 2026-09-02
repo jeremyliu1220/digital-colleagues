@@ -79,6 +79,7 @@ class P5PersistencePort(Protocol):
         request_digest: str,
         confirmation_id: str,
         occurred_at: datetime,
+        change_decision_id: str | None = None,
     ) -> ConfirmationResult: ...
 
     def admit_trigger(

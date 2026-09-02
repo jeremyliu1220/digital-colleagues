@@ -83,8 +83,8 @@ def check_migrations(root: Path) -> dict[str, object]:
     )
     baseline = cast(dict[str, Any], json.loads(_baseline(root, "migrations/manifest.json")))
     entries = manifest.get("migrations")
-    if not isinstance(entries, list) or len(entries) != 6:
-        raise MigrationError("migration manifest must contain exactly versions 1 through 6")
+    if not isinstance(entries, list) or len(entries) < 6:
+        raise MigrationError("migration manifest must retain versions 1 through 6")
     if entries[:5] != baseline.get("migrations"):
         raise MigrationError("immutable P0-P4 migration manifest entries changed")
     entry = entries[5]
@@ -107,14 +107,20 @@ def check_migrations(root: Path) -> dict[str, object]:
             json.dumps({"schema_version": 1, "migrations": entries[:5]}, indent=2) + "\n",
             encoding="utf-8",
         )
+        p5_directory = temporary / "p5"
+        p5_directory.mkdir()
+        for retained in entries[:6]:
+            shutil.copy2(root / "migrations" / retained["file"], p5_directory)
+        (p5_directory / "manifest.json").write_text(
+            json.dumps({"schema_version": 1, "migrations": entries[:6]}, indent=2) + "\n",
+            encoding="utf-8",
+        )
         clock = FixedClock(datetime(2026, 1, 1, tzinfo=UTC))
         upgraded_path = temporary / "upgrade.sqlite"
         v5_store = SQLiteP4Store(upgraded_path, migrations_path=v5_directory, clock=clock)
         v5_store.close()
-        upgraded = SQLiteP5Store(upgraded_path, migrations_path=root / "migrations", clock=clock)
-        fresh = SQLiteP5Store(
-            temporary / "fresh.sqlite", migrations_path=root / "migrations", clock=clock
-        )
+        upgraded = SQLiteP5Store(upgraded_path, migrations_path=p5_directory, clock=clock)
+        fresh = SQLiteP5Store(temporary / "fresh.sqlite", migrations_path=p5_directory, clock=clock)
         upgraded_schema = _schema(upgraded._connection)  # noqa: SLF001
         fresh_schema = _schema(fresh._connection)  # noqa: SLF001
         versions = [

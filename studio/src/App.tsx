@@ -3,7 +3,14 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 type Phase = "checking" | "bootstrap" | "builder" | "workspace";
-type View = "identity" | "builder" | "work" | "wake" | "proposals" | "audit";
+type View =
+  | "identity"
+  | "builder"
+  | "work"
+  | "wake"
+  | "proposals"
+  | "audit"
+  | "governance";
 type NoticeKind =
   | "success"
   | "validation"
@@ -12,13 +19,102 @@ type NoticeKind =
   | "stale"
   | "conflict"
   | "cancelled"
+  | "revoked"
   | "error";
 
 type Session = {
   authenticated: boolean;
   csrf_token: string;
   namespace: { tenant_id: string; scope: string; scope_id: string } | null;
-  principal: { principal_id: string; kind: string; roles: string[] };
+  principal: {
+    principal_id: string;
+    kind: string;
+    roles: string[];
+    role_revision?: number;
+  };
+  membership_revision?: number;
+  session_revision?: number;
+};
+
+type GovernanceCredential = {
+  credential_id: string;
+  kind: "enrollment" | "recovery";
+  state: "authorized" | "retrieved" | "consumed" | "revoked" | "expired";
+  target_principal_id: string | null;
+  target_role_revision: number | null;
+  target_membership_revision: number | null;
+  target_role: string | null;
+  colleague_ids: string[];
+  bootstrap_transition: boolean;
+  issued_at: string;
+  expires_at: string;
+  revision: number;
+};
+
+type GovernanceProposal = {
+  proposal_id: string;
+  change_kind: "draft" | "membership" | "admin_enrollment";
+  target_id: string;
+  target_revision: number;
+  canonical_digest: string;
+  proposer_principal_id: string;
+  issued_at: string;
+  expires_at: string;
+  state: "pending" | "approved" | "rejected" | "expired" | "stale" | "applied";
+  decision_id: string | null;
+  revision: number;
+};
+
+type GovernanceDecision = {
+  decision_id: string;
+  proposal_id: string;
+  proposal_revision: number;
+  proposal_digest: string;
+  choice: "approve" | "reject";
+  approver_principal_id: string;
+  valid_until: string;
+  consumed_at: string | null;
+  revision: number;
+};
+
+type GovernanceState = {
+  state: "ready";
+  session: {
+    session_id: string;
+    revision: number;
+    role_revision: number;
+    membership_revision: number;
+    expires_at: string;
+  };
+  membership: {
+    principal_id: string;
+    roles: string[];
+    colleague_ids: string[];
+    status: string;
+    role_revision: number;
+    membership_revision: number;
+    revision: number;
+  };
+  bootstrap_transition_state: "available" | "consumed";
+  credentials: GovernanceCredential[];
+  change_proposals: GovernanceProposal[];
+  change_decisions: GovernanceDecision[];
+  generated_at: string;
+};
+
+type ExportRecord = {
+  record_type: string;
+  record_id: string;
+  record_revision: number;
+  action: string;
+  result: string;
+  actor_principal_id: string;
+  authority_revision: string;
+  correlation_id: string;
+  causation_id: string;
+  occurred_at: string;
+  safe_digest: string;
+  safe_projection: Record<string, unknown>;
 };
 
 type Work = {
@@ -270,6 +366,7 @@ const navigation: { id: View; label: string; index: string }[] = [
   { id: "wake", label: "Wake cycles", index: "04" },
   { id: "proposals", label: "Proposal inbox", index: "05" },
   { id: "audit", label: "Causal audit", index: "06" },
+  { id: "governance", label: "Governance & access", index: "07" },
 ];
 
 function randomKey(prefix: string) {
@@ -311,7 +408,13 @@ function Notice({ kind, message }: { kind: NoticeKind; message: string }) {
   );
 }
 
-function Bootstrap({ onReady }: { onReady: (session: Session) => void }) {
+function Bootstrap({
+  onReady,
+  sessionNotice,
+}: {
+  onReady: (session: Session) => void;
+  sessionNotice?: string;
+}) {
   const [token, setToken] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -342,7 +445,7 @@ function Bootstrap({ onReady }: { onReady: (session: Session) => void }) {
         <span className="brand-mark">DC</span>
         <div>
           <strong>Digital Colleagues</strong>
-          <span>P5 local control plane</span>
+          <span>P6 local governance control plane</span>
         </div>
       </header>
       <section className="entry-composition" aria-labelledby="bootstrap-title">
@@ -375,6 +478,7 @@ function Bootstrap({ onReady }: { onReady: (session: Session) => void }) {
               </button>
             </div>
           </form>
+          {sessionNotice && <Notice kind="revoked" message={sessionNotice} />}
           {error && <Notice kind="rejection" message={error} />}
           <p className="boundary-copy">
             Loopback reduces host exposure. It is not authentication,
@@ -1381,16 +1485,20 @@ function Workspace({
   session,
   state,
   p5,
+  governance,
   csrf,
   refresh,
   refreshP5,
+  refreshGovernance,
 }: {
   session: Session;
   state: State;
   p5: P5State;
+  governance: GovernanceState;
   csrf: string;
   refresh: () => Promise<void>;
   refreshP5: () => Promise<void>;
+  refreshGovernance: () => Promise<void>;
 }) {
   const [view, setView] = useState<View>("identity");
   const [busy, setBusy] = useState("");
@@ -1402,6 +1510,7 @@ function Workspace({
     correlation_id: string;
     records: AuditRecord[];
   } | null>(null);
+  const [exported, setExported] = useState<ExportRecord[]>([]);
   const work = state.work || [];
   const proposals = state.proposals || [];
   const pending = proposals.filter(
@@ -1409,6 +1518,21 @@ function Workspace({
   );
   const profile = state.identity?.profile;
   const mandate = state.identity?.mandate;
+  const roles = governance.membership.roles;
+  const isAdmin = roles.includes("tenant_admin");
+  const isUser = roles.includes("colleague_user");
+  const isAuditor = roles.includes("auditor");
+  const canInteract = isAdmin || isUser;
+  const canExport = isAdmin || isAuditor;
+  const visibleNavigation = navigation.filter((item) => {
+    if (item.id === "builder") return isAdmin;
+    if (["work", "wake", "proposals"].includes(item.id)) return canInteract;
+    if (item.id === "audit") return canExport;
+    return true;
+  });
+  const decisionsByProposal = new Map(
+    governance.change_decisions.map((item) => [item.proposal_id, item]),
+  );
 
   async function mutate(label: string, action: () => Promise<void>) {
     setBusy(label);
@@ -1542,6 +1666,92 @@ function Workspace({
     }
   }
 
+  async function authorizeScopedEnrollment(role: "colleague_user" | "auditor") {
+    if (!session.namespace?.scope_id) return;
+    await mutate(`Authorize ${role} enrollment`, async () => {
+      await api(
+        `/governance/enrollments/${role === "auditor" ? "auditors" : "users"}`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            colleague_ids: [session.namespace?.scope_id],
+            idempotency_key: randomKey(`enroll-${role}`),
+          }),
+        },
+        csrf,
+      );
+      await refreshGovernance();
+    });
+  }
+
+  async function authorizeRecovery() {
+    await mutate("Authorize recovery", async () => {
+      await api(
+        "/governance/recovery",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            principal_id: governance.membership.principal_id,
+            idempotency_key: randomKey("recovery"),
+          }),
+        },
+        csrf,
+      );
+      await refreshGovernance();
+    });
+  }
+
+  async function decideChange(
+    proposal: GovernanceProposal,
+    choice: "approve" | "reject",
+  ) {
+    const scope = proposal.change_kind === "draft" ? "colleague" : "tenant";
+    await mutate(`${choice} exact governance change`, async () => {
+      await api(
+        `/governance/changes/${scope}/${proposal.proposal_id}/decision`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            proposal_revision: proposal.revision,
+            proposal_digest: proposal.canonical_digest,
+            choice,
+            idempotency_key: randomKey(`change-${choice}`),
+          }),
+        },
+        csrf,
+      );
+      await refreshGovernance();
+    });
+  }
+
+  async function exportAudit() {
+    const end = new Date();
+    const start = new Date(end.getTime() - 24 * 60 * 60 * 1000);
+    await mutate("Bounded audit export", async () => {
+      const result = await api<{ records: ExportRecord[] }>(
+        "/governance/audit/export",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            start_at: start.toISOString(),
+            end_at: end.toISOString(),
+            record_types: [
+              "profile",
+              "mandate",
+              "colleague_policy",
+              "effect_proposal",
+              "human_approval",
+            ],
+            limit: 100,
+          }),
+        },
+        csrf,
+      );
+      setExported(result.records);
+      await refreshGovernance();
+    });
+  }
+
   return (
     <div className="workspace-shell">
       <header className="workspace-header">
@@ -1549,7 +1759,7 @@ function Workspace({
           <span className="brand-mark">DC</span>
           <div>
             <strong>Digital Colleagues</strong>
-            <span>Local reference · P5</span>
+            <span>Local reference · P6 governance</span>
           </div>
         </div>
         <div className="runtime-status">
@@ -1561,12 +1771,12 @@ function Workspace({
         </div>
         <div className="principal-chip">
           <span>HUMAN</span>
-          <strong>tenant_admin</strong>
+          <strong>{roles.join(" · ")}</strong>
         </div>
       </header>
       <aside className="workspace-nav" aria-label="Golden Path navigation">
         <p className="nav-label">Golden Path</p>
-        {navigation.map((item) => (
+        {visibleNavigation.map((item) => (
           <button
             key={item.id}
             className={view === item.id ? "active" : ""}
@@ -1651,7 +1861,7 @@ function Workspace({
             </div>
           </section>
         )}
-        {view === "builder" && (
+        {view === "builder" && isAdmin && (
           <RevisionedBuilder
             p5={p5}
             csrf={csrf}
@@ -1660,7 +1870,7 @@ function Workspace({
             }}
           />
         )}
-        {view === "work" && (
+        {view === "work" && canInteract && (
           <section className="workspace-view" aria-labelledby="work-title">
             <div className="view-heading">
               <div>
@@ -1736,7 +1946,7 @@ function Workspace({
             )}
           </section>
         )}
-        {view === "wake" && (
+        {view === "wake" && canInteract && (
           <section className="workspace-view" aria-labelledby="wake-title">
             <div className="view-heading">
               <div>
@@ -1809,7 +2019,7 @@ function Workspace({
             )}
           </section>
         )}
-        {view === "proposals" && (
+        {view === "proposals" && canInteract && (
           <section className="workspace-view" aria-labelledby="proposal-title">
             <div className="view-heading">
               <div>
@@ -1906,7 +2116,7 @@ function Workspace({
             )}
           </section>
         )}
-        {view === "audit" && (
+        {view === "audit" && canExport && (
           <section className="workspace-view" aria-labelledby="audit-title">
             <div className="view-heading">
               <div>
@@ -1974,6 +2184,251 @@ function Workspace({
             )}
           </section>
         )}
+        {view === "governance" && (
+          <section
+            className="workspace-view governance-view"
+            aria-labelledby="governance-title"
+          >
+            <div className="view-heading">
+              <div>
+                <p className="section-kicker">Governance & access</p>
+                <h1 id="governance-title">Current authority, never cached.</h1>
+                <p>
+                  Server-side RBAC binds every action to a durable HUMAN,
+                  namespace, role revision, and membership revision.
+                </p>
+              </div>
+              <span className="revision-stamp">
+                SESSION · REV {governance.session.revision}
+              </span>
+            </div>
+
+            <div className="identity-ledger governance-ledger">
+              <article>
+                <span className="review-type authoritative">
+                  SESSION BINDING
+                </span>
+                <h2>{governance.membership.status}</h2>
+                <dl>
+                  <dt>Principal</dt>
+                  <dd>{governance.membership.principal_id}</dd>
+                  <dt>Role revision</dt>
+                  <dd>{governance.session.role_revision}</dd>
+                  <dt>Membership revision</dt>
+                  <dd>{governance.session.membership_revision}</dd>
+                  <dt>Session expiry</dt>
+                  <dd>{governance.session.expires_at}</dd>
+                  <dt>Colleague scope</dt>
+                  <dd>{governance.membership.colleague_ids.join(", ")}</dd>
+                </dl>
+              </article>
+              <article>
+                <span className="review-type descriptive">
+                  CREDENTIAL LIFECYCLE
+                </span>
+                <h2>
+                  Second Admin transition:{" "}
+                  {governance.bootstrap_transition_state}
+                </h2>
+                <p>
+                  Enrollment and recovery plaintext is retrieved once at the
+                  local operator boundary. Studio receives status only.
+                </p>
+                {governance.credentials.length === 0 ? (
+                  <p className="read-only-note">
+                    No credential lifecycle records are visible in this role and
+                    namespace.
+                  </p>
+                ) : (
+                  <ol className="credential-status-list">
+                    {governance.credentials.map((credential) => (
+                      <li key={credential.credential_id}>
+                        <span>{credential.kind}</span>
+                        <strong>{credential.state}</strong>
+                        <small>
+                          rev {credential.revision} · expires{" "}
+                          {credential.expires_at}
+                        </small>
+                        {credential.kind === "recovery" && (
+                          <small>
+                            target authority rev{" "}
+                            {credential.target_role_revision}/
+                            {credential.target_membership_revision}
+                          </small>
+                        )}
+                      </li>
+                    ))}
+                  </ol>
+                )}
+                {isAdmin && (
+                  <div className="button-cluster">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        void authorizeScopedEnrollment("colleague_user")
+                      }
+                      disabled={!!busy}
+                    >
+                      Authorize scoped User enrollment
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void authorizeScopedEnrollment("auditor")}
+                      disabled={!!busy}
+                    >
+                      Authorize scoped Auditor enrollment
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void authorizeRecovery()}
+                      disabled={!!busy}
+                    >
+                      Authorize recovery credential
+                    </button>
+                  </div>
+                )}
+              </article>
+            </div>
+
+            <section className="governance-section">
+              <span className="review-type authoritative">
+                PENDING CHANGE APPROVALS
+              </span>
+              {governance.change_proposals.length === 0 ? (
+                <p>No change proposals are visible in this authorized scope.</p>
+              ) : (
+                <div className="proposal-list">
+                  {governance.change_proposals.map((proposal) => {
+                    const decision = decisionsByProposal.get(
+                      proposal.proposal_id,
+                    );
+                    const reviewedDraft = p5.drafts?.find(
+                      (item) => item.draft.draft_id === proposal.target_id,
+                    )?.draft;
+                    const reviewedDiff = reviewedDraft?.diff.filter(
+                      (item) => item.classification !== "unchanged",
+                    );
+                    return (
+                      <article
+                        className="proposal-item"
+                        key={proposal.proposal_id}
+                      >
+                        <header>
+                          <div>
+                            <span className="state-label">
+                              {proposal.state}
+                            </span>
+                            <h2>{proposal.change_kind.replaceAll("_", " ")}</h2>
+                          </div>
+                          <strong>EXACT REV {proposal.target_revision}</strong>
+                        </header>
+                        <dl className="proposal-bindings">
+                          <dt>Canonical digest</dt>
+                          <dd>{proposal.canonical_digest}</dd>
+                          <dt>Proposer</dt>
+                          <dd>{proposal.proposer_principal_id}</dd>
+                          <dt>Approver</dt>
+                          <dd>
+                            {decision?.approver_principal_id ||
+                              "separate Admin required"}
+                          </dd>
+                          <dt>Expiry</dt>
+                          <dd>{proposal.expires_at}</dd>
+                          <dt>Refused / stale reason</dt>
+                          <dd>
+                            {proposal.state === "stale" ||
+                            proposal.state === "expired"
+                              ? `Exact ${proposal.state} binding cannot apply.`
+                              : "none"}
+                          </dd>
+                        </dl>
+                        {!!reviewedDiff?.length && (
+                          <div
+                            className="diff-list"
+                            aria-label="Reviewed exact diff"
+                          >
+                            {reviewedDiff.map((item) => (
+                              <div
+                                key={`${item.section}:${item.path}`}
+                                className={`diff-${item.classification}`}
+                              >
+                                <span>{item.section}</span>
+                                <strong>{item.path}</strong>
+                                <em>{item.classification}</em>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {isAdmin && proposal.state === "pending" && (
+                          <footer>
+                            <button
+                              type="button"
+                              className="reject-action"
+                              onClick={() =>
+                                void decideChange(proposal, "reject")
+                              }
+                            >
+                              Reject exact change
+                            </button>
+                            <button
+                              type="button"
+                              className="primary-action"
+                              onClick={() =>
+                                void decideChange(proposal, "approve")
+                              }
+                            >
+                              Approve exact change
+                            </button>
+                          </footer>
+                        )}
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+
+            <section className="governance-section">
+              <span className="review-type descriptive">SAFE AUDIT EXPORT</span>
+              <p>
+                Deterministically ordered, redacted safe projections; bounded to
+                100 records in the active colleague namespace. Private payload
+                content remains absent.
+              </p>
+              {canExport && (
+                <button
+                  type="button"
+                  className="primary-action"
+                  onClick={() => void exportAudit()}
+                  disabled={!!busy}
+                >
+                  Export bounded safe audit
+                </button>
+              )}
+              {exported.length > 0 && (
+                <ol className="work-list">
+                  {exported.map((record) => (
+                    <li
+                      key={`${record.record_type}:${record.record_id}:${record.record_revision}`}
+                    >
+                      <span className="state-label">{record.result}</span>
+                      <div>
+                        <h2>{record.record_type.replaceAll("_", " ")}</h2>
+                        <p>{record.safe_digest}</p>
+                      </div>
+                      <dl>
+                        <dt>Actor</dt>
+                        <dd>{record.actor_principal_id}</dd>
+                        <dt>Causation</dt>
+                        <dd>{record.causation_id}</dd>
+                      </dl>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </section>
+          </section>
+        )}
       </main>
       <footer className="workspace-footer">
         <span>
@@ -1981,7 +2436,7 @@ function Workspace({
             ? `WORKING · ${busy.toUpperCase()}`
             : "READY · KEYBOARD OPERABLE"}
         </span>
-        <span>Development complete, awaiting independent acceptance</span>
+        <span>P6 under verification · independent acceptance required</span>
       </footer>
     </div>
   );
@@ -1992,19 +2447,27 @@ export function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [state, setState] = useState<State>({ state: "empty" });
   const [p5, setP5] = useState<P5State>({ state: "empty" });
+  const [governance, setGovernance] = useState<GovernanceState | null>(null);
   const [fatal, setFatal] = useState("");
+  const [sessionNotice, setSessionNotice] = useState("");
 
   const loadP5State = useCallback(async () => {
     const next = await api<P5State>("/p5/studio/state");
     setP5(next);
   }, []);
+  const loadGovernance = useCallback(async () => {
+    const next = await api<GovernanceState>("/governance/state");
+    setGovernance(next);
+  }, []);
   const loadState = useCallback(async () => {
-    const [next, nextP5] = await Promise.all([
+    const [next, nextP5, nextGovernance] = await Promise.all([
       api<State>("/studio/state"),
       api<P5State>("/p5/studio/state"),
+      api<GovernanceState>("/governance/state"),
     ]);
     setState(next);
     setP5(nextP5);
+    setGovernance(nextGovernance);
     setPhase(next.state === "empty" ? "builder" : "workspace");
   }, []);
   const establish = useCallback(
@@ -2021,8 +2484,18 @@ export function App() {
       .then(async (resolved) => {
         if (active) await establish(resolved);
       })
-      .catch(() => {
-        if (active) setPhase("bootstrap");
+      .catch((cause) => {
+        if (active) {
+          if (
+            cause instanceof Error &&
+            !cause.message.toLowerCase().includes("authentication required")
+          ) {
+            setSessionNotice(
+              "Existing session expired, was revoked, or its role/membership binding changed. Use an Admin-authorized local recovery session.",
+            );
+          }
+          setPhase("bootstrap");
+        }
       });
     return () => {
       active = false;
@@ -2050,12 +2523,13 @@ export function App() {
   if (phase === "bootstrap")
     return (
       <Bootstrap
+        sessionNotice={sessionNotice}
         onReady={(resolved) => {
           void establish(resolved).catch((cause) => setFatal(String(cause)));
         }}
       />
     );
-  if (!session) return null;
+  if (!session || !governance) return null;
   if (phase === "builder")
     return (
       <Builder
@@ -2072,9 +2546,11 @@ export function App() {
       session={session}
       state={state}
       p5={p5}
+      governance={governance}
       csrf={session.csrf_token}
       refresh={loadState}
       refreshP5={loadP5State}
+      refreshGovernance={loadGovernance}
     />
   );
 }

@@ -385,7 +385,12 @@ class InitialColleagueService:
     def assign_work(
         self, *, session: AuthenticatedSession, request: WorkAssignmentRequest
     ) -> tuple[FiniteWork, bool]:
-        self._require_admin(session)
+        if session.principal.kind is not PrincipalKind.HUMAN:
+            raise PermissionDeniedError("finite work assignment requires a durable human")
+        require_authoritative_human_role(
+            session.principal,
+            accepted_roles=frozenset({HumanRole.TENANT_ADMIN, HumanRole.COLLEAGUE_USER}),
+        )
         namespace = session.colleague_namespace()
         mandate_payloads = self._store.list_record_payloads(namespace, "mandate")
         if len(mandate_payloads) != 1:

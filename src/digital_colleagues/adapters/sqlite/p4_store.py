@@ -245,6 +245,7 @@ class SQLiteP4Store(SQLiteRuntimeStore):
             row["principal_id"],
             Principal,
         )
+        available = set(row.keys())
         return AuthenticatedSession(
             tenant_id=row["tenant_id"],
             session_id=row["session_id"],
@@ -255,6 +256,10 @@ class SQLiteP4Store(SQLiteRuntimeStore):
             created_at=datetime_from_z(row["created_at"]),
             expires_at=datetime_from_z(row["expires_at"]),
             revision=row["revision"],
+            role_revision=row["role_revision"] if "role_revision" in available else 1,
+            membership_revision=(
+                row["membership_revision"] if "membership_revision" in available else 1
+            ),
             schema_version=row["schema_version"],
         )
 
@@ -449,8 +454,12 @@ class SQLiteP4Store(SQLiteRuntimeStore):
             )
         return True
 
+    def _authorize_work_assignment(self, connection: sqlite3.Connection, work: FiniteWork) -> None:
+        del connection, work
+
     def assign_work(self, work: FiniteWork, *, idempotency_key: str) -> tuple[FiniteWork, bool]:
         with self._transaction() as connection:
+            self._authorize_work_assignment(connection, work)
             replay = connection.execute(
                 """
                 SELECT record_id FROM replay_ledger

@@ -23,6 +23,17 @@ P5_OWNED_FILES = frozenset(
         "src/digital_colleagues/governance/policy.py",
     }
 )
+P6_OWNED_FILES = frozenset(
+    {
+        "src/digital_colleagues/adapters/sqlite/p6_store.py",
+        "src/digital_colleagues/api/p6_app.py",
+        "src/digital_colleagues/application/p6_contracts.py",
+        "src/digital_colleagues/application/p6_ports.py",
+        "src/digital_colleagues/application/p6_services.py",
+        "src/digital_colleagues/core/governance.py",
+        "src/digital_colleagues/governance/rbac.py",
+    }
+)
 BOUNDARIES = {
     "core": "src/digital_colleagues/core",
     "governance": "src/digital_colleagues/governance",
@@ -413,7 +424,7 @@ def check_architecture(root: Path) -> dict[str, object]:
     for boundary, relative_root in BOUNDARIES.items():
         for document in sorted((root / relative_root).rglob("*.py")):
             relative = document.relative_to(root).as_posix()
-            if relative in P5_OWNED_FILES:
+            if relative in P5_OWNED_FILES or relative in P6_OWNED_FILES:
                 continue
             counts["files_checked"] += 1
             try:

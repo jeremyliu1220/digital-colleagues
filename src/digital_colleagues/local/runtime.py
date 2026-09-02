@@ -10,12 +10,12 @@ from pathlib import Path
 
 from digital_colleagues.adapters.channel.reference import ReferenceChannel
 from digital_colleagues.adapters.intelligence.deterministic import DeterministicIntelligence
-from digital_colleagues.adapters.sqlite.p5_store import SQLiteP5Store
+from digital_colleagues.adapters.sqlite.p6_store import SQLiteP6Store
 from digital_colleagues.adapters.system.deterministic import StableHashIdentifier
 from digital_colleagues.api.p4_app import create_p4_app
 from digital_colleagues.api.p5_app import install_p5_routes
+from digital_colleagues.api.p6_app import install_p6_routes
 from digital_colleagues.application.p4_services import (
-    AuthenticationService,
     GovernedObservedIntelligence,
     InitialColleagueService,
     P4EvaluationService,
@@ -27,6 +27,15 @@ from digital_colleagues.application.p5_services import (
     PolicyGovernedIntelligence,
     RevisionedColleagueBuilderService,
 )
+from digital_colleagues.application.p6_services import (
+    P6AuditService,
+    P6AuthenticationService,
+    P6BuilderService,
+    P6ChangeService,
+    P6ColleagueService,
+    P6DispatchAuthorizer,
+    P6RuntimeController,
+)
 from digital_colleagues.local.security import (
     CredentialDigests,
     SecureTokenSource,
@@ -37,13 +46,15 @@ from digital_colleagues.local.security import (
 @dataclass(slots=True)
 class LocalRuntime:
     state_directory: Path
-    store: SQLiteP5Store
+    store: SQLiteP6Store
     clock: UtcClock
     digests: CredentialDigests
-    authentication: AuthenticationService
-    colleagues: InitialColleagueService
-    builder: RevisionedColleagueBuilderService
-    controller: P5RuntimeController
+    authentication: P6AuthenticationService
+    colleagues: P6ColleagueService
+    builder: P6BuilderService
+    controller: P6RuntimeController
+    changes: P6ChangeService
+    audit: P6AuditService
 
     def close(self) -> None:
         self.store.close()
@@ -52,7 +63,7 @@ class LocalRuntime:
 def build_local_runtime(state_directory: Path) -> LocalRuntime:
     state_directory.mkdir(mode=0o700, parents=True, exist_ok=True)
     clock = UtcClock()
-    store = SQLiteP5Store(
+    store = SQLiteP6Store(
         state_directory / "state.sqlite",
         migrations_path=Path(__file__).resolve().parents[3] / "migrations",
         clock=clock,
@@ -60,24 +71,30 @@ def build_local_runtime(state_directory: Path) -> LocalRuntime:
     digests = CredentialDigests()
     tokens = SecureTokenSource()
     identifiers = StableHashIdentifier("p4-local")
-    authentication = AuthenticationService(
+    authentication = P6AuthenticationService(
         store=store,
         clock=clock,
         tokens=tokens,
         digests=digests,
+        identifiers=identifiers,
         tenant_id="tenant-local",
     )
-    colleagues = InitialColleagueService(
+    inner_colleagues = InitialColleagueService(
         store=store,
         runtime_store=store,
         identifiers=identifiers,
         clock=clock,
     )
-    builder = RevisionedColleagueBuilderService(
+    colleagues = P6ColleagueService(
+        inner=inner_colleagues,
+        authentication=authentication,
+    )
+    inner_builder = RevisionedColleagueBuilderService(
         store=store,
         clock=clock,
         identifiers=identifiers,
     )
+    builder = P6BuilderService(inner=inner_builder, authentication=authentication)
     governed = GovernedObservedIntelligence(
         inner=DeterministicIntelligence(),
         store=store,
@@ -96,11 +113,34 @@ def build_local_runtime(state_directory: Path) -> LocalRuntime:
         clock=clock,
         identifiers=identifiers,
         digests=digests,
-        dispatch_authorizer=P5DispatchAuthorizer(store),
+        dispatch_authorizer=P6DispatchAuthorizer(
+            p5=P5DispatchAuthorizer(store),
+            store=store,
+            clock=clock,
+        ),
     )
-    controller = P5RuntimeController(
+    policy_controller = P5RuntimeController(
         inner=inner_controller,
         store=store,
+        clock=clock,
+        identifiers=identifiers,
+    )
+    controller = P6RuntimeController(
+        inner=policy_controller,
+        authentication=authentication,
+    )
+    changes = P6ChangeService(
+        store=store,
+        draft_store=store,
+        builder=inner_builder,
+        authentication=authentication,
+        clock=clock,
+        identifiers=identifiers,
+        digests=digests,
+    )
+    audit = P6AuditService(
+        store=store,
+        authentication=authentication,
         clock=clock,
         identifiers=identifiers,
     )
@@ -113,6 +153,8 @@ def build_local_runtime(state_directory: Path) -> LocalRuntime:
         colleagues=colleagues,
         builder=builder,
         controller=controller,
+        changes=changes,
+        audit=audit,
     )
 
 
@@ -123,22 +165,31 @@ def build_app_from_environment() -> object:
     runtime = build_local_runtime(state_directory)
     app = create_p4_app(
         authentication=runtime.authentication,
-        colleagues=runtime.colleagues,
+        colleagues=runtime.colleagues,  # type: ignore[arg-type]
         runtime=runtime.controller,  # type: ignore[arg-type]
         store=runtime.store,
         studio_store=runtime.store,
         expected_origin=expected_origin,
         secure_cookie=secure_cookie,
     )
-    app.title = "Digital Colleagues P5 revisioned builder API"
-    app.version = "0.0.0-p5"
+    app.title = "Digital Colleagues P6 governance hardening API"
+    app.version = "0.0.0-p6"
     install_p5_routes(
         app,
         authentication=runtime.authentication,
-        builder=runtime.builder,
+        builder=runtime.builder,  # type: ignore[arg-type]
         p5_store=runtime.store,
         expected_origin=expected_origin,
         evaluation=P4EvaluationService(runtime.store),
+    )
+    install_p6_routes(
+        app,
+        authentication=runtime.authentication,
+        changes=runtime.changes,
+        audit=runtime.audit,
+        store=runtime.store,
+        expected_origin=expected_origin,
+        secure_cookie=secure_cookie,
     )
     app.state.local_runtime = runtime
     return app

@@ -76,6 +76,8 @@ class AuthenticatedSession:
     created_at: datetime | None = None
     expires_at: datetime | None = None
     revision: int = 1
+    role_revision: int = 1
+    membership_revision: int = 1
     schema_version: int = SCHEMA_VERSION
 
     def __post_init__(self) -> None:
@@ -95,6 +97,9 @@ class AuthenticatedSession:
         if self.created_at is not None and self.expires_at is not None:
             if self.expires_at <= self.created_at:
                 raise ValueError("session expiry must follow creation")
+        require_revision(self.revision)
+        require_revision(self.role_revision, "role_revision")
+        require_revision(self.membership_revision, "membership_revision")
 
     def colleague_namespace(self) -> Namespace:
         if self.active_colleague_id is None:

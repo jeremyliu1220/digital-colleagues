@@ -48,6 +48,7 @@ from digital_colleagues.core.policy import (
     Weekday,
     WeeklyWindow,
 )
+from digital_colleagues.core.principals import HumanRole
 from digital_colleagues.core.serialization import contract_to_public_data
 
 
@@ -380,7 +381,11 @@ def install_p5_routes(
                 "mandate_revision": snapshot.mandate.revision,
                 "policy_revision": (0 if snapshot.policy is None else snapshot.policy.revision),
             },
-            "drafts": [_draft_data(item) for item in snapshot.drafts],
+            "drafts": (
+                []
+                if HumanRole.COLLEAGUE_USER in session.principal.roles
+                else [_draft_data(item) for item in snapshot.drafts]
+            ),
             "runtime_policy": {
                 "budget_count": snapshot.budget_count,
                 "run_state": (None if snapshot.run_state is None else snapshot.run_state.value),
