@@ -157,8 +157,27 @@ class P6RepositoryGateTests(unittest.TestCase):
                 "networks_remaining": 0,
                 "volumes_remaining": 0,
             }
+            escape_metric: dict[str, Any] = {
+                "status": "observed",
+                "numerator": 0,
+                "denominator": 1,
+                "rate": 0.0,
+                "reason": None,
+                "source": "durable synthetic candidate observations",
+                "safe_causal_references": ["correlation:synthetic-candidate"],
+                "evaluated_attempts": [
+                    {
+                        "candidate_id": "proposal:synthetic-candidate",
+                        "escaped": False,
+                    }
+                ],
+                "safe_refusal_count": 1,
+                "evidence_class": "synthetic",
+            }
             clean_results: dict[str, dict[str, Any]] = {
-                "compose_runtime": {"status": "passed", "cleanup": cleanup}
+                "compose_runtime": {"status": "passed", "cleanup": cleanup},
+                "abuse": {"unauthorized_proposal_escape_rate": escape_metric},
+                "golden": {"unauthorized_proposal_escape_rate": escape_metric},
             }
 
             def write(
@@ -205,6 +224,25 @@ class P6RepositoryGateTests(unittest.TestCase):
                             "cleanup": cleanup,
                         },
                         "unsafe": {"token": "forbidden-material"},
+                    }
+                ),
+                lambda: write(
+                    results={
+                        **clean_results,
+                        "golden": {
+                            "unauthorized_proposal_escape_rate": {
+                                **escape_metric,
+                                "numerator": 1,
+                                "rate": 1.0,
+                                "safe_refusal_count": 0,
+                                "evaluated_attempts": [
+                                    {
+                                        "candidate_id": "proposal:synthetic-candidate",
+                                        "escaped": True,
+                                    }
+                                ],
+                            }
+                        },
                     }
                 ),
             )

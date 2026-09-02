@@ -719,31 +719,36 @@ class SQLiteP4Store(SQLiteRuntimeStore):
             )
         return True
 
-    def proposal_candidate_counts(self, namespace: Namespace) -> tuple[int, int, tuple[str, ...]]:
+    def list_proposal_candidate_observations(
+        self, namespace: Namespace
+    ) -> tuple[ProposalCandidateObservation, ...]:
         rows = self._connection.execute(
             """
-            SELECT candidate_id, correlation_id
-            FROM p4_proposal_candidate_observations
+            SELECT * FROM p4_proposal_candidate_observations
             WHERE tenant_id = ? AND namespace_scope = ? AND namespace_scope_id = ?
             ORDER BY candidate_id
             """,
             _ns(namespace),
         ).fetchall()
+        return tuple(self._proposal_candidate_from_row(row) for row in rows)
+
+    def proposal_candidate_counts(self, namespace: Namespace) -> tuple[int, int, tuple[str, ...]]:
+        observations = self.list_proposal_candidate_observations(namespace)
         escaped = 0
-        for row in rows:
+        for observation in observations:
             proposal = self._connection.execute(
                 """
                 SELECT 1 FROM domain_records
                 WHERE tenant_id = ? AND namespace_scope = ? AND namespace_scope_id = ?
                   AND record_type = 'effect_proposal' AND record_id = ?
                 """,
-                (*_ns(namespace), row["candidate_id"]),
+                (*_ns(namespace), observation.candidate_id),
             ).fetchone()
             escaped += proposal is not None
         return (
-            len(rows),
+            len(observations),
             escaped,
-            tuple(sorted({row["correlation_id"] for row in rows})),
+            tuple(sorted({item.correlation_id for item in observations})),
         )
 
     def _records[RecordT](

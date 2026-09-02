@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 
 from digital_colleagues.application.errors import (
     PermissionDeniedError,
+    ReplayConflictError,
     StaleConflictError,
     ValidationError,
 )
@@ -161,7 +162,11 @@ class P6AuthenticationService(AuthenticationService):
         return current
 
     def bind_colleague(
-        self, session: AuthenticatedSession, colleague_id: str
+        self,
+        session: AuthenticatedSession,
+        colleague_id: str,
+        *,
+        idempotency_key: str | None = None,
     ) -> AuthenticatedSession:
         namespace = Namespace.colleague(session.tenant_id, colleague_id)
         self.authorize(
@@ -169,9 +174,37 @@ class P6AuthenticationService(AuthenticationService):
             action=AuthorizationAction.READ_COLLEAGUE,
             namespace=namespace,
         )
-        return self._store.set_active_colleague(
+        if idempotency_key is None:
+            return self._store.set_active_colleague(
+                session=session,
+                colleague_id=colleague_id,
+                occurred_at=self._clock.now(),
+            )
+        return self._governance_store.set_active_colleague_replay(
             session=session,
             colleague_id=colleague_id,
+            idempotency_key=idempotency_key,
+            request_digest=self._digests.digest("p6:set-active-colleague", colleague_id),
+            occurred_at=self._clock.now(),
+        )
+
+    def revoke_credential(
+        self,
+        *,
+        session: AuthenticatedSession,
+        credential_id: str,
+        idempotency_key: str,
+    ) -> GovernanceCredential:
+        self.authorize(
+            session=session,
+            action=AuthorizationAction.MANAGE_CREDENTIAL,
+            namespace=Namespace.tenant(session.tenant_id),
+        )
+        return self._governance_store.revoke_credential(
+            session=session,
+            credential_id=credential_id,
+            idempotency_key=idempotency_key,
+            request_digest=self._digests.digest("p6:revoke-credential", credential_id),
             occurred_at=self._clock.now(),
         )
 
@@ -191,13 +224,28 @@ class P6AuthenticationService(AuthenticationService):
                 raise ValidationError("Admin enrollment must use the fixed tenant scope")
         elif "*" in request.colleague_ids:
             raise ValidationError("non-Admin enrollment requires exact colleague scope")
-        now = self._clock.now()
         credential_id = self._identifiers.derive(
             "credential", "enrollment", session.principal.principal_id, request.idempotency_key
         )
         bootstrap_transition = (
             request.role is HumanRole.TENANT_ADMIN and request.approved_change_decision_id is None
         )
+        existing = self._governance_store.find_governance_credential(
+            tenant_id=session.tenant_id,
+            credential_id=credential_id,
+        )
+        if existing is not None:
+            if (
+                existing.kind is not CredentialKind.ENROLLMENT
+                or existing.issued_by_principal_id != session.principal.principal_id
+                or existing.target_role is not request.role
+                or existing.colleague_ids != request.colleague_ids
+                or existing.bootstrap_transition != bootstrap_transition
+                or existing.change_decision_id != request.approved_change_decision_id
+            ):
+                raise ReplayConflictError("enrollment idempotency key was rebound")
+            return existing
+        now = self._clock.now()
         credential = GovernanceCredential(
             namespace=Namespace.tenant(session.tenant_id),
             credential_id=credential_id,
@@ -231,15 +279,27 @@ class P6AuthenticationService(AuthenticationService):
             action=AuthorizationAction.MANAGE_CREDENTIAL,
             namespace=Namespace.tenant(session.tenant_id),
         )
+        credential_id = self._identifiers.derive(
+            "credential", "recovery", session.principal.principal_id, request.idempotency_key
+        )
+        existing = self._governance_store.find_governance_credential(
+            tenant_id=session.tenant_id,
+            credential_id=credential_id,
+        )
+        if existing is not None:
+            if (
+                existing.kind is not CredentialKind.RECOVERY
+                or existing.issued_by_principal_id != session.principal.principal_id
+                or existing.target_principal_id != request.principal_id
+            ):
+                raise ReplayConflictError("recovery idempotency key was rebound")
+            return existing
         target = self._governance_store.membership_for_principal(
             session.tenant_id, request.principal_id
         )
         if target.status is not MembershipStatus.ACTIVE:
             raise PermissionDeniedError("recovery target was refused")
         now = self._clock.now()
-        credential_id = self._identifiers.derive(
-            "credential", "recovery", request.principal_id, request.idempotency_key
-        )
         credential = GovernanceCredential(
             namespace=Namespace.tenant(session.tenant_id),
             credential_id=credential_id,
@@ -444,6 +504,20 @@ class P6ChangeService:
             action=AuthorizationAction.PROPOSE_CHANGE,
             namespace=namespace,
         )
+        existing = self._store.find_change_proposal_replay(
+            namespace=namespace,
+            proposer_principal_id=session.principal.principal_id,
+            idempotency_key=idempotency_key,
+        )
+        if existing is not None:
+            if (
+                existing.change_kind is not ChangeKind.DRAFT
+                or existing.target_id != draft_id
+                or existing.target_revision != expected_revision
+                or existing.canonical_digest != expected_digest
+            ):
+                raise ReplayConflictError("change proposal idempotency key was rebound")
+            return existing
         draft = self._draft_store.get_draft(namespace, draft_id)
         if (
             draft.state.value != "reviewable"
@@ -499,6 +573,21 @@ class P6ChangeService:
             action=AuthorizationAction.PROPOSE_CHANGE,
             namespace=namespace,
         )
+        existing = self._store.find_change_proposal_replay(
+            namespace=namespace,
+            proposer_principal_id=session.principal.principal_id,
+            idempotency_key=idempotency_key,
+        )
+        if existing is not None:
+            if (
+                existing.change_kind is not ChangeKind.MEMBERSHIP
+                or existing.target_id != target_principal_id
+                or existing.proposed_role is not role
+                or existing.proposed_status is not status
+                or existing.proposed_colleague_ids != colleague_ids
+            ):
+                raise ReplayConflictError("change proposal idempotency key was rebound")
+            return existing
         target = self._store.membership_for_principal(session.tenant_id, target_principal_id)
         now = self._clock.now()
         digest = governance_change_digest(
@@ -548,6 +637,15 @@ class P6ChangeService:
             action=AuthorizationAction.PROPOSE_CHANGE,
             namespace=namespace,
         )
+        existing = self._store.find_change_proposal_replay(
+            namespace=namespace,
+            proposer_principal_id=session.principal.principal_id,
+            idempotency_key=idempotency_key,
+        )
+        if existing is not None:
+            if existing.change_kind is not ChangeKind.ADMIN_ENROLLMENT:
+                raise ReplayConflictError("change proposal idempotency key was rebound")
+            return existing
         now = self._clock.now()
         target_id = self._identifiers.derive("enrollment", "admin", idempotency_key)
         digest = governance_change_digest(
@@ -599,6 +697,20 @@ class P6ChangeService:
             action=AuthorizationAction.DECIDE_CHANGE,
             namespace=namespace,
         )
+        replay = self._store.find_change_decision_replay(
+            namespace=namespace,
+            approver_principal_id=session.principal.principal_id,
+            idempotency_key=request.idempotency_key,
+        )
+        if replay is not None:
+            if (
+                replay.proposal_id != proposal_id
+                or replay.proposal_revision != request.proposal_revision
+                or replay.proposal_digest != request.proposal_digest
+                or replay.choice is not request.choice
+            ):
+                raise ReplayConflictError("change decision idempotency key was rebound")
+            return self._store.get_change_proposal(namespace, proposal_id), replay
         proposal = self._store.get_change_proposal(namespace, proposal_id)
         now = self._clock.now()
         if now >= proposal.expires_at:
@@ -682,6 +794,7 @@ class P6ChangeService:
         session: AuthenticatedSession,
         proposal_id: str,
         decision_id: str,
+        idempotency_key: str,
     ) -> Membership:
         namespace = Namespace.tenant(session.tenant_id)
         self._authentication.authorize(
@@ -712,7 +825,11 @@ class P6ChangeService:
         return self._store.apply_membership_change(
             proposal=proposal,
             decision_id=decision_id,
-            actor=session.principal,
+            session=session,
+            idempotency_key=idempotency_key,
+            request_digest=self._digests.digest(
+                "change:membership-apply", f"{proposal_id}:{decision_id}"
+            ),
             occurred_at=self._clock.now(),
         )
 

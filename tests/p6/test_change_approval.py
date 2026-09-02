@@ -18,6 +18,7 @@ from digital_colleagues.adapters.system.deterministic import FixedClock
 from digital_colleagues.application.errors import (
     ConflictError,
     PermissionDeniedError,
+    ReplayConflictError,
     StaleConflictError,
 )
 from digital_colleagues.application.p4_contracts import InitialColleagueRequest
@@ -292,6 +293,7 @@ class P6ChangeApprovalTests(unittest.TestCase):
                 session=first.session,
                 proposal_id=proposal.proposal_id,
                 decision_id=decision.decision_id,
+                idempotency_key="apply-user-change",
             )
             self.assertEqual(updated.roles, (HumanRole.AUDITOR,))
             self.assertEqual(updated.membership_revision, 2)
@@ -302,6 +304,7 @@ class P6ChangeApprovalTests(unittest.TestCase):
                     session=first.session,
                     proposal_id=proposal.proposal_id,
                     decision_id=decision.decision_id,
+                    idempotency_key="apply-user-change-again",
                 )
 
             api = TestClient(harness.app())
@@ -321,6 +324,226 @@ class P6ChangeApprovalTests(unittest.TestCase):
             )
             self.assertEqual(injection.status_code, 422, injection.text)
             harness.store.close()
+
+    def test_change_replay_and_membership_apply_binding_survive_restart(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="digital-colleagues-p6-change-replay-") as name:
+            database = Path(name) / "state.sqlite"
+            harness = build_harness(database)
+            first_cookie, first = bootstrap(harness)
+            _, second = enroll(
+                harness,
+                issuer=first,
+                role=HumanRole.TENANT_ADMIN,
+                scopes=("*",),
+                key="change-replay-second-admin",
+            )
+            _, user = enroll(
+                harness,
+                issuer=first,
+                role=HumanRole.COLLEAGUE_USER,
+                scopes=("colleague:alpha",),
+                key="change-replay-user",
+            )
+            proposal = harness.changes.propose_membership(
+                session=first.session,
+                target_principal_id=user.membership.principal_id,
+                role=HumanRole.AUDITOR,
+                status=MembershipStatus.ACTIVE,
+                colleague_ids=("colleague:alpha",),
+                idempotency_key="membership-proposal-replay",
+            )
+            harness.store.close()
+
+            restarted = build_harness(database, now=NOW + timedelta(minutes=1))
+            proposal_replay = restarted.changes.propose_membership(
+                session=first.session,
+                target_principal_id=user.membership.principal_id,
+                role=HumanRole.AUDITOR,
+                status=MembershipStatus.ACTIVE,
+                colleague_ids=("colleague:alpha",),
+                idempotency_key="membership-proposal-replay",
+            )
+            self.assertEqual(proposal_replay, proposal)
+            with self.assertRaises(ReplayConflictError):
+                restarted.changes.propose_membership(
+                    session=first.session,
+                    target_principal_id=user.membership.principal_id,
+                    role=HumanRole.AUDITOR,
+                    status=MembershipStatus.ACTIVE,
+                    colleague_ids=("colleague:beta",),
+                    idempotency_key="membership-proposal-replay",
+                )
+            client = TestClient(restarted.app())
+            client.cookies.set("dc_session", first_cookie)
+            headers = self.headers(first.csrf_token)
+            proposal_body = {
+                "target_principal_id": user.membership.principal_id,
+                "proposed_role": "auditor",
+                "proposed_status": "active",
+                "proposed_colleague_ids": ["colleague:alpha"],
+                "idempotency_key": "membership-proposal-replay",
+            }
+            api_proposal = client.post(
+                "/governance/memberships/proposals",
+                headers=headers,
+                json=proposal_body,
+            )
+            self.assertEqual(api_proposal.status_code, 201, api_proposal.text)
+            api_proposal_replay = client.post(
+                "/governance/memberships/proposals",
+                headers=headers,
+                json=proposal_body,
+            )
+            self.assertEqual(api_proposal_replay.status_code, 201, api_proposal_replay.text)
+            self.assertEqual(api_proposal_replay.json(), api_proposal.json())
+            api_proposal_rebound = client.post(
+                "/governance/memberships/proposals",
+                headers=headers,
+                json={**proposal_body, "proposed_colleague_ids": ["colleague:beta"]},
+            )
+            self.assertEqual(api_proposal_rebound.status_code, 409, api_proposal_rebound.text)
+            decision_request = ChangeDecisionRequest(
+                proposal_revision=proposal.revision,
+                proposal_digest=proposal.canonical_digest,
+                choice=ChangeChoice.APPROVE,
+                idempotency_key="membership-decision-replay",
+            )
+            approved, decision = restarted.changes.decide(
+                session=second.session_grant.session,
+                namespace=proposal.namespace,
+                proposal_id=proposal.proposal_id,
+                request=decision_request,
+            )
+            approved_replay, decision_replay = restarted.changes.decide(
+                session=second.session_grant.session,
+                namespace=proposal.namespace,
+                proposal_id=proposal.proposal_id,
+                request=decision_request,
+            )
+            self.assertEqual(approved_replay, approved)
+            self.assertEqual(decision_replay, decision)
+            with self.assertRaises(ReplayConflictError):
+                restarted.changes.decide(
+                    session=second.session_grant.session,
+                    namespace=proposal.namespace,
+                    proposal_id=proposal.proposal_id,
+                    request=ChangeDecisionRequest(
+                        proposal_revision=proposal.revision,
+                        proposal_digest=proposal.canonical_digest,
+                        choice=ChangeChoice.REJECT,
+                        idempotency_key="membership-decision-replay",
+                    ),
+                )
+            second_client = TestClient(restarted.app())
+            second_client.cookies.set("dc_session", second.session_grant.session_credential)
+            second_headers = self.headers(second.session_grant.csrf_token)
+            decision_body = {
+                "proposal_revision": proposal.revision,
+                "proposal_digest": proposal.canonical_digest,
+                "choice": "approve",
+                "idempotency_key": "membership-decision-replay",
+            }
+            api_decision = second_client.post(
+                f"/governance/changes/tenant/{proposal.proposal_id}/decision",
+                headers=second_headers,
+                json=decision_body,
+            )
+            self.assertEqual(api_decision.status_code, 201, api_decision.text)
+            api_decision_replay = second_client.post(
+                f"/governance/changes/tenant/{proposal.proposal_id}/decision",
+                headers=second_headers,
+                json=decision_body,
+            )
+            self.assertEqual(api_decision_replay.status_code, 201, api_decision_replay.text)
+            self.assertEqual(api_decision_replay.json(), api_decision.json())
+            api_decision_rebound = second_client.post(
+                f"/governance/changes/tenant/{proposal.proposal_id}/decision",
+                headers=second_headers,
+                json={**decision_body, "choice": "reject"},
+            )
+            self.assertEqual(api_decision_rebound.status_code, 409, api_decision_rebound.text)
+            apply_body = {
+                "decision_id": decision.decision_id,
+                "idempotency_key": "membership-apply-replay",
+            }
+            applied = client.post(
+                f"/governance/changes/tenant/{proposal.proposal_id}/apply",
+                headers=headers,
+                json=apply_body,
+            )
+            self.assertEqual(applied.status_code, 200, applied.text)
+            first_result = applied.json()
+            replayed = client.post(
+                f"/governance/changes/tenant/{proposal.proposal_id}/apply",
+                headers=headers,
+                json=apply_body,
+            )
+            self.assertEqual(replayed.status_code, 200, replayed.text)
+            self.assertEqual(replayed.json(), first_result)
+            rebound = client.post(
+                f"/governance/changes/tenant/{proposal.proposal_id}/apply",
+                headers=headers,
+                json={
+                    "decision_id": "decision:other",
+                    "idempotency_key": "membership-apply-replay",
+                },
+            )
+            self.assertEqual(rebound.status_code, 409, rebound.text)
+            self.assertEqual(
+                restarted.store.membership_for_principal(
+                    "tenant-local", user.membership.principal_id
+                ).membership_revision,
+                2,
+            )
+            binding = restarted.store._connection.execute(  # noqa: SLF001
+                "SELECT idempotency_key, request_digest FROM p4_mutation_replay "
+                "WHERE action = 'p6:apply-membership'"
+            ).fetchone()
+            self.assertEqual(binding["idempotency_key"], "membership-apply-replay")
+            self.assertTrue(binding["request_digest"].startswith("sha256:"))
+            self.assertEqual(
+                restarted.store._connection.execute(  # noqa: SLF001
+                    "SELECT COUNT(*) FROM p6_change_proposals"
+                ).fetchone()[0],
+                1,
+            )
+            self.assertEqual(
+                restarted.store._connection.execute(  # noqa: SLF001
+                    "SELECT COUNT(*) FROM p6_change_decisions"
+                ).fetchone()[0],
+                1,
+            )
+            self.assertEqual(
+                restarted.store._connection.execute(  # noqa: SLF001
+                    "SELECT COUNT(*) FROM p6_governance_audit WHERE action = 'membership_changed'"
+                ).fetchone()[0],
+                1,
+            )
+            restarted.store.close()
+
+            final = build_harness(database, now=NOW + timedelta(minutes=2))
+            final_client = TestClient(final.app())
+            final_client.cookies.set("dc_session", first_cookie)
+            after_restart = final_client.post(
+                f"/governance/changes/tenant/{proposal.proposal_id}/apply",
+                headers=headers,
+                json=apply_body,
+            )
+            self.assertEqual(after_restart.status_code, 200, after_restart.text)
+            self.assertEqual(after_restart.json(), first_result)
+            self.assertEqual(
+                final.store.membership_for_principal(
+                    "tenant-local", user.membership.principal_id
+                ).membership_revision,
+                2,
+            )
+            self.assertEqual(
+                final.store._connection.execute(  # noqa: SLF001
+                    "SELECT COUNT(*) FROM p6_governance_audit WHERE action = 'membership_changed'"
+                ).fetchone()[0],
+                1,
+            )
+            final.store.close()
 
     def test_expired_and_rejected_changes_are_durable_terminal_refusals(self) -> None:
         with tempfile.TemporaryDirectory(prefix="digital-colleagues-p6-terminal-") as name:
@@ -399,6 +622,7 @@ class P6ChangeApprovalTests(unittest.TestCase):
                     session=first.session,
                     proposal_id=rejected.proposal_id,
                     decision_id=rejection.decision_id,
+                    idempotency_key="apply-rejected-change",
                 )
 
             first_candidate = harness.changes.propose_membership(
@@ -449,6 +673,7 @@ class P6ChangeApprovalTests(unittest.TestCase):
                         session=first.session,
                         proposal_id=first_candidate.proposal_id,
                         decision_id=first_decision.decision_id,
+                        idempotency_key="apply-first-candidate",
                     )
             rolled_back = harness.store.membership_for_principal(
                 "tenant-local", user.membership.principal_id
@@ -466,12 +691,14 @@ class P6ChangeApprovalTests(unittest.TestCase):
                 session=first.session,
                 proposal_id=first_candidate.proposal_id,
                 decision_id=first_decision.decision_id,
+                idempotency_key="apply-first-candidate",
             )
             with self.assertRaises(StaleConflictError):
                 harness.changes.apply_membership(
                     session=first.session,
                     proposal_id=stale_candidate.proposal_id,
                     decision_id=stale_decision.decision_id,
+                    idempotency_key="apply-stale-candidate",
                 )
             self.assertEqual(
                 harness.store.get_change_proposal(

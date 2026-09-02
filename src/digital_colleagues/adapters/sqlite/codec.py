@@ -11,6 +11,7 @@ from enum import Enum
 from typing import Any
 
 from digital_colleagues.application.errors import PersistenceError
+from digital_colleagues.application.p4_contracts import AuthenticatedSession
 from digital_colleagues.core.authority import (
     CapabilityGrant,
     Constraint,
@@ -41,6 +42,13 @@ from digital_colleagues.core.effects import (
     EffectProposal,
     EffectProposalState,
     HumanApprovalDecision,
+)
+from digital_colleagues.core.governance import (
+    CredentialKind,
+    CredentialState,
+    GovernanceCredential,
+    Membership,
+    MembershipStatus,
 )
 from digital_colleagues.core.namespace import Namespace, NamespaceScope
 from digital_colleagues.core.policy import (
@@ -104,6 +112,9 @@ _DATACLASSES: tuple[type[object], ...] = (
     ExplicitDefault,
     DraftDiffItem,
     ColleagueDraft,
+    AuthenticatedSession,
+    GovernanceCredential,
+    Membership,
     CompletionEvidence,
     FiniteWork,
     Responsibility,
@@ -154,6 +165,9 @@ _ENUMS: tuple[type[Enum], ...] = (
     DiffSection,
     DiffClassification,
     DefaultSource,
+    CredentialKind,
+    CredentialState,
+    MembershipStatus,
 )
 _DATACLASS_REGISTRY = {value.__name__: value for value in _DATACLASSES}
 _ENUM_REGISTRY = {value.__name__: value for value in _ENUMS}

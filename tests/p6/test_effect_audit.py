@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from datetime import timedelta
 from pathlib import Path
+from typing import cast
 
 from fastapi.testclient import TestClient
 
@@ -26,6 +27,11 @@ from digital_colleagues.core.governance import (
     MembershipStatus,
 )
 from digital_colleagues.core.principals import HumanRole
+from scripts.check_p6_abuse import (
+    observe_unauthorized_proposal_escape,
+    require_zero_unauthorized_escape,
+)
+from scripts.p6_gate_support import FocusedGateError
 from tests.p3.fixtures import T0, T2, T3, admin, approval_request, namespace, service, user
 from tests.p3.scenario import prepare_proposal
 from tests.p6.fixtures import NOW, ROOT, build_harness, initial_request
@@ -77,6 +83,27 @@ def _effect_store(
 
 
 class P6EffectAuditTests(unittest.TestCase):
+    def test_escape_metric_is_observed_and_fault_injection_fails_closed(self) -> None:
+        observed = observe_unauthorized_proposal_escape()
+        require_zero_unauthorized_escape(observed)
+        self.assertEqual(observed["status"], "observed")
+        self.assertEqual(observed["numerator"], 0)
+        self.assertEqual(observed["denominator"], 1)
+        self.assertEqual(observed["safe_refusal_count"], 1)
+        attempts = cast(list[dict[str, object]], observed["evaluated_attempts"])
+        self.assertEqual(len(attempts), 1)
+        self.assertFalse(attempts[0]["escaped"])
+        self.assertTrue(observed["safe_causal_references"])
+
+        escaped = observe_unauthorized_proposal_escape(fault_escape=True)
+        self.assertEqual(escaped["numerator"], 1)
+        self.assertEqual(escaped["denominator"], 1)
+        self.assertEqual(escaped["safe_refusal_count"], 0)
+        escaped_attempts = cast(list[dict[str, object]], escaped["evaluated_attempts"])
+        self.assertTrue(escaped_attempts[0]["escaped"])
+        with self.assertRaisesRegex(FocusedGateError, "unauthorized proposal candidate escaped"):
+            require_zero_unauthorized_escape(escaped)
+
     def test_effect_dispatch_revalidates_current_membership_and_expiry(self) -> None:
         with tempfile.TemporaryDirectory(prefix="digital-colleagues-p6-effect-") as name:
             store, identifiers, decision = _effect_store(Path(name) / "state.sqlite")

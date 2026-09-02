@@ -792,6 +792,8 @@ class RevisionedColleagueBuilderService:
             "expected_base_policy_revision": request.expected_base_policy_revision,
             "expected_canonical_digest": request.expected_canonical_digest,
         }
+        if change_decision_id is not None:
+            binding["change_decision_id"] = change_decision_id
         request_digest = _sha256(_canonical_json(binding))
         return self._store.confirm_draft(
             namespace=session.colleague_namespace(),

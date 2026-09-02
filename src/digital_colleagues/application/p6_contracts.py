@@ -110,12 +110,12 @@ class P6StudioSnapshot:
     credentials: tuple[GovernanceCredential, ...]
     change_proposals: tuple[ChangeProposal, ...]
     change_decisions: tuple[ChangeDecision, ...]
-    bootstrap_transition_state: str
+    bootstrap_transition_state: str | None
     generated_at: datetime
     schema_version: int = SCHEMA_VERSION
 
     def __post_init__(self) -> None:
         require_schema_version(self.schema_version)
         self.session.principal.namespace.require_exact(self.membership.namespace)
-        if self.bootstrap_transition_state not in {"available", "consumed"}:
+        if self.bootstrap_transition_state not in {None, "available", "consumed"}:
             raise ValueError("bootstrap transition state is unsupported")

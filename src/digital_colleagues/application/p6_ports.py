@@ -28,6 +28,16 @@ class GovernancePersistencePort(Protocol):
         self, *, credential_digest: str, evaluated_at: datetime
     ) -> tuple[AuthenticatedSession, Membership]: ...
 
+    def set_active_colleague_replay(
+        self,
+        *,
+        session: AuthenticatedSession,
+        colleague_id: str,
+        idempotency_key: str,
+        request_digest: str,
+        occurred_at: datetime,
+    ) -> AuthenticatedSession: ...
+
     def membership_for_principal(self, tenant_id: str, principal_id: str) -> Membership: ...
 
     def authorize_enrollment(
@@ -43,6 +53,10 @@ class GovernancePersistencePort(Protocol):
         credential: GovernanceCredential,
         issuer_membership: Membership,
     ) -> GovernanceCredential: ...
+
+    def find_governance_credential(
+        self, *, tenant_id: str, credential_id: str
+    ) -> GovernanceCredential | None: ...
 
     def claim_credential_secret(
         self,
@@ -61,9 +75,10 @@ class GovernancePersistencePort(Protocol):
     def revoke_credential(
         self,
         *,
-        tenant_id: str,
+        session: AuthenticatedSession,
         credential_id: str,
-        actor: Principal,
+        idempotency_key: str,
+        request_digest: str,
         occurred_at: datetime,
     ) -> GovernanceCredential: ...
 
@@ -87,11 +102,27 @@ class GovernancePersistencePort(Protocol):
 
     def create_change_proposal(self, proposal: ChangeProposal) -> ChangeProposal: ...
 
+    def find_change_proposal_replay(
+        self,
+        *,
+        namespace: Namespace,
+        proposer_principal_id: str,
+        idempotency_key: str,
+    ) -> ChangeProposal | None: ...
+
     def get_change_proposal(self, namespace: Namespace, proposal_id: str) -> ChangeProposal: ...
 
     def decide_change(
         self, *, proposal: ChangeProposal, decision: ChangeDecision
     ) -> tuple[ChangeProposal, ChangeDecision]: ...
+
+    def find_change_decision_replay(
+        self,
+        *,
+        namespace: Namespace,
+        approver_principal_id: str,
+        idempotency_key: str,
+    ) -> ChangeDecision | None: ...
 
     def expire_change_proposal(
         self,
@@ -118,7 +149,9 @@ class GovernancePersistencePort(Protocol):
         *,
         proposal: ChangeProposal,
         decision_id: str,
-        actor: Principal,
+        session: AuthenticatedSession,
+        idempotency_key: str,
+        request_digest: str,
         occurred_at: datetime,
     ) -> Membership: ...
 

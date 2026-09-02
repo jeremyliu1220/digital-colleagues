@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Awaitable, Callable
 from datetime import datetime
 from typing import Self
@@ -13,7 +14,11 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from digital_colleagues.api.p4_app import SESSION_COOKIE
-from digital_colleagues.application.errors import PermissionDeniedError
+from digital_colleagues.application.errors import (
+    ConflictError,
+    PermissionDeniedError,
+    ReplayConflictError,
+)
 from digital_colleagues.application.p4_contracts import AuthenticatedSession
 from digital_colleagues.application.p6_contracts import (
     ChangeDecisionRequest,
@@ -63,6 +68,11 @@ class RecoveryMutation(_StrictMutation):
 
 class ActiveColleagueMutation(_StrictMutation):
     colleague_id: str = Field(min_length=1, max_length=128)
+    idempotency_key: str = Field(min_length=1, max_length=128)
+
+
+class IdempotencyMutation(_StrictMutation):
+    idempotency_key: str = Field(min_length=1, max_length=128)
 
 
 class DraftChangeMutation(_StrictMutation):
@@ -170,6 +180,42 @@ def install_p6_routes(
             csrf_token=request.headers.get("x-csrf-token"),
             expected_origin=expected_origin,
         )
+
+    def replayable(
+        *,
+        session: AuthenticatedSession,
+        action: str,
+        idempotency_key: str,
+        binding: dict[str, object],
+        operation: Callable[[], dict[str, object]],
+    ) -> dict[str, object]:
+        canonical = json.dumps(binding, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+        try:
+            replay, request_digest = authentication.mutation_replay(
+                session=session,
+                action=action,
+                idempotency_key=idempotency_key,
+                request_binding=canonical,
+            )
+        except ConflictError as error:
+            raise ReplayConflictError("P6 mutation idempotency key was rebound") from error
+        if replay is not None:
+            restored = contract_to_public_data(replay)
+            if not isinstance(restored, dict):
+                raise ReplayConflictError("P6 mutation replay result shape is invalid")
+            return restored
+        result = operation()
+        try:
+            authentication.record_mutation(
+                session=session,
+                action=action,
+                idempotency_key=idempotency_key,
+                request_digest=request_digest,
+                result=result,
+            )
+        except ConflictError as error:
+            raise ReplayConflictError("P6 mutation idempotency key raced") from error
+        return result
 
     @app.middleware("http")
     async def retained_route_authorization(
@@ -301,7 +347,7 @@ def install_p6_routes(
         )
         snapshot = store.p6_studio_snapshot(session=session, evaluated_at=authentication.now())
         assert snapshot.session.expires_at is not None
-        return {
+        result: dict[str, object] = {
             "state": "ready",
             "session": {
                 "session_id": snapshot.session.session_id,
@@ -311,7 +357,6 @@ def install_p6_routes(
                 "expires_at": datetime_to_z(snapshot.session.expires_at),
             },
             "membership": _membership_data(snapshot.membership),
-            "bootstrap_transition_state": snapshot.bootstrap_transition_state,
             "credentials": [_credential_data(item) for item in snapshot.credentials],
             "change_proposals": [
                 contract_to_public_data(item) for item in snapshot.change_proposals
@@ -321,15 +366,32 @@ def install_p6_routes(
             ],
             "generated_at": datetime_to_z(snapshot.generated_at),
         }
+        if snapshot.bootstrap_transition_state is not None:
+            result["bootstrap_transition_state"] = snapshot.bootstrap_transition_state
+        return result
 
     @app.post("/governance/session/active-colleague")
     def set_active_colleague(body: ActiveColleagueMutation, request: Request) -> dict[str, object]:
         session = mutation_session(request)
-        updated = authentication.bind_colleague(session, body.colleague_id)
-        return {
-            "active_colleague_id": updated.active_colleague_id,
-            "session_revision": updated.revision,
-        }
+
+        def operation() -> dict[str, object]:
+            updated = authentication.bind_colleague(
+                session,
+                body.colleague_id,
+                idempotency_key=body.idempotency_key,
+            )
+            return {
+                "active_colleague_id": updated.active_colleague_id,
+                "session_revision": updated.revision,
+            }
+
+        return replayable(
+            session=session,
+            action="p6:set-active-colleague",
+            idempotency_key=body.idempotency_key,
+            binding={"active_scope_id": body.colleague_id},
+            operation=operation,
+        )
 
     def authorize_enrollment(
         *,
@@ -339,16 +401,29 @@ def install_p6_routes(
         idempotency_key: str,
         decision_id: str | None = None,
     ) -> dict[str, object]:
-        credential = authentication.authorize_enrollment(
+        def operation() -> dict[str, object]:
+            credential = authentication.authorize_enrollment(
+                session=session,
+                request=EnrollmentAuthorizationRequest(
+                    role=role,
+                    colleague_ids=colleague_ids,
+                    idempotency_key=idempotency_key,
+                    approved_change_decision_id=decision_id,
+                ),
+            )
+            return {"credential": _credential_data(credential), "plaintext_returned": False}
+
+        return replayable(
             session=session,
-            request=EnrollmentAuthorizationRequest(
-                role=role,
-                colleague_ids=colleague_ids,
-                idempotency_key=idempotency_key,
-                approved_change_decision_id=decision_id,
-            ),
+            action="p6:authorize-enrollment",
+            idempotency_key=idempotency_key,
+            binding={
+                "role": role.value,
+                "colleague_ids": list(colleague_ids),
+                "approved_change_decision_id": decision_id,
+            },
+            operation=operation,
         )
-        return {"credential": _credential_data(credential), "plaintext_returned": False}
 
     @app.post("/governance/enrollments/users", status_code=201)
     def authorize_user_enrollment(
@@ -386,66 +461,127 @@ def install_p6_routes(
 
     @app.post("/governance/recovery", status_code=201)
     def authorize_recovery(body: RecoveryMutation, request: Request) -> dict[str, object]:
-        credential = authentication.authorize_recovery(
-            session=mutation_session(request),
-            request=RecoveryAuthorizationRequest(
-                principal_id=body.principal_id,
-                idempotency_key=body.idempotency_key,
-            ),
+        session = mutation_session(request)
+
+        def operation() -> dict[str, object]:
+            credential = authentication.authorize_recovery(
+                session=session,
+                request=RecoveryAuthorizationRequest(
+                    principal_id=body.principal_id,
+                    idempotency_key=body.idempotency_key,
+                ),
+            )
+            return {"credential": _credential_data(credential), "plaintext_returned": False}
+
+        return replayable(
+            session=session,
+            action="p6:authorize-recovery",
+            idempotency_key=body.idempotency_key,
+            binding={"principal_id": body.principal_id},
+            operation=operation,
         )
-        return {"credential": _credential_data(credential), "plaintext_returned": False}
 
     @app.post("/governance/credentials/{credential_id}/revoke")
-    def revoke_credential(credential_id: str, request: Request) -> dict[str, object]:
+    def revoke_credential(
+        credential_id: str, body: IdempotencyMutation, request: Request
+    ) -> dict[str, object]:
         session = mutation_session(request)
-        authentication.authorize(
+
+        def operation() -> dict[str, object]:
+            credential = authentication.revoke_credential(
+                session=session,
+                credential_id=credential_id,
+                idempotency_key=body.idempotency_key,
+            )
+            return {"credential": _credential_data(credential)}
+
+        return replayable(
             session=session,
-            action=AuthorizationAction.MANAGE_CREDENTIAL,
-            namespace=Namespace.tenant(session.tenant_id),
+            action="p6:revoke-credential",
+            idempotency_key=body.idempotency_key,
+            binding={"credential_id": credential_id},
+            operation=operation,
         )
-        credential = store.revoke_credential(
-            tenant_id=session.tenant_id,
-            credential_id=credential_id,
-            actor=session.principal,
-            occurred_at=authentication.now(),
-        )
-        return {"credential": _credential_data(credential)}
 
     @app.post("/governance/drafts/{draft_id}/proposals", status_code=201)
     def propose_draft_change(
         draft_id: str, body: DraftChangeMutation, request: Request
     ) -> dict[str, object]:
-        proposal = changes.propose_draft(
-            session=mutation_session(request),
-            draft_id=draft_id,
-            expected_revision=body.draft_revision,
-            expected_digest=body.canonical_digest,
+        session = mutation_session(request)
+
+        def operation() -> dict[str, object]:
+            proposal = changes.propose_draft(
+                session=session,
+                draft_id=draft_id,
+                expected_revision=body.draft_revision,
+                expected_digest=body.canonical_digest,
+                idempotency_key=body.idempotency_key,
+            )
+            return {"proposal": contract_to_public_data(proposal)}
+
+        return replayable(
+            session=session,
+            action="p6:propose-change",
             idempotency_key=body.idempotency_key,
+            binding={
+                "change_kind": "draft",
+                "draft_id": draft_id,
+                "draft_revision": body.draft_revision,
+                "canonical_digest": body.canonical_digest,
+            },
+            operation=operation,
         )
-        return {"proposal": contract_to_public_data(proposal)}
 
     @app.post("/governance/memberships/proposals", status_code=201)
     def propose_membership_change(
         body: MembershipChangeMutation, request: Request
     ) -> dict[str, object]:
-        proposal = changes.propose_membership(
-            session=mutation_session(request),
-            target_principal_id=body.target_principal_id,
-            role=body.proposed_role,
-            status=body.proposed_status,
-            colleague_ids=tuple(body.proposed_colleague_ids),
+        session = mutation_session(request)
+
+        def operation() -> dict[str, object]:
+            proposal = changes.propose_membership(
+                session=session,
+                target_principal_id=body.target_principal_id,
+                role=body.proposed_role,
+                status=body.proposed_status,
+                colleague_ids=tuple(body.proposed_colleague_ids),
+                idempotency_key=body.idempotency_key,
+            )
+            return {"proposal": contract_to_public_data(proposal)}
+
+        return replayable(
+            session=session,
+            action="p6:propose-change",
             idempotency_key=body.idempotency_key,
+            binding={
+                "change_kind": "membership",
+                "target_principal_id": body.target_principal_id,
+                "proposed_role": body.proposed_role.value,
+                "proposed_status": body.proposed_status.value,
+                "proposed_colleague_ids": body.proposed_colleague_ids,
+            },
+            operation=operation,
         )
-        return {"proposal": contract_to_public_data(proposal)}
 
     @app.post("/governance/admin-enrollments/proposals", status_code=201)
     def propose_admin_enrollment(
         body: AdminEnrollmentMutation, request: Request
     ) -> dict[str, object]:
-        proposal = changes.propose_admin_enrollment(
-            session=mutation_session(request), idempotency_key=body.idempotency_key
+        session = mutation_session(request)
+
+        def operation() -> dict[str, object]:
+            proposal = changes.propose_admin_enrollment(
+                session=session, idempotency_key=body.idempotency_key
+            )
+            return {"proposal": contract_to_public_data(proposal)}
+
+        return replayable(
+            session=session,
+            action="p6:propose-change",
+            idempotency_key=body.idempotency_key,
+            binding={"change_kind": "admin_enrollment"},
+            operation=operation,
         )
-        return {"proposal": contract_to_public_data(proposal)}
 
     def change_namespace(session: AuthenticatedSession, scope: str) -> Namespace:
         if scope == "tenant":
@@ -462,58 +598,104 @@ def install_p6_routes(
         request: Request,
     ) -> dict[str, object]:
         session = mutation_session(request)
-        proposal, decision = changes.decide(
+        namespace = change_namespace(session, scope)
+
+        def operation() -> dict[str, object]:
+            proposal, decision = changes.decide(
+                session=session,
+                namespace=namespace,
+                proposal_id=proposal_id,
+                request=ChangeDecisionRequest(
+                    proposal_revision=body.proposal_revision,
+                    proposal_digest=body.proposal_digest,
+                    choice=body.choice,
+                    idempotency_key=body.idempotency_key,
+                ),
+            )
+            return {
+                "proposal": contract_to_public_data(proposal),
+                "decision": contract_to_public_data(decision),
+            }
+
+        return replayable(
             session=session,
-            namespace=change_namespace(session, scope),
-            proposal_id=proposal_id,
-            request=ChangeDecisionRequest(
-                proposal_revision=body.proposal_revision,
-                proposal_digest=body.proposal_digest,
-                choice=body.choice,
-                idempotency_key=body.idempotency_key,
-            ),
+            action="p6:decide-change",
+            idempotency_key=body.idempotency_key,
+            binding={
+                "scope": scope,
+                "proposal_id": proposal_id,
+                "proposal_revision": body.proposal_revision,
+                "proposal_digest": body.proposal_digest,
+                "choice": body.choice.value,
+            },
+            operation=operation,
         )
-        return {
-            "proposal": contract_to_public_data(proposal),
-            "decision": contract_to_public_data(decision),
-        }
 
     @app.post("/governance/changes/colleague/{proposal_id}/apply")
     def apply_draft_change(
         proposal_id: str, body: ApplyChangeMutation, request: Request
     ) -> dict[str, object]:
         session = mutation_session(request)
-        result = changes.apply_draft(
-            session=session,
-            namespace=session.colleague_namespace(),
-            proposal_id=proposal_id,
-            decision_id=body.decision_id,
-            idempotency_key=body.idempotency_key,
-        )
-        return {
-            "confirmation": {
-                "schema_version": result.schema_version,
-                "draft_id": result.draft_id,
-                "draft_revision": result.draft_revision,
-                "profile_revision": result.profile_revision,
-                "mandate_revision": result.mandate_revision,
-                "policy_revision": result.policy_revision,
-                "canonical_digest": result.canonical_digest,
-                "replayed": result.replayed,
+
+        def operation() -> dict[str, object]:
+            result = changes.apply_draft(
+                session=session,
+                namespace=session.colleague_namespace(),
+                proposal_id=proposal_id,
+                decision_id=body.decision_id,
+                idempotency_key=body.idempotency_key,
+            )
+            return {
+                "confirmation": {
+                    "schema_version": result.schema_version,
+                    "draft_id": result.draft_id,
+                    "draft_revision": result.draft_revision,
+                    "profile_revision": result.profile_revision,
+                    "mandate_revision": result.mandate_revision,
+                    "policy_revision": result.policy_revision,
+                    "canonical_digest": result.canonical_digest,
+                    "replayed": result.replayed,
+                }
             }
-        }
+
+        return replayable(
+            session=session,
+            action="p6:apply-change",
+            idempotency_key=body.idempotency_key,
+            binding={
+                "scope": "colleague",
+                "proposal_id": proposal_id,
+                "decision_id": body.decision_id,
+            },
+            operation=operation,
+        )
 
     @app.post("/governance/changes/tenant/{proposal_id}/apply")
     def apply_membership_change(
         proposal_id: str, body: ApplyChangeMutation, request: Request
     ) -> dict[str, object]:
         session = mutation_session(request)
-        membership = changes.apply_membership(
+
+        def operation() -> dict[str, object]:
+            membership = changes.apply_membership(
+                session=session,
+                proposal_id=proposal_id,
+                decision_id=body.decision_id,
+                idempotency_key=body.idempotency_key,
+            )
+            return {"membership": _membership_data(membership)}
+
+        return replayable(
             session=session,
-            proposal_id=proposal_id,
-            decision_id=body.decision_id,
+            action="p6:apply-change",
+            idempotency_key=body.idempotency_key,
+            binding={
+                "scope": "tenant",
+                "proposal_id": proposal_id,
+                "decision_id": body.decision_id,
+            },
+            operation=operation,
         )
-        return {"membership": _membership_data(membership)}
 
     @app.post("/governance/audit/export")
     def export_audit(body: AuditExportMutation, request: Request) -> dict[str, object]:

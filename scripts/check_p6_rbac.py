@@ -57,6 +57,8 @@ def check_rbac(root: Path) -> dict[str, object]:
         "test_scoped_roles_matrix_api_authority_injection_and_idor_fail_closed",
         "tests.p6.test_authentication_rbac.P6AuthenticationRbacTests."
         "test_role_and_membership_revisions_are_checked_on_every_session_use",
+        "tests.p6.test_authentication_rbac.P6AuthenticationRbacTests."
+        "test_scoped_auditor_projection_excludes_tenant_and_other_colleague_metadata",
     )
     return {
         "schema_version": 1,

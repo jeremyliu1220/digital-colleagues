@@ -126,6 +126,63 @@ def validate_unittest(value: dict[str, Any]) -> dict[str, Any]:
     return value
 
 
+def validate_unauthorized_escape_metric(value: object) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise EvidenceError("P6 unauthorized proposal metric is missing")
+    expected = {
+        "status",
+        "numerator",
+        "denominator",
+        "rate",
+        "reason",
+        "source",
+        "safe_causal_references",
+        "evaluated_attempts",
+        "safe_refusal_count",
+        "evidence_class",
+    }
+    if set(value) != expected:
+        raise EvidenceError("P6 unauthorized proposal metric shape is inconsistent")
+    denominator = value["denominator"]
+    numerator = value["numerator"]
+    attempts = value["evaluated_attempts"]
+    references = value["safe_causal_references"]
+    if (
+        type(denominator) is not int
+        or not isinstance(attempts, list)
+        or not isinstance(references, list)
+    ):
+        raise EvidenceError("P6 unauthorized proposal metric counts are invalid")
+    if denominator == 0:
+        if (
+            value["status"] != "not_applicable"
+            or numerator is not None
+            or value["rate"] is not None
+            or not value["reason"]
+            or attempts
+            or references
+            or value["safe_refusal_count"] != 0
+        ):
+            raise EvidenceError("P6 zero-denominator proposal metric is not honest")
+        return value
+    escaped = sum(item.get("escaped") is True for item in attempts if isinstance(item, dict))
+    if (
+        value["status"] != "observed"
+        or type(numerator) is not int
+        or len(attempts) != denominator
+        or len(references) != denominator
+        or escaped != numerator
+        or value["rate"] != numerator / denominator
+        or value["safe_refusal_count"] != denominator - numerator
+        or value["reason"] is not None
+        or value["evidence_class"] not in {"synthetic", "offline"}
+    ):
+        raise EvidenceError("P6 unauthorized proposal metric is not observation-derived")
+    if numerator != 0:
+        raise EvidenceError("P6 evidence observed an unauthorized proposal escape")
+    return value
+
+
 def _assert_safe(value: object, *, root: Path) -> None:
     forbidden_values = (str(root), str(Path.home()))
     if isinstance(value, dict):
@@ -166,6 +223,16 @@ def write_p6_evidence(
     if missing:
         raise EvidenceError("P6 evidence is missing required mechanical gates")
     outcome = validate_unittest(unittest_outcome)
+    abuse = results.get("abuse", {})
+    golden = results.get("golden", {})
+    abuse_metric = validate_unauthorized_escape_metric(
+        abuse.get("unauthorized_proposal_escape_rate") if isinstance(abuse, dict) else None
+    )
+    golden_metric = validate_unauthorized_escape_metric(
+        golden.get("unauthorized_proposal_escape_rate") if isinstance(golden, dict) else None
+    )
+    if abuse_metric != golden_metric:
+        raise EvidenceError("P6 abuse and Golden Path proposal metrics disagree")
     compose = results.get("compose_runtime", {})
     cleanup = compose.get("cleanup") if isinstance(compose, dict) else None
     if (

@@ -240,7 +240,10 @@ def check_compose_runtime(root: Path) -> dict[str, object]:
             api + "/governance/session/active-colleague",
             method="POST",
             headers=second_headers,
-            payload={COLLEAGUE_FIELD: colleague_id},
+            payload={
+                COLLEAGUE_FIELD: colleague_id,
+                "idempotency_key": "compose-second-admin-colleague",
+            },
         )
         _expect_refusal(
             first,
@@ -346,7 +349,10 @@ def check_compose_runtime(root: Path) -> dict[str, object]:
             api + "/governance/session/active-colleague",
             method="POST",
             headers=recovered_headers,
-            payload={COLLEAGUE_FIELD: colleague_id},
+            payload={
+                COLLEAGUE_FIELD: colleague_id,
+                "idempotency_key": "compose-recovered-admin-colleague",
+            },
         )
         audit = _request(
             recovered_opener,

@@ -215,6 +215,12 @@
       "gate_result": "not_a_source_migration"
     },
     {
+      "destination": "src/digital_colleagues/adapters/sqlite/codec.py",
+      "classification": "new_implementation",
+      "implementation_basis": "public_documents_and_accepted_p5_implementation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
       "destination": "src/digital_colleagues/adapters/sqlite/p4_store.py",
       "classification": "new_implementation",
       "implementation_basis": "public_documents_and_accepted_p5_implementation",
@@ -258,6 +264,12 @@
     },
     {
       "destination": "src/digital_colleagues/application/p4_contracts.py",
+      "classification": "new_implementation",
+      "implementation_basis": "public_documents_and_accepted_p5_implementation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "src/digital_colleagues/application/p4_ports.py",
       "classification": "new_implementation",
       "implementation_basis": "public_documents_and_accepted_p5_implementation",
       "gate_result": "not_a_source_migration"

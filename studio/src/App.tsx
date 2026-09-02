@@ -95,7 +95,7 @@ type GovernanceState = {
     membership_revision: number;
     revision: number;
   };
-  bootstrap_transition_state: "available" | "consumed";
+  bootstrap_transition_state?: "available" | "consumed";
   credentials: GovernanceCredential[];
   change_proposals: GovernanceProposal[];
   change_decisions: GovernanceDecision[];
@@ -2227,8 +2227,9 @@ function Workspace({
                   CREDENTIAL LIFECYCLE
                 </span>
                 <h2>
-                  Second Admin transition:{" "}
-                  {governance.bootstrap_transition_state}
+                  {isAdmin && governance.bootstrap_transition_state
+                    ? `Second Admin transition: ${governance.bootstrap_transition_state}`
+                    : "Credential status in exact colleague scope"}
                 </h2>
                 <p>
                   Enrollment and recovery plaintext is retrieved once at the

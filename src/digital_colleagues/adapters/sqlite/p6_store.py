@@ -11,7 +11,7 @@ from dataclasses import replace
 from datetime import datetime
 from typing import cast
 
-from digital_colleagues.adapters.sqlite.codec import to_storage_json
+from digital_colleagues.adapters.sqlite.codec import from_storage_json, to_storage_json
 from digital_colleagues.adapters.sqlite.p5_store import SQLiteP5Store
 from digital_colleagues.adapters.sqlite.store import _namespace_from_row, _ns
 from digital_colleagues.application.errors import (
@@ -69,6 +69,69 @@ def _tuple_json(value: str) -> tuple[str, ...]:
     if not isinstance(raw, list) or any(not isinstance(item, str) for item in raw):
         raise ConflictError("durable governance scope shape is invalid")
     return tuple(raw)
+
+
+def _same_enrollment_authorization(
+    stored: GovernanceCredential, requested: GovernanceCredential
+) -> bool:
+    return (
+        stored.namespace == requested.namespace
+        and stored.credential_id == requested.credential_id
+        and stored.kind is CredentialKind.ENROLLMENT
+        and requested.kind is CredentialKind.ENROLLMENT
+        and stored.target_role is requested.target_role
+        and stored.colleague_ids == requested.colleague_ids
+        and stored.bootstrap_transition == requested.bootstrap_transition
+        and stored.change_decision_id == requested.change_decision_id
+        and stored.issued_by_principal_id == requested.issued_by_principal_id
+    )
+
+
+def _same_recovery_authorization(
+    stored: GovernanceCredential, requested: GovernanceCredential
+) -> bool:
+    return (
+        stored.namespace == requested.namespace
+        and stored.credential_id == requested.credential_id
+        and stored.kind is CredentialKind.RECOVERY
+        and requested.kind is CredentialKind.RECOVERY
+        and stored.target_principal_id == requested.target_principal_id
+        and stored.issued_by_principal_id == requested.issued_by_principal_id
+    )
+
+
+def _same_change_proposal_request(stored: ChangeProposal, requested: ChangeProposal) -> bool:
+    shared = (
+        stored.namespace == requested.namespace
+        and stored.change_kind is requested.change_kind
+        and stored.proposer_principal_id == requested.proposer_principal_id
+        and stored.idempotency_key == requested.idempotency_key
+        and stored.target_id == requested.target_id
+    )
+    if not shared:
+        return False
+    if stored.change_kind is ChangeKind.DRAFT:
+        return (
+            stored.target_revision == requested.target_revision
+            and stored.canonical_digest == requested.canonical_digest
+        )
+    return (
+        stored.proposed_role is requested.proposed_role
+        and stored.proposed_status is requested.proposed_status
+        and stored.proposed_colleague_ids == requested.proposed_colleague_ids
+    )
+
+
+def _same_change_decision_request(stored: ChangeDecision, requested: ChangeDecision) -> bool:
+    return (
+        stored.namespace == requested.namespace
+        and stored.approver_principal_id == requested.approver_principal_id
+        and stored.idempotency_key == requested.idempotency_key
+        and stored.proposal_id == requested.proposal_id
+        and stored.proposal_revision == requested.proposal_revision
+        and stored.proposal_digest == requested.proposal_digest
+        and stored.choice is requested.choice
+    )
 
 
 class SQLiteP6Store(SQLiteP5Store):
@@ -345,6 +408,94 @@ class SQLiteP6Store(SQLiteP5Store):
             raise PermissionDeniedError("authenticated session was refused")
         return session, membership
 
+    def set_active_colleague_replay(
+        self,
+        *,
+        session: AuthenticatedSession,
+        colleague_id: str,
+        idempotency_key: str,
+        request_digest: str,
+        occurred_at: datetime,
+    ) -> AuthenticatedSession:
+        namespace = Namespace.colleague(session.tenant_id, colleague_id)
+        with self._transaction() as connection:
+            membership = self._require_current_membership(
+                connection,
+                actor=session.principal,
+                action=AuthorizationAction.READ_COLLEAGUE,
+                namespace=namespace,
+            )
+            replay = connection.execute(
+                """SELECT request_digest, result_json FROM p4_mutation_replay
+                WHERE tenant_id = ? AND namespace_scope = 'principal'
+                  AND namespace_scope_id = ?
+                  AND action = 'p6:set-active-colleague:atomic'
+                  AND idempotency_key = ?""",
+                (session.tenant_id, session.principal.principal_id, idempotency_key),
+            ).fetchone()
+            if replay is not None:
+                if replay["request_digest"] != request_digest:
+                    raise ReplayConflictError("active colleague idempotency key was rebound")
+                return from_storage_json(replay["result_json"], AuthenticatedSession)
+            current_row = connection.execute(
+                """SELECT * FROM p4_sessions
+                WHERE tenant_id = ? AND namespace_scope = 'principal'
+                  AND namespace_scope_id = ? AND session_id = ? AND revoked_at IS NULL""",
+                (session.tenant_id, session.principal.principal_id, session.session_id),
+            ).fetchone()
+            if (
+                current_row is None
+                or self._session_from_row(current_row) != session
+                or session.role_revision != membership.role_revision
+                or session.membership_revision != membership.membership_revision
+            ):
+                raise PermissionDeniedError("session namespace binding was refused")
+            exists = connection.execute(
+                """SELECT 1 FROM domain_records
+                WHERE tenant_id = ? AND namespace_scope = ? AND namespace_scope_id = ?
+                  AND record_type = 'profile'""",
+                _ns(namespace),
+            ).fetchone()
+            if exists is None:
+                raise NotFoundError("active colleague namespace was not found")
+            changed = connection.execute(
+                """UPDATE p4_sessions
+                SET active_colleague_id = ?, revision = revision + 1
+                WHERE tenant_id = ? AND namespace_scope = 'principal'
+                  AND namespace_scope_id = ? AND session_id = ? AND revision = ?""",
+                (
+                    colleague_id,
+                    session.tenant_id,
+                    session.principal.principal_id,
+                    session.session_id,
+                    session.revision,
+                ),
+            )
+            if changed.rowcount != 1:
+                raise ConflictError("session namespace binding lost its atomic claim")
+            updated = replace(
+                session,
+                active_colleague_id=colleague_id,
+                revision=session.revision + 1,
+            )
+            connection.execute(
+                """INSERT INTO p4_mutation_replay(
+                  schema_version, tenant_id, namespace_scope, namespace_scope_id,
+                  session_id, action, idempotency_key, request_digest, result_json, created_at
+                ) VALUES (?, ?, 'principal', ?, ?, 'p6:set-active-colleague:atomic', ?, ?, ?, ?)""",
+                (
+                    SCHEMA_VERSION,
+                    session.tenant_id,
+                    session.principal.principal_id,
+                    session.session_id,
+                    idempotency_key,
+                    request_digest,
+                    to_storage_json(updated),
+                    datetime_to_z(occurred_at),
+                ),
+            )
+        return updated
+
     def consume_bootstrap(
         self,
         *,
@@ -541,10 +692,7 @@ class SQLiteP6Store(SQLiteP5Store):
             ).fetchone()
             if existing is not None:
                 stored = self._credential_from_row(existing)
-                if (
-                    replace(stored, state=credential.state, revision=credential.revision)
-                    != credential
-                ):
+                if not _same_enrollment_authorization(stored, credential):
                     raise ReplayConflictError("enrollment idempotency key was rebound")
                 return stored
             if credential.bootstrap_transition:
@@ -654,6 +802,16 @@ class SQLiteP6Store(SQLiteP5Store):
             )
         return credential
 
+    def find_governance_credential(
+        self, *, tenant_id: str, credential_id: str
+    ) -> GovernanceCredential | None:
+        row = self._connection.execute(
+            """SELECT * FROM p6_governance_credentials
+            WHERE tenant_id = ? AND credential_id = ?""",
+            (tenant_id, credential_id),
+        ).fetchone()
+        return None if row is None else self._credential_from_row(row)
+
     def authorize_recovery(
         self,
         *,
@@ -729,7 +887,9 @@ class SQLiteP6Store(SQLiteP5Store):
                     WHERE tenant_id = ? AND credential_id = ?""",
                     (credential.namespace.tenant_id, credential.credential_id),
                 ).fetchone()
-                if row is None or self._credential_from_row(row) != credential:
+                if row is None or not _same_recovery_authorization(
+                    self._credential_from_row(row), credential
+                ):
                     raise ReplayConflictError("recovery idempotency key was rebound") from exc
                 return self._credential_from_row(row)
             self._insert_governance_audit(
@@ -910,11 +1070,14 @@ class SQLiteP6Store(SQLiteP5Store):
     def revoke_credential(
         self,
         *,
-        tenant_id: str,
+        session: AuthenticatedSession,
         credential_id: str,
-        actor: Principal,
+        idempotency_key: str,
+        request_digest: str,
         occurred_at: datetime,
     ) -> GovernanceCredential:
+        actor = session.principal
+        tenant_id = session.tenant_id
         with self._transaction() as connection:
             membership = self._require_current_membership(
                 connection,
@@ -922,6 +1085,30 @@ class SQLiteP6Store(SQLiteP5Store):
                 action=AuthorizationAction.MANAGE_CREDENTIAL,
                 namespace=Namespace.tenant(tenant_id),
             )
+            replay = connection.execute(
+                """SELECT request_digest, result_json FROM p4_mutation_replay
+                WHERE tenant_id = ? AND namespace_scope = 'principal'
+                  AND namespace_scope_id = ? AND action = 'p6:revoke-credential:atomic'
+                  AND idempotency_key = ?""",
+                (tenant_id, actor.principal_id, idempotency_key),
+            ).fetchone()
+            if replay is not None:
+                if replay["request_digest"] != request_digest:
+                    raise ReplayConflictError("credential revoke idempotency key was rebound")
+                return from_storage_json(replay["result_json"], GovernanceCredential)
+            session_row = connection.execute(
+                """SELECT * FROM p4_sessions
+                WHERE tenant_id = ? AND namespace_scope = 'principal'
+                  AND namespace_scope_id = ? AND session_id = ? AND revoked_at IS NULL""",
+                (tenant_id, actor.principal_id, session.session_id),
+            ).fetchone()
+            if (
+                session_row is None
+                or self._session_from_row(session_row) != session
+                or session.role_revision != membership.role_revision
+                or session.membership_revision != membership.membership_revision
+            ):
+                raise PermissionDeniedError("credential revoke session binding was refused")
             row = connection.execute(
                 """SELECT * FROM p6_governance_credentials
                 WHERE tenant_id = ? AND credential_id = ?""",
@@ -932,7 +1119,7 @@ class SQLiteP6Store(SQLiteP5Store):
             credential = self._credential_from_row(row)
             if credential.state not in {CredentialState.AUTHORIZED, CredentialState.RETRIEVED}:
                 raise ConflictError("credential cannot be revoked")
-            connection.execute(
+            changed = connection.execute(
                 """UPDATE p6_governance_credentials
                 SET state = 'revoked', revoked_at = ?, token_digest = NULL,
                     revision = revision + 1
@@ -944,6 +1131,8 @@ class SQLiteP6Store(SQLiteP5Store):
                     credential.revision,
                 ),
             )
+            if changed.rowcount != 1:
+                raise ConflictError("credential revoke lost its atomic claim")
             revoked = replace(
                 credential,
                 state=CredentialState.REVOKED,
@@ -967,6 +1156,22 @@ class SQLiteP6Store(SQLiteP5Store):
                 causation_id=credential.credential_id,
                 occurred_at=occurred_at,
                 safe_projection={"kind": credential.kind.value},
+            )
+            connection.execute(
+                """INSERT INTO p4_mutation_replay(
+                  schema_version, tenant_id, namespace_scope, namespace_scope_id,
+                  session_id, action, idempotency_key, request_digest, result_json, created_at
+                ) VALUES (?, ?, 'principal', ?, ?, 'p6:revoke-credential:atomic', ?, ?, ?, ?)""",
+                (
+                    SCHEMA_VERSION,
+                    tenant_id,
+                    actor.principal_id,
+                    session.session_id,
+                    idempotency_key,
+                    request_digest,
+                    to_storage_json(revoked),
+                    datetime_to_z(occurred_at),
+                ),
             )
         return revoked
 
@@ -1262,7 +1467,7 @@ class SQLiteP6Store(SQLiteP5Store):
             ).fetchone()
             if existing is not None:
                 stored = self._change_proposal_from_row(existing)
-                if stored != proposal:
+                if not _same_change_proposal_request(stored, proposal):
                     raise ReplayConflictError("change proposal idempotency key was rebound")
                 return stored
             if proposal.change_kind is ChangeKind.DRAFT:
@@ -1380,6 +1585,21 @@ class SQLiteP6Store(SQLiteP5Store):
             )
         return proposal
 
+    def find_change_proposal_replay(
+        self,
+        *,
+        namespace: Namespace,
+        proposer_principal_id: str,
+        idempotency_key: str,
+    ) -> ChangeProposal | None:
+        row = self._connection.execute(
+            """SELECT * FROM p6_change_proposals
+            WHERE tenant_id = ? AND namespace_scope = ? AND namespace_scope_id = ?
+              AND proposer_principal_id = ? AND idempotency_key = ?""",
+            (*_ns(namespace), proposer_principal_id, idempotency_key),
+        ).fetchone()
+        return None if row is None else self._change_proposal_from_row(row)
+
     def get_change_proposal(self, namespace: Namespace, proposal_id: str) -> ChangeProposal:
         row = self._connection.execute(
             """SELECT * FROM p6_change_proposals
@@ -1406,8 +1626,6 @@ class SQLiteP6Store(SQLiteP5Store):
             if row is None:
                 raise NotFoundError("governance change was not found")
             current_proposal = self._change_proposal_from_row(row)
-            if current_proposal != proposal:
-                raise StaleConflictError("change proposal binding is stale")
             approver = self.get_principal(
                 decision.namespace.tenant_id, decision.approver_principal_id
             )
@@ -1419,6 +1637,23 @@ class SQLiteP6Store(SQLiteP5Store):
             )
             if proposal.proposer_principal_id == approver.principal_id:
                 raise PermissionDeniedError("change proposer cannot approve their own change")
+            existing = connection.execute(
+                """SELECT * FROM p6_change_decisions
+                WHERE tenant_id = ? AND namespace_scope = ? AND namespace_scope_id = ?
+                  AND approver_principal_id = ? AND idempotency_key = ?""",
+                (
+                    *_ns(proposal.namespace),
+                    approver.principal_id,
+                    decision.idempotency_key,
+                ),
+            ).fetchone()
+            if existing is not None:
+                stored = self._change_decision_from_row(existing)
+                if not _same_change_decision_request(stored, decision):
+                    raise ReplayConflictError("change decision idempotency key was rebound")
+                return current_proposal, stored
+            if current_proposal != proposal:
+                raise StaleConflictError("change proposal binding is stale")
             if (
                 decision.namespace != proposal.namespace
                 or decision.proposal_id != proposal.proposal_id
@@ -1462,21 +1697,6 @@ class SQLiteP6Store(SQLiteP5Store):
                 )
                 expired = True
             else:
-                existing = connection.execute(
-                    """SELECT * FROM p6_change_decisions
-                    WHERE tenant_id = ? AND namespace_scope = ? AND namespace_scope_id = ?
-                      AND approver_principal_id = ? AND idempotency_key = ?""",
-                    (
-                        *_ns(proposal.namespace),
-                        approver.principal_id,
-                        decision.idempotency_key,
-                    ),
-                ).fetchone()
-                if existing is not None:
-                    stored = self._change_decision_from_row(existing)
-                    if stored != decision:
-                        raise ReplayConflictError("change decision idempotency key was rebound")
-                    return proposal, stored
                 connection.execute(
                     """
                     INSERT INTO p6_change_decisions(
@@ -1555,6 +1775,21 @@ class SQLiteP6Store(SQLiteP5Store):
             raise PermissionDeniedError("change proposal validity expired")
         assert decided_proposal is not None
         return decided_proposal, decision
+
+    def find_change_decision_replay(
+        self,
+        *,
+        namespace: Namespace,
+        approver_principal_id: str,
+        idempotency_key: str,
+    ) -> ChangeDecision | None:
+        row = self._connection.execute(
+            """SELECT * FROM p6_change_decisions
+            WHERE tenant_id = ? AND namespace_scope = ? AND namespace_scope_id = ?
+              AND approver_principal_id = ? AND idempotency_key = ?""",
+            (*_ns(namespace), approver_principal_id, idempotency_key),
+        ).fetchone()
+        return None if row is None else self._change_decision_from_row(row)
 
     def expire_change_proposal(
         self,
@@ -1864,12 +2099,32 @@ class SQLiteP6Store(SQLiteP5Store):
         *,
         proposal: ChangeProposal,
         decision_id: str,
-        actor: Principal,
+        session: AuthenticatedSession,
+        idempotency_key: str,
+        request_digest: str,
         occurred_at: datetime,
     ) -> Membership:
         if proposal.change_kind is not ChangeKind.MEMBERSHIP:
             raise PermissionDeniedError("change kind was refused")
+        actor = session.principal
         with self._transaction() as connection:
+            self._require_current_membership(
+                connection,
+                actor=actor,
+                action=AuthorizationAction.APPLY_CHANGE,
+                namespace=proposal.namespace,
+            )
+            replay = connection.execute(
+                """SELECT request_digest, result_json FROM p4_mutation_replay
+                WHERE tenant_id = ? AND namespace_scope = 'principal'
+                  AND namespace_scope_id = ? AND action = 'p6:apply-membership'
+                  AND idempotency_key = ?""",
+                (proposal.namespace.tenant_id, actor.principal_id, idempotency_key),
+            ).fetchone()
+            if replay is not None:
+                if replay["request_digest"] != request_digest:
+                    raise ReplayConflictError("membership apply idempotency key was rebound")
+                return from_storage_json(replay["result_json"], Membership)
             row = connection.execute(
                 """SELECT * FROM p6_change_proposals
                 WHERE tenant_id = ? AND namespace_scope = ? AND namespace_scope_id = ?
@@ -2032,6 +2287,22 @@ class SQLiteP6Store(SQLiteP5Store):
                     "scope_count": len(proposal.proposed_colleague_ids),
                     "membership_revision": new_membership_revision,
                 },
+            )
+            connection.execute(
+                """INSERT INTO p4_mutation_replay(
+                  schema_version, tenant_id, namespace_scope, namespace_scope_id,
+                  session_id, action, idempotency_key, request_digest, result_json, created_at
+                ) VALUES (?, ?, 'principal', ?, ?, 'p6:apply-membership', ?, ?, ?, ?)""",
+                (
+                    SCHEMA_VERSION,
+                    proposal.namespace.tenant_id,
+                    actor.principal_id,
+                    session.session_id,
+                    idempotency_key,
+                    request_digest,
+                    to_storage_json(updated),
+                    datetime_to_z(occurred_at),
+                ),
             )
         return updated
 
@@ -2382,10 +2653,19 @@ class SQLiteP6Store(SQLiteP5Store):
         )
         if governed.session_id != session.session_id:
             raise PermissionDeniedError("Studio session binding was refused")
-        if HumanRole.COLLEAGUE_USER in membership.roles:
+        is_admin = HumanRole.TENANT_ADMIN in membership.roles
+        if not is_admin:
             credentials: tuple[GovernanceCredential, ...] = ()
-            proposals: tuple[ChangeProposal, ...] = ()
-            decisions: tuple[ChangeDecision, ...] = ()
+            proposal_values: list[ChangeProposal] = []
+            decision_values: list[ChangeDecision] = []
+            if HumanRole.AUDITOR in membership.roles and session.active_colleague_id is not None:
+                namespace = session.colleague_namespace()
+                if not membership.allows_namespace(namespace):
+                    raise PermissionDeniedError("Studio governance scope was refused")
+                proposal_values.extend(self.list_change_proposals(namespace))
+                decision_values.extend(self.list_change_decisions(namespace))
+            proposals = tuple(proposal_values)
+            decisions = tuple(decision_values)
         else:
             rows = self._connection.execute(
                 """SELECT * FROM p6_governance_credentials
@@ -2395,38 +2675,40 @@ class SQLiteP6Store(SQLiteP5Store):
             credentials = tuple(
                 credential
                 for row in rows
-                if (credential := self._credential_from_row(row)).colleague_ids == ("*",)
-                or set(credential.colleague_ids).intersection(membership.colleague_ids)
-                or membership.colleague_ids == ("*",)
+                if (credential := self._credential_from_row(row)).namespace.tenant_id
+                == session.tenant_id
             )
-            proposal_values: list[ChangeProposal] = []
-            decision_values: list[ChangeDecision] = []
+            admin_proposal_values: list[ChangeProposal] = []
+            admin_decision_values: list[ChangeDecision] = []
             if session.active_colleague_id is not None:
                 namespace = session.colleague_namespace()
-                proposal_values.extend(self.list_change_proposals(namespace))
-                decision_values.extend(self.list_change_decisions(namespace))
+                admin_proposal_values.extend(self.list_change_proposals(namespace))
+                admin_decision_values.extend(self.list_change_decisions(namespace))
             if membership.colleague_ids == ("*",):
-                proposal_values.extend(
+                admin_proposal_values.extend(
                     self.list_change_proposals(Namespace.tenant(session.tenant_id))
                 )
-                decision_values.extend(
+                admin_decision_values.extend(
                     self.list_change_decisions(Namespace.tenant(session.tenant_id))
                 )
-            proposals = tuple(proposal_values)
-            decisions = tuple(decision_values)
-        transition = self._connection.execute(
-            """SELECT state FROM p6_bootstrap_transitions
-            WHERE tenant_id = ? AND transition_id = 'transition:second-admin'""",
-            (session.tenant_id,),
-        ).fetchone()
-        if transition is None:
-            raise ConflictError("bootstrap transition state is missing")
+            proposals = tuple(admin_proposal_values)
+            decisions = tuple(admin_decision_values)
+        transition_state: str | None = None
+        if is_admin:
+            transition = self._connection.execute(
+                """SELECT state FROM p6_bootstrap_transitions
+                WHERE tenant_id = ? AND transition_id = 'transition:second-admin'""",
+                (session.tenant_id,),
+            ).fetchone()
+            if transition is None:
+                raise ConflictError("bootstrap transition state is missing")
+            transition_state = cast(str, transition["state"])
         return P6StudioSnapshot(
             session=governed,
             membership=membership,
             credentials=credentials,
             change_proposals=proposals,
             change_decisions=decisions,
-            bootstrap_transition_state=transition["state"],
+            bootstrap_transition_state=transition_state,
             generated_at=evaluated_at,
         )

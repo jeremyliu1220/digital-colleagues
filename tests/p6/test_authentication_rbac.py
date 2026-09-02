@@ -6,6 +6,7 @@ import tempfile
 import threading
 import unittest
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import replace
 from datetime import timedelta
 from pathlib import Path
 
@@ -16,6 +17,7 @@ from digital_colleagues.adapters.system.deterministic import FixedClock
 from digital_colleagues.application.errors import (
     ConflictError,
     PermissionDeniedError,
+    ReplayConflictError,
 )
 from digital_colleagues.application.p4_contracts import SessionGrant
 from digital_colleagues.application.p6_contracts import (
@@ -33,7 +35,7 @@ from digital_colleagues.core.governance import (
 from digital_colleagues.core.namespace import Namespace
 from digital_colleagues.core.principals import HumanRole, Principal
 from digital_colleagues.governance.rbac import action_matrix, authorize_action
-from tests.p6.fixtures import NOW, ORIGIN, P6Harness, build_harness
+from tests.p6.fixtures import NOW, ORIGIN, P6Harness, build_harness, initial_request
 
 
 def bootstrap(harness: P6Harness) -> tuple[str, SessionGrant]:
@@ -239,6 +241,363 @@ class P6AuthenticationRbacTests(unittest.TestCase):
             self.assertEqual(auditor_mutation.status_code, 403, auditor_mutation.text)
             harness.store.close()
 
+    def test_scoped_auditor_projection_excludes_tenant_and_other_colleague_metadata(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory(prefix="digital-colleagues-p6-auditor-scope-") as name:
+            harness = build_harness(Path(name) / "state.sqlite")
+            first_cookie, first = bootstrap(harness)
+            _, second = enroll(
+                harness,
+                issuer=first,
+                role=HumanRole.TENANT_ADMIN,
+                scopes=("*",),
+                key="auditor-scope-second-admin",
+            )
+            alpha, _, _ = harness.colleagues.create(
+                session=first.session,
+                request=replace(initial_request(), idempotency_key="auditor-scope-alpha"),
+            )
+            alpha_id = alpha.namespace.scope_id
+            beta_id = "colleague:beta"
+            assert alpha_id is not None
+            alpha_credential = harness.authentication.authorize_enrollment(
+                session=first.session,
+                request=EnrollmentAuthorizationRequest(
+                    role=HumanRole.COLLEAGUE_USER,
+                    colleague_ids=(alpha_id,),
+                    idempotency_key="auditor-visible-alpha-target",
+                ),
+            )
+            beta_credential = harness.authentication.authorize_enrollment(
+                session=first.session,
+                request=EnrollmentAuthorizationRequest(
+                    role=HumanRole.COLLEAGUE_USER,
+                    colleague_ids=(beta_id,),
+                    idempotency_key="auditor-hidden-beta-target",
+                ),
+            )
+            _, auditor = enroll(
+                harness,
+                issuer=second.session_grant,
+                role=HumanRole.AUDITOR,
+                scopes=(alpha_id,),
+                key="exact-alpha-auditor",
+            )
+
+            auditor_client = TestClient(harness.app())
+            auditor_client.cookies.set("dc_session", auditor.session_grant.session_credential)
+            auditor_response = auditor_client.get("/governance/state")
+            self.assertEqual(auditor_response.status_code, 200, auditor_response.text)
+            auditor_state = auditor_response.json()
+            self.assertEqual(auditor_state["membership"]["colleague_ids"], [alpha_id])
+            self.assertEqual(auditor_state["credentials"], [])
+            self.assertNotIn("bootstrap_transition_state", auditor_state)
+            serialized = auditor_response.text
+            for forbidden in (
+                alpha_credential.credential_id,
+                beta_credential.credential_id,
+                beta_id,
+            ):
+                self.assertNotIn(forbidden, serialized)
+            self.assertEqual(auditor_state["change_proposals"], [])
+            self.assertEqual(auditor_state["change_decisions"], [])
+
+            admin_client = TestClient(harness.app())
+            admin_client.cookies.set("dc_session", first_cookie)
+            admin_state = admin_client.get("/governance/state")
+            self.assertEqual(admin_state.status_code, 200, admin_state.text)
+            self.assertEqual(admin_state.json()["bootstrap_transition_state"], "consumed")
+            admin_credential_ids = {
+                item["credential_id"] for item in admin_state.json()["credentials"]
+            }
+            self.assertIn(alpha_credential.credential_id, admin_credential_ids)
+            self.assertIn(beta_credential.credential_id, admin_credential_ids)
+            allowed = admin_client.post(
+                "/governance/enrollments/users",
+                headers={"Origin": ORIGIN, "X-CSRF-Token": first.csrf_token},
+                json={
+                    "colleague_ids": [alpha_id],
+                    "idempotency_key": "admin-remains-authorized",
+                },
+            )
+            self.assertEqual(allowed.status_code, 201, allowed.text)
+            harness.store.close()
+
+    def test_browser_credential_replay_is_canonical_and_restart_durable(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="digital-colleagues-p6-browser-replay-") as name:
+            database = Path(name) / "state.sqlite"
+            harness = build_harness(database)
+            first_cookie, first = bootstrap(harness)
+            client = TestClient(harness.app())
+            client.cookies.set("dc_session", first_cookie)
+            headers = {"Origin": ORIGIN, "X-CSRF-Token": first.csrf_token}
+            enrollment_body = {
+                "colleague_ids": ["colleague:alpha"],
+                "idempotency_key": "browser-enrollment-replay",
+            }
+            enrollment = client.post(
+                "/governance/enrollments/users", headers=headers, json=enrollment_body
+            )
+            self.assertEqual(enrollment.status_code, 201, enrollment.text)
+            first_enrollment = enrollment.json()
+            credential_id = first_enrollment["credential"]["credential_id"]
+            token = harness.authentication.retrieve_operator_credential(credential_id)
+            user = harness.authentication.exchange_enrollment(token)
+            harness.store.close()
+
+            restarted = build_harness(database, now=NOW + timedelta(minutes=1))
+            replay_client = TestClient(restarted.app())
+            replay_client.cookies.set("dc_session", first_cookie)
+            replay = replay_client.post(
+                "/governance/enrollments/users", headers=headers, json=enrollment_body
+            )
+            self.assertEqual(replay.status_code, 201, replay.text)
+            self.assertEqual(replay.json(), first_enrollment)
+            rebound = replay_client.post(
+                "/governance/enrollments/auditors",
+                headers=headers,
+                json=enrollment_body,
+            )
+            self.assertEqual(rebound.status_code, 409, rebound.text)
+            self.assertEqual(
+                restarted.store._connection.execute(  # noqa: SLF001
+                    "SELECT COUNT(*) FROM p6_governance_credentials"
+                ).fetchone()[0],
+                1,
+            )
+            recovery_body = {
+                "principal_id": user.membership.principal_id,
+                "idempotency_key": "browser-recovery-replay",
+            }
+            recovery = replay_client.post(
+                "/governance/recovery", headers=headers, json=recovery_body
+            )
+            self.assertEqual(recovery.status_code, 201, recovery.text)
+            first_recovery = recovery.json()
+            restarted.store.close()
+
+            recovered_store = build_harness(database, now=NOW + timedelta(minutes=2))
+            recovered_client = TestClient(recovered_store.app())
+            recovered_client.cookies.set("dc_session", first_cookie)
+            recovery_replay = recovered_client.post(
+                "/governance/recovery", headers=headers, json=recovery_body
+            )
+            self.assertEqual(recovery_replay.status_code, 201, recovery_replay.text)
+            self.assertEqual(recovery_replay.json(), first_recovery)
+            recovery_rebound = recovered_client.post(
+                "/governance/recovery",
+                headers=headers,
+                json={
+                    "principal_id": first.session.principal.principal_id,
+                    "idempotency_key": "browser-recovery-replay",
+                },
+            )
+            self.assertEqual(recovery_rebound.status_code, 409, recovery_rebound.text)
+            self.assertEqual(
+                recovered_store.store._connection.execute(  # noqa: SLF001
+                    "SELECT COUNT(*) FROM p6_governance_credentials"
+                ).fetchone()[0],
+                2,
+            )
+            audit_counts = dict(
+                recovered_store.store._connection.execute(  # noqa: SLF001
+                    "SELECT action, COUNT(*) FROM p6_governance_audit "
+                    "WHERE action IN ('enrollment_authorized', 'recovery_authorized') "
+                    "GROUP BY action"
+                ).fetchall()
+            )
+            self.assertEqual(audit_counts, {"enrollment_authorized": 1, "recovery_authorized": 1})
+            recovered_store.store.close()
+
+    def test_direct_credential_replay_ignores_server_time_and_concurrent_retry(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="digital-colleagues-p6-direct-replay-") as name:
+            database = Path(name) / "state.sqlite"
+            harness = build_harness(database)
+            _, first = bootstrap(harness)
+            request = EnrollmentAuthorizationRequest(
+                role=HumanRole.COLLEAGUE_USER,
+                colleague_ids=("colleague:alpha",),
+                idempotency_key="direct-time-independent",
+            )
+            original = harness.authentication.authorize_enrollment(
+                session=first.session, request=request
+            )
+            harness.store.close()
+
+            restarted = build_harness(database, now=NOW + timedelta(minutes=1))
+            self.assertEqual(
+                restarted.authentication.authorize_enrollment(
+                    session=first.session, request=request
+                ),
+                original,
+            )
+            with self.assertRaises(ReplayConflictError):
+                restarted.authentication.authorize_enrollment(
+                    session=first.session,
+                    request=EnrollmentAuthorizationRequest(
+                        role=HumanRole.AUDITOR,
+                        colleague_ids=("colleague:alpha",),
+                        idempotency_key="direct-time-independent",
+                    ),
+                )
+            restarted.store.close()
+
+            barrier = threading.Barrier(2)
+
+            def authorize(index: int):  # type: ignore[no-untyped-def]
+                concurrent = build_harness(database, now=NOW + timedelta(minutes=index + 1))
+                try:
+                    barrier.wait()
+                    return concurrent.authentication.authorize_enrollment(
+                        session=first.session,
+                        request=EnrollmentAuthorizationRequest(
+                            role=HumanRole.COLLEAGUE_USER,
+                            colleague_ids=("colleague:alpha",),
+                            idempotency_key="concurrent-authorize-retry",
+                        ),
+                    )
+                finally:
+                    concurrent.store.close()
+
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                outcomes = list(executor.map(authorize, (1, 2)))
+            self.assertEqual(outcomes[0], outcomes[1])
+            inspected = build_harness(database)
+            self.assertEqual(
+                inspected.store._connection.execute(  # noqa: SLF001
+                    "SELECT COUNT(*) FROM p6_governance_credentials WHERE credential_id = ?",
+                    (outcomes[0].credential_id,),
+                ).fetchone()[0],
+                1,
+            )
+            self.assertEqual(
+                inspected.store._connection.execute(  # noqa: SLF001
+                    "SELECT COUNT(*) FROM p6_governance_audit "
+                    "WHERE action = 'enrollment_authorized'"
+                ).fetchone()[0],
+                2,
+            )
+            inspected.store.close()
+
+    def test_active_colleague_and_revoke_browser_mutations_are_replay_safe(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="digital-colleagues-p6-browser-inventory-") as name:
+            database = Path(name) / "state.sqlite"
+            harness = build_harness(database)
+            first_cookie, first = bootstrap(harness)
+            profile, _, _ = harness.colleagues.create(
+                session=first.session,
+                request=replace(initial_request(), idempotency_key="browser-inventory-colleague"),
+            )
+            colleague_id = profile.namespace.scope_id
+            assert colleague_id is not None
+            credential = harness.authentication.authorize_enrollment(
+                session=first.session,
+                request=EnrollmentAuthorizationRequest(
+                    role=HumanRole.COLLEAGUE_USER,
+                    colleague_ids=(colleague_id,),
+                    idempotency_key="browser-inventory-credential",
+                ),
+            )
+            atomically_bound = harness.authentication.bind_colleague(
+                first.session,
+                colleague_id,
+                idempotency_key="browser-active-colleague",
+            )
+            client = TestClient(harness.app())
+            client.cookies.set("dc_session", first_cookie)
+            headers = {"Origin": ORIGIN, "X-CSRF-Token": first.csrf_token}
+            bind_body = dict(
+                colleague_id=colleague_id,
+                idempotency_key="browser-active-colleague",
+            )
+            bound = client.post(
+                "/governance/session/active-colleague", headers=headers, json=bind_body
+            )
+            self.assertEqual(bound.status_code, 200, bound.text)
+            self.assertEqual(
+                bound.json(),
+                {
+                    "active_colleague_id": colleague_id,
+                    "session_revision": atomically_bound.revision,
+                },
+            )
+            bound_replay = client.post(
+                "/governance/session/active-colleague", headers=headers, json=bind_body
+            )
+            self.assertEqual(bound_replay.status_code, 200, bound_replay.text)
+            self.assertEqual(bound_replay.json(), bound.json())
+            bind_rebound = client.post(
+                "/governance/session/active-colleague",
+                headers=headers,
+                json=dict(
+                    colleague_id="colleague:other",
+                    idempotency_key="browser-active-colleague",
+                ),
+            )
+            self.assertEqual(bind_rebound.status_code, 409, bind_rebound.text)
+
+            atomically_revoked = harness.authentication.revoke_credential(
+                session=atomically_bound,
+                credential_id=credential.credential_id,
+                idempotency_key="browser-revoke-credential",
+            )
+            revoke_body = {"idempotency_key": "browser-revoke-credential"}
+            revoked = client.post(
+                f"/governance/credentials/{credential.credential_id}/revoke",
+                headers=headers,
+                json=revoke_body,
+            )
+            self.assertEqual(revoked.status_code, 200, revoked.text)
+            self.assertEqual(
+                revoked.json()["credential"]["credential_id"],
+                atomically_revoked.credential_id,
+            )
+            revoke_replay = client.post(
+                f"/governance/credentials/{credential.credential_id}/revoke",
+                headers=headers,
+                json=revoke_body,
+            )
+            self.assertEqual(revoke_replay.status_code, 200, revoke_replay.text)
+            self.assertEqual(revoke_replay.json(), revoked.json())
+            revoke_rebound = client.post(
+                "/governance/credentials/credential:other/revoke",
+                headers=headers,
+                json=revoke_body,
+            )
+            self.assertEqual(revoke_rebound.status_code, 409, revoke_rebound.text)
+            self.assertEqual(
+                harness.store._connection.execute(  # noqa: SLF001
+                    "SELECT COUNT(*) FROM p6_governance_audit WHERE action = 'credential_revoked'"
+                ).fetchone()[0],
+                1,
+            )
+            self.assertEqual(
+                harness.store._connection.execute(  # noqa: SLF001
+                    "SELECT COUNT(*) FROM p4_mutation_replay "
+                    "WHERE action IN ('p6:set-active-colleague:atomic', "
+                    "'p6:revoke-credential:atomic')"
+                ).fetchone()[0],
+                2,
+            )
+            harness.store.close()
+            restarted = build_harness(database, now=NOW + timedelta(minutes=1))
+            restarted_client = TestClient(restarted.app())
+            restarted_client.cookies.set("dc_session", first_cookie)
+            restarted_bound = restarted_client.post(
+                "/governance/session/active-colleague", headers=headers, json=bind_body
+            )
+            restarted_revoked = restarted_client.post(
+                f"/governance/credentials/{credential.credential_id}/revoke",
+                headers=headers,
+                json=revoke_body,
+            )
+            self.assertEqual(restarted_bound.status_code, 200, restarted_bound.text)
+            self.assertEqual(restarted_bound.json(), bound.json())
+            self.assertEqual(restarted_revoked.status_code, 200, restarted_revoked.text)
+            self.assertEqual(restarted_revoked.json(), revoked.json())
+            restarted.store.close()
+
     def test_recovery_rotates_session_and_revoked_expired_or_guessed_tokens_fail(self) -> None:
         with tempfile.TemporaryDirectory(prefix="digital-colleagues-p6-recovery-") as name:
             harness = build_harness(Path(name) / "state.sqlite")
@@ -303,11 +662,10 @@ class P6AuthenticationRbacTests(unittest.TestCase):
                     idempotency_key="revoked-recovery",
                 ),
             )
-            harness.store.revoke_credential(
-                tenant_id="tenant-local",
+            harness.authentication.revoke_credential(
+                session=first.session,
                 credential_id=revoked.credential_id,
-                actor=first.session.principal,
-                occurred_at=NOW,
+                idempotency_key="revoke-recovery-credential",
             )
             with self.assertRaises(ConflictError):
                 harness.authentication.retrieve_operator_credential(revoked.credential_id)

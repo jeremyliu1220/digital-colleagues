@@ -14,6 +14,10 @@ if __package__ in {None, ""}:
     sys.path.insert(0, str(root))
     sys.path.insert(0, str(root / "src"))
 
+from scripts.check_p6_abuse import (  # noqa: E402
+    observe_unauthorized_proposal_escape,
+    require_zero_unauthorized_escape,
+)
 from scripts.p6_gate_support import FocusedGateError, run_focused_tests  # noqa: E402
 
 
@@ -25,6 +29,8 @@ def check_golden_path(root: Path) -> dict[str, object]:
         "tests.p6.test_effect_audit",
         "tests.p6.test_migrations",
     )
+    unauthorized_metric = observe_unauthorized_proposal_escape()
+    require_zero_unauthorized_escape(unauthorized_metric)
     return {
         "schema_version": 1,
         "gate": "p6_security_golden_path_clean",
@@ -41,11 +47,7 @@ def check_golden_path(root: Path) -> dict[str, object]:
             "denominator": 0,
             "reason": "security fixture has no eligible user-visible autonomous opportunity",
         },
-        "unauthorized_proposal_escape_rate": {
-            "numerator": 0,
-            "denominator": 16,
-            "rate": 0.0,
-        },
+        "unauthorized_proposal_escape_rate": unauthorized_metric,
         "human_evaluation": "not_evaluated",
         "live_provider_evidence": "not_evaluated",
         "production_security": "not_claimed",

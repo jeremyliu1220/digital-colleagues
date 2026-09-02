@@ -115,6 +115,10 @@ class StudioPersistencePort(Protocol):
         self, observation: ProposalCandidateObservation
     ) -> bool: ...
 
+    def list_proposal_candidate_observations(
+        self, namespace: Namespace
+    ) -> tuple[ProposalCandidateObservation, ...]: ...
+
     def proposal_candidate_counts(
         self, namespace: Namespace
     ) -> tuple[int, int, tuple[str, ...]]: ...
