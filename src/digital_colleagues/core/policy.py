@@ -134,6 +134,28 @@ class PolicyOutcomeKind(StrEnum):
     EXPLICIT_RESUME = "explicit_resume"
 
 
+POLICY_REFUSAL_OUTCOMES: frozenset[PolicyOutcomeKind] = frozenset(
+    {
+        PolicyOutcomeKind.STALE_POLICY,
+        PolicyOutcomeKind.DISALLOWED_TRIGGER,
+        PolicyOutcomeKind.OUTSIDE_HOURS_DEFER,
+        PolicyOutcomeKind.OUTSIDE_HOURS_NO_OP,
+        PolicyOutcomeKind.OUTSIDE_HOURS_STOP,
+        PolicyOutcomeKind.OUTSIDE_HOURS_ESCALATE,
+        PolicyOutcomeKind.PROACTIVITY_SUPPRESSED,
+        PolicyOutcomeKind.NOTIFICATION_SUPPRESSED,
+        PolicyOutcomeKind.INTERRUPTION_SUPPRESSED,
+        PolicyOutcomeKind.BUDGET_EXHAUSTED,
+        PolicyOutcomeKind.DUPLICATE_TRIGGER,
+        PolicyOutcomeKind.REPEATED_FAILURE_STOP,
+        PolicyOutcomeKind.REPEATED_FAILURE_ESCALATE,
+        PolicyOutcomeKind.FINITE_WORK_TERMINAL_STOP,
+        PolicyOutcomeKind.BLOCKED_WORK_ESCALATE,
+        PolicyOutcomeKind.STOPPED,
+    }
+)
+
+
 @dataclass(frozen=True, slots=True)
 class WeeklyWindow:
     """One local-wall-clock window, attributed to its starting weekday."""

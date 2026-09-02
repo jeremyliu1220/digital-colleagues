@@ -19,6 +19,7 @@ from digital_colleagues.core.effects import ActionResult, ActionResultState
 from digital_colleagues.core.errors import AuthorizationError, CoreInvariantError
 from digital_colleagues.core.namespace import Namespace
 from digital_colleagues.core.policy import (
+    POLICY_REFUSAL_OUTCOMES,
     ColleaguePolicy,
     DurableTriggerKind,
     EscalationCondition,
@@ -238,6 +239,16 @@ class P5PolicyTests(unittest.TestCase):
         self.assertEqual(response.status_code, 201, response.text)
         return cast(str, response.json()["work"]["work_id"])
 
+    def test_policy_refusal_outcomes_exclude_success_and_governance_transition(self) -> None:
+        self.assertEqual(
+            POLICY_REFUSAL_OUTCOMES,
+            frozenset(PolicyOutcomeKind)
+            - {
+                PolicyOutcomeKind.ALLOWED,
+                PolicyOutcomeKind.EXPLICIT_RESUME,
+            },
+        )
+
     def test_working_hours_timezone_overlap_cross_midnight_and_dst_are_deterministic(self) -> None:
         self.assertTrue(within_working_hours(_policy(), datetime(2026, 1, 5, 10, tzinfo=UTC)))
         self.assertFalse(within_working_hours(_policy(), datetime(2026, 1, 5, 18, tzinfo=UTC)))
@@ -450,6 +461,20 @@ class P5PolicyTests(unittest.TestCase):
                 restarted_client.get("/p5/studio/state").json()["runtime_policy"]["run_state"],
                 "stopped",
             )
+            stopped = restarted_client.post(
+                "/runtime/triggers",
+                headers=self._headers(csrf),
+                json={
+                    "work_id": work_id,
+                    "trigger_class": "event",
+                    "deterministic_noop": False,
+                    "idempotency_key": "resume-stopped-refusal",
+                },
+            )
+            self.assertEqual(stopped.status_code, 201, stopped.text)
+            self.assertEqual(stopped.json()["policy_outcome"], "stopped")
+            self.assertEqual(restarted.intelligence.call_count, 0)
+            self.assertEqual(restarted.channel.call_count, 0)
 
             mandate_only = self._review_changes(
                 restarted_client,
@@ -594,6 +619,11 @@ class P5PolicyTests(unittest.TestCase):
             self.assertEqual(evidence[0]["policy_revision"], 5)
             self.assertEqual(evidence[0]["mandate_revision"], 2)
             self.assertEqual(evidence[0]["stage"], "stop")
+            self.assertEqual(evidence[0]["source_id"], resume["draft_id"])
+            self.assertEqual(evidence[0]["correlation_id"], resume["correlation_id"])
+            self.assertEqual(evidence[0]["causation_id"], resume["draft_id"])
+            self.assertEqual(evidence[0]["safe_projection"]["draft_id"], resume["draft_id"])
+            self.assertEqual(evidence[0]["safe_projection"]["draft_revision"], resume["revision"])
             self.assertEqual(
                 evidence[0]["safe_projection"]["previous_stop_reason"], "budget_exhausted"
             )
@@ -601,6 +631,28 @@ class P5PolicyTests(unittest.TestCase):
                 evidence[0]["safe_projection"]["resume_change"],
                 "wake_budget_limit_increased",
             )
+            metric_response = restarted_client.get("/p5/evaluation/metrics")
+            self.assertEqual(metric_response.status_code, 200, metric_response.text)
+            refusals = metric_response.json()["policy_refusals"]
+            durable_refusals = [
+                item
+                for item in resumed["runtime_policy"]["outcomes"]
+                if PolicyOutcomeKind(item["outcome"]) in POLICY_REFUSAL_OUTCOMES
+            ]
+            self.assertEqual(refusals["count"], len(durable_refusals))
+            self.assertEqual(refusals["count"], 2)
+            self.assertEqual(
+                refusals["outcomes"],
+                [
+                    PolicyOutcomeKind.BUDGET_EXHAUSTED.value,
+                    PolicyOutcomeKind.STOPPED.value,
+                ],
+            )
+            self.assertNotIn(PolicyOutcomeKind.EXPLICIT_RESUME.value, refusals["outcomes"])
+            self.assertNotIn(PolicyOutcomeKind.ALLOWED.value, refusals["outcomes"])
+            self.assertFalse(refusals["counted_as_successful_interactions"])
+            self.assertEqual(restarted.intelligence.call_count, 0)
+            self.assertEqual(restarted.channel.call_count, 0)
 
             restarted.store.close()
             final_restart = build_harness(database)

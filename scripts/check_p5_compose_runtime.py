@@ -869,6 +869,33 @@ def check_compose_runtime(root: Path) -> dict[str, object]:
             != active_policy_revision
         ):
             raise ComposeRuntimeError("P5 metric readout lacked exact active policy binding")
+        final_policy_state = _request(opener, api + "/p5/studio/state")
+        durable_outcomes = final_policy_state["runtime_policy"]["outcomes"]
+        durable_refusals = [
+            item
+            for item in durable_outcomes
+            if item.get("outcome") not in {"allowed", "explicit_resume"}
+        ]
+        refusal_readout = metric_readout.get("policy_refusals", {})
+        expected_refusal_outcomes = {
+            "budget_exhausted",
+            "disallowed_trigger",
+            "interruption_suppressed",
+            "outside_hours_defer",
+            "proactivity_suppressed",
+            "stopped",
+        }
+        if (
+            not any(item.get("outcome") == "explicit_resume" for item in durable_outcomes)
+            or "explicit_resume" in refusal_readout.get("outcomes", [])
+            or refusal_readout.get("count") != len(durable_refusals)
+            or set(refusal_readout.get("outcomes", []))
+            != {item.get("outcome") for item in durable_refusals}
+            or not expected_refusal_outcomes.issubset(refusal_readout.get("outcomes", []))
+        ):
+            raise ComposeRuntimeError(
+                "P5 metric readout misclassified durable refusals or explicit resume"
+            )
         logs = _compose(
             docker,
             project,

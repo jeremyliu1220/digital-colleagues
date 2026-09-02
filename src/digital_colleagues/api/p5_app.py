@@ -35,6 +35,7 @@ from digital_colleagues.core.authority import (
 from digital_colleagues.core.builder import ColleagueDraft
 from digital_colleagues.core.common import FrozenJsonObject
 from digital_colleagues.core.policy import (
+    POLICY_REFUSAL_OUTCOMES,
     DurableTriggerKind,
     EscalationCondition,
     InterruptionMode,
@@ -408,7 +409,7 @@ def install_p5_routes(
         policy = snapshot.policy
         metrics = evaluation.evaluate(namespace)
         refused = tuple(
-            item for item in snapshot.policy_outcomes if item.outcome.value != "allowed"
+            item for item in snapshot.policy_outcomes if item.outcome in POLICY_REFUSAL_OUTCOMES
         )
         return {
             "scenario_version": "p5-revisioned-builder-v1",
