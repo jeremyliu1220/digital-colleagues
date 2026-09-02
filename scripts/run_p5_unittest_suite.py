@@ -28,6 +28,21 @@ P5_BOUNDARIES = {
     "tests.p5.test_policy.P5PolicyTests.test_finite_stop_blocked_and_repeated_failure_escalations_are_typed": "p5_notification_interruption_typed_stop_escalation",
     "tests.p5.test_policy.P5PolicyTests.test_policy_change_makes_old_proposal_and_context_stale_before_approval_or_dispatch": "p5_stale_policy_proposal_context",
     "tests.p5.test_migrations.P5MigrationTests.test_migration_006_checksum_fresh_and_v5_upgrade_are_identical": "p5_migration_fresh_v5_upgrade",
+    "tests.p5.test_builder.P5RepositoryGateTests.test_accepted_p5_commit_on_main_passes": "p5_repository_accepted_main",
+    "tests.p5.test_builder.P5RepositoryGateTests.test_original_p5_development_branch_at_accepted_commit_passes": "p5_repository_original_branch",
+    "tests.p5.test_builder.P5RepositoryGateTests.test_normal_descendant_hotfix_branch_passes": "p5_repository_descendant_hotfix",
+    "tests.p5.test_builder.P5RepositoryGateTests.test_different_branch_name_with_accepted_ancestor_passes": "p5_repository_branch_name_independent",
+    "tests.p5.test_builder.P5RepositoryGateTests.test_missing_accepted_p5_ancestor_fails_closed": "p5_repository_missing_accepted_ancestor",
+    "tests.p5.test_builder.P5RepositoryGateTests.test_unavailable_accepted_p5_commit_fails_closed": "p5_repository_unavailable_accepted_commit",
+    "tests.p5.test_builder.P5RepositoryGateTests.test_accepted_p5_immutable_file_deletion_fails_closed": "p5_repository_immutable_deletion",
+    "tests.p5.test_builder.P5RepositoryGateTests.test_accepted_p5_immutable_file_modification_fails_closed": "p5_repository_immutable_modification",
+    "tests.p5.test_builder.P5RepositoryGateTests.test_fixed_acceptance_document_protections_remain_effective": "p5_repository_fixed_acceptance_documents",
+    "tests.p5.test_builder.P5RepositoryGateTests.test_retained_p0_p4_immutable_protections_remain_effective": "p5_repository_retained_history",
+    "tests.p5.test_builder.P5RepositoryGateTests.test_runtime_credential_and_build_residue_still_fail_closed": "p5_repository_residue",
+    "tests.p5.test_builder.P5RepositoryGateTests.test_exact_repository_root_and_required_files_fail_closed": "p5_repository_root_and_required_files",
+    "tests.p5.test_builder.P5RepositoryGateTests.test_real_hotfix_tree_is_an_accepted_p5_descendant": "p5_repository_real_tree",
+    "tests.p5.test_builder.P5EvidenceGuardTests.test_evidence_writer_retains_fixed_development_branch_and_base_guards": "p5_evidence_branch_base_guards",
+    "tests.p5.test_builder.P5EvidenceGuardTests.test_evidence_writer_retains_complete_gate_and_commit_shape_guards": "p5_evidence_completeness_commit_guards",
 }
 REQUIRED_TEST_BOUNDARIES = {**P4_BOUNDARIES, **P5_BOUNDARIES}
 

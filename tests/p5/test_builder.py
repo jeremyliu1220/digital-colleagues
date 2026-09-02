@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import subprocess
 import tempfile
 import threading
 import unittest
@@ -9,7 +11,8 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from datetime import timedelta
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
@@ -26,6 +29,10 @@ from digital_colleagues.application.p5_services import RevisionedColleagueBuilde
 from digital_colleagues.core.namespace import Namespace
 from digital_colleagues.core.principals import Principal
 from digital_colleagues.local.security import CredentialDigests
+from scripts import check_p4_repository as p4_repository_gate
+from scripts import check_p5_repository as repository_gate
+from scripts.collect_p5_evidence import REQUIRED_GATES, EvidenceError, write_p5_evidence
+from scripts.run_p5_unittest_suite import REQUIRED_TEST_BOUNDARIES
 from tests.p5.fixtures import (
     ROOT,
     P5Harness,
@@ -418,6 +425,326 @@ class P5BuilderTests(unittest.TestCase):
             expired_client.cookies.set("dc_session", credential)
             self.assertEqual(expired_client.get("/colleagues/drafts").status_code, 403)
             harness.store.close()
+
+
+def gate_git(root: Path, *arguments: str) -> str:
+    return subprocess.run(
+        ["git", *arguments],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+
+
+def passing_p5_outcome() -> dict[str, Any]:
+    test_ids = sorted(REQUIRED_TEST_BOUNDARIES)
+    return {
+        "tests_run": len(test_ids),
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0,
+        "expected_failures": 0,
+        "unexpected_successes": 0,
+        "gate_passed": True,
+        "test_ids": test_ids,
+        "fault_boundaries": sorted(REQUIRED_TEST_BOUNDARIES.values()),
+    }
+
+
+class P5RepositoryGateTests(unittest.TestCase):
+    def _commit(self, root: Path, message: str) -> str:
+        gate_git(root, "add", ".")
+        gate_git(
+            root,
+            "-c",
+            "user.name=P5 Gate Test",
+            "-c",
+            "user.email=p5-gate.invalid",
+            "commit",
+            "-m",
+            message,
+        )
+        return gate_git(root, "rev-parse", "HEAD")
+
+    @staticmethod
+    def _write(root: Path, relative: str, content: str) -> None:
+        document = root / relative
+        document.parent.mkdir(parents=True, exist_ok=True)
+        document.write_text(content, encoding="utf-8")
+
+    def repository(self) -> tuple[Path, dict[str, str]]:
+        temporary = tempfile.TemporaryDirectory(prefix="p5-repository-gate-")
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name)
+        gate_git(root, "init", "--initial-branch=main")
+        for relative in (
+            "artifacts/p0/summary.json",
+            "artifacts/p1/summary.json",
+            "artifacts/p2/summary.json",
+            "artifacts/p3/summary.json",
+            "docs/p0/acceptance.md",
+            "docs/p1/acceptance.md",
+            "docs/p2/acceptance.md",
+            "docs/p3/acceptance.md",
+            "migrations/001_initial.sql",
+            "migrations/002_runtime_indexes.sql",
+            "migrations/003_timer_triggers.sql",
+            "provenance/p3-migration-receipt.json",
+        ):
+            self._write(root, relative, f"historical {relative}\n")
+        p4_historical_base = self._commit(root, "P0-P3 historical baseline")
+
+        for relative in p4_repository_gate.ACCEPTED_P4_IMMUTABLE_PATHS:
+            self._write(root, relative, f"accepted P4 {relative}\n")
+        self._write(root, "compose.yaml", "services: {}\n")
+        self._write(root, "required-p4.txt", "required P4\n")
+        accepted_p4 = self._commit(root, "accepted P4")
+
+        for relative in repository_gate.ACCEPTANCE_DOCUMENT_PATHS:
+            self._write(root, relative, f"fixed P5 acceptance {relative}\n")
+        p5_acceptance = self._commit(root, "fixed P5 acceptance")
+
+        for relative in repository_gate.ACCEPTED_P5_IMMUTABLE_PATHS:
+            document = root / relative
+            if not document.exists():
+                self._write(root, relative, f"accepted P5 {relative}\n")
+        self._write(root, "required-p5.txt", "required P5\n")
+        accepted_p5 = self._commit(root, "accepted P5")
+        return root, {
+            "p4_historical_base": p4_historical_base,
+            "accepted_p4": accepted_p4,
+            "p5_acceptance": p5_acceptance,
+            "accepted_p5": accepted_p5,
+        }
+
+    def check(
+        self,
+        root: Path,
+        commits: dict[str, str],
+        *,
+        accepted_p5: str | None = None,
+    ) -> dict[str, object]:
+        with (
+            patch.object(
+                p4_repository_gate,
+                "BASE_COMMIT",
+                commits["p4_historical_base"],
+            ),
+            patch.object(
+                p4_repository_gate,
+                "ACCEPTED_P4_COMMIT",
+                commits["accepted_p4"],
+            ),
+            patch.object(
+                p4_repository_gate,
+                "REQUIRED_FILES",
+                {"compose.yaml", "required-p4.txt"},
+            ),
+            patch.object(repository_gate, "BASE_COMMIT", commits["accepted_p4"]),
+            patch.object(
+                repository_gate,
+                "ACCEPTANCE_COMMIT",
+                commits["p5_acceptance"],
+            ),
+            patch.object(
+                repository_gate,
+                "ACCEPTED_P5_COMMIT",
+                accepted_p5 or commits["accepted_p5"],
+            ),
+            patch.object(repository_gate, "REQUIRED_FILES", {"required-p5.txt"}),
+        ):
+            return repository_gate.check_repository(root)
+
+    def test_accepted_p5_commit_on_main_passes(self) -> None:
+        root, commits = self.repository()
+        result = self.check(root, commits)
+        self.assertEqual(result["branch"], "main")
+        self.assertEqual(result["accepted_p5_commit"], commits["accepted_p5"])
+        self.assertTrue(result["accepted_p5_ancestor"])
+
+    def test_original_p5_development_branch_at_accepted_commit_passes(self) -> None:
+        root, commits = self.repository()
+        gate_git(root, "switch", "-c", repository_gate.BRANCH)
+        result = self.check(root, commits)
+        self.assertEqual(result["branch"], repository_gate.BRANCH)
+
+    def test_normal_descendant_hotfix_branch_passes(self) -> None:
+        root, commits = self.repository()
+        gate_git(root, "switch", "-c", "codex/p5-post-merge-check")
+        self._write(root, "hotfix.txt", "descendant\n")
+        self._commit(root, "normal P5 descendant")
+        result = self.check(root, commits)
+        self.assertEqual(result["branch"], "codex/p5-post-merge-check")
+        self.assertTrue(result["accepted_p5_ancestor"])
+
+    def test_different_branch_name_with_accepted_ancestor_passes(self) -> None:
+        root, commits = self.repository()
+        gate_git(root, "switch", "-c", "codex/p6-governance-hardening")
+        result = self.check(root, commits)
+        self.assertEqual(result["branch"], "codex/p6-governance-hardening")
+
+    def test_missing_accepted_p5_ancestor_fails_closed(self) -> None:
+        root, commits = self.repository()
+        gate_git(root, "switch", "-c", "unrelated", commits["p5_acceptance"])
+        with self.assertRaisesRegex(repository_gate.RepositoryError, "not an ancestor"):
+            self.check(root, commits)
+
+    def test_unavailable_accepted_p5_commit_fails_closed(self) -> None:
+        root, commits = self.repository()
+        with self.assertRaisesRegex(repository_gate.RepositoryError, "commit is unavailable"):
+            self.check(root, commits, accepted_p5="f" * 40)
+
+    def test_accepted_p5_immutable_file_deletion_fails_closed(self) -> None:
+        root, commits = self.repository()
+        for relative in repository_gate.ACCEPTED_P5_IMMUTABLE_PATHS:
+            with self.subTest(relative=relative):
+                document = root / relative
+                baseline = document.read_bytes()
+                document.unlink()
+                with self.assertRaisesRegex(
+                    repository_gate.RepositoryError,
+                    "immutable file is missing",
+                ):
+                    self.check(root, commits)
+                document.write_bytes(baseline)
+
+    def test_accepted_p5_immutable_file_modification_fails_closed(self) -> None:
+        root, commits = self.repository()
+        for relative in repository_gate.ACCEPTED_P5_IMMUTABLE_PATHS:
+            with self.subTest(relative=relative):
+                document = root / relative
+                baseline = document.read_bytes()
+                document.write_text("changed\n", encoding="utf-8")
+                with self.assertRaisesRegex(
+                    repository_gate.RepositoryError,
+                    "immutable file changed",
+                ):
+                    self.check(root, commits)
+                document.write_bytes(baseline)
+
+    def test_fixed_acceptance_document_protections_remain_effective(self) -> None:
+        root, commits = self.repository()
+        for relative in repository_gate.ACCEPTANCE_DOCUMENT_PATHS:
+            if relative in repository_gate.ACCEPTED_P5_IMMUTABLE_PATHS:
+                continue
+            with self.subTest(relative=relative):
+                document = root / relative
+                baseline = document.read_bytes()
+                document.write_text("changed\n", encoding="utf-8")
+                with self.assertRaisesRegex(
+                    repository_gate.RepositoryError,
+                    "acceptance document changed",
+                ):
+                    self.check(root, commits)
+                document.unlink()
+                with self.assertRaisesRegex(
+                    repository_gate.RepositoryError,
+                    "acceptance document is missing",
+                ):
+                    self.check(root, commits)
+                document.write_bytes(baseline)
+
+    def test_retained_p0_p4_immutable_protections_remain_effective(self) -> None:
+        root, commits = self.repository()
+        for relative in (
+            "docs/p0/acceptance.md",
+            "docs/p1/acceptance.md",
+            "docs/p2/acceptance.md",
+            "docs/p3/acceptance.md",
+            "migrations/001_initial.sql",
+            "migrations/002_runtime_indexes.sql",
+            "migrations/003_timer_triggers.sql",
+            *p4_repository_gate.ACCEPTED_P4_IMMUTABLE_PATHS,
+        ):
+            with self.subTest(relative=relative):
+                document = root / relative
+                baseline = document.read_bytes()
+                document.write_text("changed\n", encoding="utf-8")
+                with self.assertRaises(p4_repository_gate.RepositoryError):
+                    self.check(root, commits)
+                document.write_bytes(baseline)
+
+    def test_runtime_credential_and_build_residue_still_fail_closed(self) -> None:
+        for relative in ("state.sqlite", ".env", "build/output.js"):
+            with self.subTest(relative=relative):
+                root, commits = self.repository()
+                self._write(root, relative, "residue\n")
+                with self.assertRaisesRegex(
+                    p4_repository_gate.RepositoryError,
+                    "residue is present",
+                ):
+                    self.check(root, commits)
+
+    def test_exact_repository_root_and_required_files_fail_closed(self) -> None:
+        root, commits = self.repository()
+        nested = root / "nested"
+        nested.mkdir()
+        with self.assertRaisesRegex(repository_gate.RepositoryError, "root is not exact"):
+            self.check(nested, commits)
+        (root / "required-p5.txt").unlink()
+        with self.assertRaisesRegex(repository_gate.RepositoryError, "required P5 files"):
+            self.check(root, commits)
+
+    def test_real_hotfix_tree_is_an_accepted_p5_descendant(self) -> None:
+        result = repository_gate.check_repository(ROOT)
+        self.assertEqual(result["accepted_p5_commit"], repository_gate.ACCEPTED_P5_COMMIT)
+        self.assertTrue(result["accepted_p5_ancestor"])
+
+
+class P5EvidenceGuardTests(unittest.TestCase):
+    def test_evidence_writer_retains_fixed_development_branch_and_base_guards(self) -> None:
+        summary = json.loads((ROOT / "artifacts/p5/summary.json").read_text(encoding="utf-8"))
+        results = summary["results"]
+        with tempfile.TemporaryDirectory(prefix="p5-evidence-guard-") as temporary:
+            evidence_path = Path(temporary) / "summary.json"
+            for branch, merge_base in (
+                ("main", repository_gate.BASE_COMMIT),
+                ("codex/not-p5-acceptance", repository_gate.BASE_COMMIT),
+                (repository_gate.BRANCH, "d" * 40),
+            ):
+                with self.subTest(branch=branch, merge_base=merge_base):
+                    with self.assertRaisesRegex(EvidenceError, "branch or merge-base drifted"):
+                        write_p5_evidence(
+                            evidence_path=evidence_path,
+                            results=results,
+                            unittest_outcome=passing_p5_outcome(),
+                            verified_gates=set(REQUIRED_GATES),
+                            branch=branch,
+                            implementation_commit="c" * 40,
+                            merge_base=merge_base,
+                            tree_digest="sha256:" + ("e" * 64),
+                        )
+            self.assertFalse(evidence_path.exists())
+
+    def test_evidence_writer_retains_complete_gate_and_commit_shape_guards(self) -> None:
+        summary = json.loads((ROOT / "artifacts/p5/summary.json").read_text(encoding="utf-8"))
+        results = summary["results"]
+        with tempfile.TemporaryDirectory(prefix="p5-evidence-completeness-") as temporary:
+            evidence_path = Path(temporary) / "summary.json"
+            with self.assertRaisesRegex(EvidenceError, "missing required mechanical gates"):
+                write_p5_evidence(
+                    evidence_path=evidence_path,
+                    results=results,
+                    unittest_outcome=passing_p5_outcome(),
+                    verified_gates=set(),
+                    branch=repository_gate.BRANCH,
+                    implementation_commit="c" * 40,
+                    merge_base=repository_gate.BASE_COMMIT,
+                    tree_digest="sha256:" + ("e" * 64),
+                )
+            with self.assertRaisesRegex(EvidenceError, "not a real commit SHA"):
+                write_p5_evidence(
+                    evidence_path=evidence_path,
+                    results=results,
+                    unittest_outcome=passing_p5_outcome(),
+                    verified_gates=set(REQUIRED_GATES),
+                    branch=repository_gate.BRANCH,
+                    implementation_commit="not-a-commit",
+                    merge_base=repository_gate.BASE_COMMIT,
+                    tree_digest="sha256:" + ("e" * 64),
+                )
+            self.assertFalse(evidence_path.exists())
 
 
 if __name__ == "__main__":
