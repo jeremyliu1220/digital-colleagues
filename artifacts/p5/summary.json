@@ -5,9 +5,9 @@
     "base_commit": "259e5627c0a4d713934263efe18caf8c675a1669",
     "branch": "codex/p5-revisioned-colleague-builder",
     "evidence_commit_target": "the subsequent commit containing these exact summary bytes",
-    "implementation_commit": "43b6a70ed7e8cdd7957ceede231edd4ec766679f",
+    "implementation_commit": "0af6d6965c84195eb905bbca6a11c718f9e3539b",
     "merge_base": "259e5627c0a4d713934263efe18caf8c675a1669",
-    "public_tree_digest_excluding_summary": "sha256:1a6d841ac8265692e32ddd5d00f5057cbe12d3ac2a6f4c7b2114a331f25cb1bf",
+    "public_tree_digest_excluding_summary": "sha256:1de8f953e754cc618f73ba3070c463387a816085060f434f9453cb258d8208d6",
     "summary_exclusion_rule": "exclude_exact_artifacts/p5/summary.json_path_only"
   },
   "evidence_class": [
@@ -53,7 +53,7 @@
         "policy_version": "colleague-experience-p4-v2",
         "reason": "eligible opportunities exist but durable evaluator coverage is incomplete",
         "safe_causal_references": [
-          "correlation:f84f9f643384f1f6561fbbf182842186"
+          "correlation:fcb8e631b689bd12e31164c3cd145ce0"
         ],
         "scenario_version": "p4-golden-path-v1",
         "schema_version": 1,
@@ -71,7 +71,7 @@
         "policy_version": "colleague-experience-p4-v2",
         "reason": "eligible opportunities exist but durable evaluator coverage is incomplete",
         "safe_causal_references": [
-          "correlation:f84f9f643384f1f6561fbbf182842186"
+          "correlation:fcb8e631b689bd12e31164c3cd145ce0"
         ],
         "scenario_version": "p4-golden-path-v1",
         "schema_version": 1,
@@ -87,37 +87,37 @@
         "numerator": 2,
         "policy_bindings": [
           {
-            "mandate_id": "mandate:9d2fe54a929394978f5357e476446ff7",
+            "mandate_id": "mandate:ce03ffc66c5b91299d88ba67355092e5",
             "mandate_revision": 2,
-            "policy_id": "policy:6ca1d99f046ad5a4b74d751a22467ea1",
+            "policy_id": "policy:ff7f455b379d78680910a257766f4877",
             "policy_revision": 1
           },
           {
-            "mandate_id": "mandate:9d2fe54a929394978f5357e476446ff7",
+            "mandate_id": "mandate:ce03ffc66c5b91299d88ba67355092e5",
             "mandate_revision": 3,
-            "policy_id": "policy:6ca1d99f046ad5a4b74d751a22467ea1",
+            "policy_id": "policy:ff7f455b379d78680910a257766f4877",
             "policy_revision": 2
           },
           {
-            "mandate_id": "mandate:9d2fe54a929394978f5357e476446ff7",
+            "mandate_id": "mandate:ce03ffc66c5b91299d88ba67355092e5",
             "mandate_revision": 3,
-            "policy_id": "policy:6ca1d99f046ad5a4b74d751a22467ea1",
+            "policy_id": "policy:ff7f455b379d78680910a257766f4877",
             "policy_revision": 7
           },
           {
-            "mandate_id": "mandate:9d2fe54a929394978f5357e476446ff7",
+            "mandate_id": "mandate:ce03ffc66c5b91299d88ba67355092e5",
             "mandate_revision": 3,
-            "policy_id": "policy:6ca1d99f046ad5a4b74d751a22467ea1",
+            "policy_id": "policy:ff7f455b379d78680910a257766f4877",
             "policy_revision": 8
           }
         ],
         "policy_version": "colleague-experience-p4-v2",
         "reason": null,
         "safe_causal_references": [
-          "correlation:686abf856662f255e1cc68b5d1ed6454",
-          "correlation:6a174f67b5050adf3970133e91be5558",
-          "correlation:a5a722d2a07774519b7cf36413548b83",
-          "correlation:c44907f62c79e877eb984630b57ae538"
+          "correlation:514ee712a0344cb65826551bca11322d",
+          "correlation:87386f31113640d11ca1d762c1e11010",
+          "correlation:a3cff5321e44725be4cb40faac0f65aa",
+          "correlation:d6f29426927defef2deafef4d8c7ada2"
         ],
         "scenario_version": "p4-golden-path-v1",
         "schema_version": 1,
@@ -133,16 +133,16 @@
         "numerator": 1,
         "policy_bindings": [
           {
-            "mandate_id": "mandate:9d2fe54a929394978f5357e476446ff7",
+            "mandate_id": "mandate:ce03ffc66c5b91299d88ba67355092e5",
             "mandate_revision": 3,
-            "policy_id": "policy:6ca1d99f046ad5a4b74d751a22467ea1",
+            "policy_id": "policy:ff7f455b379d78680910a257766f4877",
             "policy_revision": 8
           }
         ],
         "policy_version": "colleague-experience-p4-v2",
         "reason": null,
         "safe_causal_references": [
-          "correlation:6a174f67b5050adf3970133e91be5558"
+          "correlation:d6f29426927defef2deafef4d8c7ada2"
         ],
         "scenario_version": "p4-golden-path-v1",
         "schema_version": 1,
@@ -158,23 +158,23 @@
         "numerator": null,
         "policy_bindings": [
           {
-            "mandate_id": "mandate:9d2fe54a929394978f5357e476446ff7",
+            "mandate_id": "mandate:ce03ffc66c5b91299d88ba67355092e5",
             "mandate_revision": 2,
-            "policy_id": "policy:6ca1d99f046ad5a4b74d751a22467ea1",
+            "policy_id": "policy:ff7f455b379d78680910a257766f4877",
             "policy_revision": 1
           },
           {
-            "mandate_id": "mandate:9d2fe54a929394978f5357e476446ff7",
+            "mandate_id": "mandate:ce03ffc66c5b91299d88ba67355092e5",
             "mandate_revision": 3,
-            "policy_id": "policy:6ca1d99f046ad5a4b74d751a22467ea1",
+            "policy_id": "policy:ff7f455b379d78680910a257766f4877",
             "policy_revision": 8
           }
         ],
         "policy_version": "colleague-experience-p4-v2",
         "reason": "eligible opportunities exist but durable evaluator coverage is incomplete",
         "safe_causal_references": [
-          "correlation:6a174f67b5050adf3970133e91be5558",
-          "correlation:a5a722d2a07774519b7cf36413548b83"
+          "correlation:a3cff5321e44725be4cb40faac0f65aa",
+          "correlation:d6f29426927defef2deafef4d8c7ada2"
         ],
         "scenario_version": "p4-golden-path-v1",
         "schema_version": 1,
@@ -192,7 +192,7 @@
         "policy_version": "colleague-experience-p4-v2",
         "reason": "eligible opportunities exist but durable evaluator coverage is incomplete",
         "safe_causal_references": [
-          "correlation:f84f9f643384f1f6561fbbf182842186"
+          "correlation:fcb8e631b689bd12e31164c3cd145ce0"
         ],
         "scenario_version": "p4-golden-path-v1",
         "schema_version": 1,
@@ -210,7 +210,7 @@
         "policy_version": "colleague-experience-p4-v2",
         "reason": null,
         "safe_causal_references": [
-          "correlation:f84f9f643384f1f6561fbbf182842186"
+          "correlation:fcb8e631b689bd12e31164c3cd145ce0"
         ],
         "scenario_version": "p4-golden-path-v1",
         "schema_version": 1,
@@ -236,18 +236,17 @@
       }
     ],
     "policy_binding": {
-      "mandate_id": "mandate:9d2fe54a929394978f5357e476446ff7",
+      "mandate_id": "mandate:ce03ffc66c5b91299d88ba67355092e5",
       "mandate_revision": 3,
-      "policy_id": "policy:6ca1d99f046ad5a4b74d751a22467ea1",
+      "policy_id": "policy:ff7f455b379d78680910a257766f4877",
       "policy_revision": 8
     },
     "policy_refusals": {
-      "count": 7,
+      "count": 6,
       "counted_as_successful_interactions": false,
       "outcomes": [
         "budget_exhausted",
         "disallowed_trigger",
-        "explicit_resume",
         "interruption_suppressed",
         "outside_hours_defer",
         "proactivity_suppressed",
@@ -288,7 +287,7 @@
       "schema_version": 1
     },
     "boundary": {
-      "bytes_scanned": 1983496,
+      "bytes_scanned": 1989364,
       "exceptions_applied": 0,
       "files_scanned": 253,
       "gate": "public_boundary_clean",
@@ -333,17 +332,17 @@
         "volumes_remaining": 0
       },
       "command": "python3 -B scripts/check_p5_compose_runtime.py .",
-      "compose_project": "dc-p5-runtime-34504-1938014c",
+      "compose_project": "dc-p5-runtime-55104-904b6468",
       "credentials_absent_from_service_logs": true,
       "draft_history_recovered": true,
-      "ended_at": "2026-09-02T01:47:09.195505Z",
+      "ended_at": "2026-09-02T04:25:48.317118Z",
       "environment": {
-        "api_host_port": 49581,
+        "api_host_port": 51183,
         "compose_version": "5.4.0",
         "docker_server_version": "29.7.2",
         "host": "darwin",
         "published_bind": "127.0.0.1",
-        "studio_host_port": 49582
+        "studio_host_port": 51184
       },
       "evidence_class": "synthetic_offline",
       "explicit_defaults_visible": true,
@@ -369,7 +368,7 @@
             "policy_version": "colleague-experience-p4-v2",
             "reason": "eligible opportunities exist but durable evaluator coverage is incomplete",
             "safe_causal_references": [
-              "correlation:f84f9f643384f1f6561fbbf182842186"
+              "correlation:fcb8e631b689bd12e31164c3cd145ce0"
             ],
             "scenario_version": "p4-golden-path-v1",
             "schema_version": 1,
@@ -387,7 +386,7 @@
             "policy_version": "colleague-experience-p4-v2",
             "reason": "eligible opportunities exist but durable evaluator coverage is incomplete",
             "safe_causal_references": [
-              "correlation:f84f9f643384f1f6561fbbf182842186"
+              "correlation:fcb8e631b689bd12e31164c3cd145ce0"
             ],
             "scenario_version": "p4-golden-path-v1",
             "schema_version": 1,
@@ -403,37 +402,37 @@
             "numerator": 2,
             "policy_bindings": [
               {
-                "mandate_id": "mandate:9d2fe54a929394978f5357e476446ff7",
+                "mandate_id": "mandate:ce03ffc66c5b91299d88ba67355092e5",
                 "mandate_revision": 2,
-                "policy_id": "policy:6ca1d99f046ad5a4b74d751a22467ea1",
+                "policy_id": "policy:ff7f455b379d78680910a257766f4877",
                 "policy_revision": 1
               },
               {
-                "mandate_id": "mandate:9d2fe54a929394978f5357e476446ff7",
+                "mandate_id": "mandate:ce03ffc66c5b91299d88ba67355092e5",
                 "mandate_revision": 3,
-                "policy_id": "policy:6ca1d99f046ad5a4b74d751a22467ea1",
+                "policy_id": "policy:ff7f455b379d78680910a257766f4877",
                 "policy_revision": 2
               },
               {
-                "mandate_id": "mandate:9d2fe54a929394978f5357e476446ff7",
+                "mandate_id": "mandate:ce03ffc66c5b91299d88ba67355092e5",
                 "mandate_revision": 3,
-                "policy_id": "policy:6ca1d99f046ad5a4b74d751a22467ea1",
+                "policy_id": "policy:ff7f455b379d78680910a257766f4877",
                 "policy_revision": 7
               },
               {
-                "mandate_id": "mandate:9d2fe54a929394978f5357e476446ff7",
+                "mandate_id": "mandate:ce03ffc66c5b91299d88ba67355092e5",
                 "mandate_revision": 3,
-                "policy_id": "policy:6ca1d99f046ad5a4b74d751a22467ea1",
+                "policy_id": "policy:ff7f455b379d78680910a257766f4877",
                 "policy_revision": 8
               }
             ],
             "policy_version": "colleague-experience-p4-v2",
             "reason": null,
             "safe_causal_references": [
-              "correlation:686abf856662f255e1cc68b5d1ed6454",
-              "correlation:6a174f67b5050adf3970133e91be5558",
-              "correlation:a5a722d2a07774519b7cf36413548b83",
-              "correlation:c44907f62c79e877eb984630b57ae538"
+              "correlation:514ee712a0344cb65826551bca11322d",
+              "correlation:87386f31113640d11ca1d762c1e11010",
+              "correlation:a3cff5321e44725be4cb40faac0f65aa",
+              "correlation:d6f29426927defef2deafef4d8c7ada2"
             ],
             "scenario_version": "p4-golden-path-v1",
             "schema_version": 1,
@@ -449,16 +448,16 @@
             "numerator": 1,
             "policy_bindings": [
               {
-                "mandate_id": "mandate:9d2fe54a929394978f5357e476446ff7",
+                "mandate_id": "mandate:ce03ffc66c5b91299d88ba67355092e5",
                 "mandate_revision": 3,
-                "policy_id": "policy:6ca1d99f046ad5a4b74d751a22467ea1",
+                "policy_id": "policy:ff7f455b379d78680910a257766f4877",
                 "policy_revision": 8
               }
             ],
             "policy_version": "colleague-experience-p4-v2",
             "reason": null,
             "safe_causal_references": [
-              "correlation:6a174f67b5050adf3970133e91be5558"
+              "correlation:d6f29426927defef2deafef4d8c7ada2"
             ],
             "scenario_version": "p4-golden-path-v1",
             "schema_version": 1,
@@ -474,23 +473,23 @@
             "numerator": null,
             "policy_bindings": [
               {
-                "mandate_id": "mandate:9d2fe54a929394978f5357e476446ff7",
+                "mandate_id": "mandate:ce03ffc66c5b91299d88ba67355092e5",
                 "mandate_revision": 2,
-                "policy_id": "policy:6ca1d99f046ad5a4b74d751a22467ea1",
+                "policy_id": "policy:ff7f455b379d78680910a257766f4877",
                 "policy_revision": 1
               },
               {
-                "mandate_id": "mandate:9d2fe54a929394978f5357e476446ff7",
+                "mandate_id": "mandate:ce03ffc66c5b91299d88ba67355092e5",
                 "mandate_revision": 3,
-                "policy_id": "policy:6ca1d99f046ad5a4b74d751a22467ea1",
+                "policy_id": "policy:ff7f455b379d78680910a257766f4877",
                 "policy_revision": 8
               }
             ],
             "policy_version": "colleague-experience-p4-v2",
             "reason": "eligible opportunities exist but durable evaluator coverage is incomplete",
             "safe_causal_references": [
-              "correlation:6a174f67b5050adf3970133e91be5558",
-              "correlation:a5a722d2a07774519b7cf36413548b83"
+              "correlation:a3cff5321e44725be4cb40faac0f65aa",
+              "correlation:d6f29426927defef2deafef4d8c7ada2"
             ],
             "scenario_version": "p4-golden-path-v1",
             "schema_version": 1,
@@ -508,7 +507,7 @@
             "policy_version": "colleague-experience-p4-v2",
             "reason": "eligible opportunities exist but durable evaluator coverage is incomplete",
             "safe_causal_references": [
-              "correlation:f84f9f643384f1f6561fbbf182842186"
+              "correlation:fcb8e631b689bd12e31164c3cd145ce0"
             ],
             "scenario_version": "p4-golden-path-v1",
             "schema_version": 1,
@@ -526,7 +525,7 @@
             "policy_version": "colleague-experience-p4-v2",
             "reason": null,
             "safe_causal_references": [
-              "correlation:f84f9f643384f1f6561fbbf182842186"
+              "correlation:fcb8e631b689bd12e31164c3cd145ce0"
             ],
             "scenario_version": "p4-golden-path-v1",
             "schema_version": 1,
@@ -552,18 +551,17 @@
           }
         ],
         "policy_binding": {
-          "mandate_id": "mandate:9d2fe54a929394978f5357e476446ff7",
+          "mandate_id": "mandate:ce03ffc66c5b91299d88ba67355092e5",
           "mandate_revision": 3,
-          "policy_id": "policy:6ca1d99f046ad5a4b74d751a22467ea1",
+          "policy_id": "policy:ff7f455b379d78680910a257766f4877",
           "policy_revision": 8
         },
         "policy_refusals": {
-          "count": 7,
+          "count": 6,
           "counted_as_successful_interactions": false,
           "outcomes": [
             "budget_exhausted",
             "disallowed_trigger",
-            "explicit_resume",
             "interruption_suppressed",
             "outside_hours_defer",
             "proactivity_suppressed",
@@ -582,7 +580,7 @@
       "schema_version": 1,
       "stale_draft_fault": "refused_409_and_persisted",
       "stale_proposal_fault": "refused_403_before_approval_dispatch",
-      "started_at": "2026-09-02T01:46:45.539672Z",
+      "started_at": "2026-09-02T04:25:24.759085Z",
       "state_volume": "isolated_project_scoped_temporary_volume",
       "status": "passed",
       "typed_policy_controls": "working_hours_trigger_proactivity_interruption_passed"
@@ -653,13 +651,13 @@
       "skips": 0,
       "stale_policy_proposal_refused": true,
       "stopped_provider_and_channel_call_counts": 0,
-      "tests_run": 7,
+      "tests_run": 8,
       "unauthorized_proposal_escape_target": 0,
       "unrelated_confirmation_preserves_durable_stop": true
     },
     "provenance": {
       "gate": "p5_provenance_clean",
-      "implementation_tree_digest": "sha256:f3f8d81cd83eb240a3d1151b96f9b92e35f7579852934c3ed8354b8f57ad7f7d",
+      "implementation_tree_digest": "sha256:01e7c8bb278bac7673aa4974142eba342ab5ba1bfe85edb2a805d03dc1b1a618",
       "new_implementation_count": 63,
       "receipt_digest": "sha256:3408dd3410b146f49ba0fa2441f5c44800638930405fac0d8068d36c44a674fb",
       "schema_version": 1,
@@ -677,7 +675,7 @@
       "base_commit": "259e5627c0a4d713934263efe18caf8c675a1669",
       "branch": "codex/p5-revisioned-colleague-builder",
       "gate": "p5_repository_clean",
-      "head_commit": "43b6a70ed7e8cdd7957ceede231edd4ec766679f",
+      "head_commit": "0af6d6965c84195eb905bbca6a11c718f9e3539b",
       "merge_base": "259e5627c0a4d713934263efe18caf8c675a1669",
       "migration_006_digest": "sha256:7909da4b0b3eb514222f1fd1068c19eb6e8b98d466a786b76c20ae7999e26bcd",
       "required_file_count": 29,
@@ -949,6 +947,7 @@
         "tests.p5.test_policy.P5PolicyTests.test_disallowed_outside_hours_proactivity_notification_and_interruption_are_separate",
         "tests.p5.test_policy.P5PolicyTests.test_finite_stop_blocked_and_repeated_failure_escalations_are_typed",
         "tests.p5.test_policy.P5PolicyTests.test_policy_change_makes_old_proposal_and_context_stale_before_approval_or_dispatch",
+        "tests.p5.test_policy.P5PolicyTests.test_policy_refusal_outcomes_exclude_success_and_governance_transition",
         "tests.p5.test_policy.P5PolicyTests.test_queued_wake_after_stop_is_restart_safe_governed_noop_without_provider_calls",
         "tests.p5.test_policy.P5PolicyTests.test_stopped_state_survives_unrelated_confirmations_until_exact_explicit_resume",
         "tests.p5.test_policy.P5PolicyTests.test_working_hours_timezone_overlap_cross_midnight_and_dst_are_deterministic",
@@ -976,7 +975,7 @@
         "tests.runtime.test_p3_runtime.RuntimeSemanticsTests.test_wake_cycle_bounds_preserve_pending_work_and_agenda_takeover_fences_stale_owner",
         "tests.runtime.test_timer_runtime.TimerRuntimeTests.test_durable_timer_due_replay_restart_fencing_causation_and_namespace_isolation"
       ],
-      "tests_run": 195,
+      "tests_run": 196,
       "unexpected_successes": 0
     }
   },
