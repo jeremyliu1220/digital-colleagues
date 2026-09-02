@@ -5,6 +5,7 @@ from __future__ import annotations
 import tempfile
 import unittest
 from collections.abc import Mapping
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
@@ -12,6 +13,7 @@ from typing import Any, cast
 from fastapi.testclient import TestClient
 
 from digital_colleagues.application.errors import PermissionDeniedError
+from digital_colleagues.application.p5_contracts import ConfirmDraftRequest
 from digital_colleagues.core.common import FrozenJsonObject
 from digital_colleagues.core.effects import ActionResult, ActionResultState
 from digital_colleagues.core.errors import AuthorizationError, CoreInvariantError
@@ -23,6 +25,7 @@ from digital_colleagues.core.policy import (
     InterruptionMode,
     NotificationMode,
     OutsideHoursOutcome,
+    PolicyOutcomeKind,
     PolicyRunState,
     ProactivityMode,
     StopCondition,
@@ -151,6 +154,74 @@ class P5PolicyTests(unittest.TestCase):
         self.assertEqual(confirmed.status_code, 200, confirmed.text)
         return cast(dict[str, Any], client.get("/p5/studio/state").json())
 
+    def _review_changes(
+        self,
+        client: TestClient,
+        csrf: str,
+        *,
+        key: str,
+        profile_changes: Mapping[str, object] | None = None,
+        mandate_changes: Mapping[str, object] | None = None,
+        policy_changes: Mapping[str, object] | None = None,
+    ) -> dict[str, Any]:
+        created = client.post(
+            "/colleagues/drafts",
+            headers=self._headers(csrf),
+            json={"idempotency_key": "draft-" + key},
+        )
+        self.assertEqual(created.status_code, 201, created.text)
+        draft = created.json()["draft"]
+        body = update_body(draft, key="update-" + key)
+        if profile_changes:
+            profile = body["profile"]
+            assert isinstance(profile, dict)
+            profile.update(profile_changes)
+        if mandate_changes:
+            mandate = body["mandate"]
+            assert isinstance(mandate, dict)
+            mandate.update(mandate_changes)
+        body["policy"] = {} if policy_changes is None else dict(policy_changes)
+        updated = client.put(
+            f"/colleagues/drafts/{draft['draft_id']}",
+            headers=self._headers(csrf),
+            json=body,
+        )
+        self.assertEqual(updated.status_code, 200, updated.text)
+        draft = updated.json()["draft"]
+        reviewed = client.post(
+            f"/colleagues/drafts/{draft['draft_id']}/review",
+            headers=self._headers(csrf),
+            json={
+                "expected_draft_revision": draft["revision"],
+                "idempotency_key": "review-" + key,
+            },
+        )
+        self.assertEqual(reviewed.status_code, 200, reviewed.text)
+        return cast(dict[str, Any], reviewed.json()["draft"])
+
+    def _confirm_reviewed(
+        self,
+        client: TestClient,
+        csrf: str,
+        *,
+        key: str,
+        draft: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        response = client.post(
+            f"/colleagues/drafts/{draft['draft_id']}/confirm",
+            headers=self._headers(csrf),
+            json={
+                "expected_draft_revision": draft["revision"],
+                "expected_base_profile_revision": draft["base_profile_revision"],
+                "expected_base_mandate_revision": draft["base_mandate_revision"],
+                "expected_base_policy_revision": draft["base_policy_revision"],
+                "expected_canonical_digest": draft["canonical_digest"],
+                "idempotency_key": "confirm-" + key,
+            },
+        )
+        self.assertEqual(response.status_code, 200, response.text)
+        return cast(dict[str, Any], response.json()["confirmation"])
+
     def _assign_work(self, client: TestClient, csrf: str, key: str) -> str:
         state = client.get("/studio/state").json()
         responsibility_id = state["identity"]["mandate"]["responsibilities"][0]["responsibility_id"]
@@ -277,11 +348,347 @@ class P5PolicyTests(unittest.TestCase):
                 restarted_client,
                 csrf,
                 key="explicit-resume",
-                policy_changes={"wake_limit": 2, "run_state": "active"},
+                policy_changes={
+                    "wake_limit": 2,
+                    "run_state": "active",
+                    "explicit_resume": True,
+                },
             )
             self.assertEqual(resumed["active"]["policy_revision"], 2)
             self.assertEqual(resumed["runtime_policy"]["run_state"], "active")
             restarted.store.close()
+
+    def test_stopped_state_survives_unrelated_confirmations_until_exact_explicit_resume(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory(prefix="digital-colleagues-p5-resume-") as temporary:
+            database = Path(temporary) / "state.sqlite"
+            harness, client, csrf = self._setup(database)
+            self._confirm_policy(
+                client,
+                csrf,
+                key="resume-baseline",
+                policy_changes={
+                    "wake_limit": 1,
+                    "stop_conditions": ["admin_stop", "budget_exhausted"],
+                },
+            )
+            work_id = self._assign_work(client, csrf, "work-resume-boundary")
+            first = client.post(
+                "/runtime/triggers",
+                headers=self._headers(csrf),
+                json={
+                    "work_id": work_id,
+                    "trigger_class": "event",
+                    "deterministic_noop": True,
+                    "idempotency_key": "resume-budget-one",
+                },
+            )
+            exhausted = client.post(
+                "/runtime/triggers",
+                headers=self._headers(csrf),
+                json={
+                    "work_id": work_id,
+                    "trigger_class": "timer",
+                    "deterministic_noop": False,
+                    "idempotency_key": "resume-budget-two",
+                },
+            )
+            self.assertTrue(first.json()["accepted"])
+            self.assertEqual(exhausted.json()["policy_outcome"], "budget_exhausted")
+
+            profile_only = self._review_changes(
+                client,
+                csrf,
+                key="profile-only-stopped",
+                profile_changes={"display_name": "Atlas remains stopped"},
+            )
+            changed = [
+                (item["section"], item["path"])
+                for item in profile_only["diff"]
+                if item["classification"] != "unchanged"
+            ]
+            self.assertEqual(changed, [("profile", "display_name")])
+            profile_confirmation = self._confirm_reviewed(
+                client,
+                csrf,
+                key="profile-only-stopped",
+                draft=profile_only,
+            )
+            self.assertEqual(profile_confirmation["policy_revision"], 1)
+            state = client.get("/p5/studio/state").json()
+            self.assertEqual(
+                state["active"]["identity_card"]["display_name"], "Atlas remains stopped"
+            )
+            self.assertEqual(state["runtime_policy"]["run_state"], "stopped")
+            self.assertNotIn(
+                PolicyOutcomeKind.EXPLICIT_RESUME.value,
+                {item["outcome"] for item in state["runtime_policy"]["outcomes"]},
+            )
+            run = harness.store._connection.execute(  # noqa: SLF001
+                "SELECT state, reason, policy_revision FROM p5_run_states"
+            ).fetchone()
+            self.assertEqual(
+                (run["state"], run["reason"], run["policy_revision"]),
+                (
+                    "stopped",
+                    "budget_exhausted",
+                    1,
+                ),
+            )
+
+            cookie = client.cookies.get("dc_session")
+            harness.store.close()
+            restarted = build_harness(database)
+            restarted_client = TestClient(restarted.app())
+            assert cookie is not None
+            restarted_client.cookies.set("dc_session", cookie)
+            session_response = restarted_client.get("/auth/session")
+            self.assertEqual(session_response.status_code, 200, session_response.text)
+            csrf = session_response.json()["csrf_token"]
+            self.assertEqual(
+                restarted_client.get("/p5/studio/state").json()["runtime_policy"]["run_state"],
+                "stopped",
+            )
+
+            mandate_only = self._review_changes(
+                restarted_client,
+                csrf,
+                key="mandate-only-stopped",
+                mandate_changes={"mission": "Revised authority remains durably stopped"},
+            )
+            mandate_confirmation = self._confirm_reviewed(
+                restarted_client,
+                csrf,
+                key="mandate-only-stopped",
+                draft=mandate_only,
+            )
+            self.assertEqual(mandate_confirmation["policy_revision"], 2)
+            self.assertEqual(
+                restarted_client.get("/p5/studio/state").json()["runtime_policy"]["run_state"],
+                "stopped",
+            )
+
+            unrelated = self._review_changes(
+                restarted_client,
+                csrf,
+                key="unrelated-policy-stopped",
+                policy_changes={"notification": "suppressed"},
+            )
+            unrelated_confirmation = self._confirm_reviewed(
+                restarted_client,
+                csrf,
+                key="unrelated-policy-stopped",
+                draft=unrelated,
+            )
+            self.assertEqual(unrelated_confirmation["policy_revision"], 3)
+            before_resume = restarted_client.get("/p5/studio/state").json()
+            self.assertEqual(before_resume["runtime_policy"]["run_state"], "stopped")
+            self.assertNotIn(
+                PolicyOutcomeKind.EXPLICIT_RESUME.value,
+                {item["outcome"] for item in before_resume["runtime_policy"]["outcomes"]},
+            )
+
+            applicable_without_intent = self._review_changes(
+                restarted_client,
+                csrf,
+                key="applicable-without-resume-intent",
+                policy_changes={"wake_limit": 2, "run_state": "active"},
+            )
+            no_intent_confirmation = self._confirm_reviewed(
+                restarted_client,
+                csrf,
+                key="applicable-without-resume-intent",
+                draft=applicable_without_intent,
+            )
+            self.assertEqual(no_intent_confirmation["policy_revision"], 4)
+            self.assertEqual(
+                restarted_client.get("/p5/studio/state").json()["runtime_policy"]["run_state"],
+                "stopped",
+            )
+
+            resume = self._review_changes(
+                restarted_client,
+                csrf,
+                key="exact-explicit-resume",
+                policy_changes={
+                    "wake_limit": 3,
+                    "run_state": "active",
+                    "explicit_resume": True,
+                },
+            )
+            stale = {
+                "expected_draft_revision": resume["revision"],
+                "expected_base_profile_revision": resume["base_profile_revision"],
+                "expected_base_mandate_revision": resume["base_mandate_revision"],
+                "expected_base_policy_revision": resume["base_policy_revision"] + 1,
+                "expected_canonical_digest": resume["canonical_digest"],
+                "idempotency_key": "confirm-resume-stale-base",
+            }
+            stale_response = restarted_client.post(
+                f"/colleagues/drafts/{resume['draft_id']}/confirm",
+                headers=self._headers(csrf),
+                json=stale,
+            )
+            self.assertEqual(stale_response.status_code, 409, stale_response.text)
+            wrong_digest = {
+                **stale,
+                "expected_base_policy_revision": resume["base_policy_revision"],
+                "expected_canonical_digest": "sha256:" + "0" * 64,
+                "idempotency_key": "confirm-resume-wrong-digest",
+            }
+            wrong_response = restarted_client.post(
+                f"/colleagues/drafts/{resume['draft_id']}/confirm",
+                headers=self._headers(csrf),
+                json=wrong_digest,
+            )
+            self.assertEqual(wrong_response.status_code, 409, wrong_response.text)
+
+            credential = restarted_client.cookies.get("dc_session")
+            assert credential is not None
+            admin_session = restarted.authentication.resolve(credential)
+            request = ConfirmDraftRequest(
+                expected_draft_revision=resume["revision"],
+                expected_base_profile_revision=resume["base_profile_revision"],
+                expected_base_mandate_revision=resume["base_mandate_revision"],
+                expected_base_policy_revision=resume["base_policy_revision"],
+                expected_canonical_digest=resume["canonical_digest"],
+                idempotency_key="forbidden-resume",
+            )
+            for principal in (
+                Principal.model(tenant_id=admin_session.tenant_id, principal_id="model-resume"),
+                Principal.service(
+                    tenant_id=admin_session.tenant_id,
+                    principal_id="service-resume",
+                ),
+            ):
+                with self.assertRaises(PermissionDeniedError):
+                    restarted.builder.confirm(
+                        session=replace(admin_session, principal=principal),
+                        draft_id=resume["draft_id"],
+                        request=replace(
+                            request,
+                            idempotency_key="forbidden-" + principal.kind.value,
+                        ),
+                    )
+            self.assertEqual(
+                restarted_client.get("/p5/studio/state").json()["runtime_policy"]["run_state"],
+                "stopped",
+            )
+
+            resume_confirmation = self._confirm_reviewed(
+                restarted_client,
+                csrf,
+                key="exact-explicit-resume",
+                draft=resume,
+            )
+            self.assertEqual(resume_confirmation["policy_revision"], 5)
+            resumed = restarted_client.get("/p5/studio/state").json()
+            self.assertEqual(resumed["runtime_policy"]["run_state"], "active")
+            evidence = [
+                item
+                for item in resumed["runtime_policy"]["outcomes"]
+                if item["outcome"] == PolicyOutcomeKind.EXPLICIT_RESUME.value
+            ]
+            self.assertEqual(len(evidence), 1)
+            self.assertEqual(evidence[0]["policy_revision"], 5)
+            self.assertEqual(evidence[0]["mandate_revision"], 2)
+            self.assertEqual(evidence[0]["stage"], "stop")
+            self.assertEqual(
+                evidence[0]["safe_projection"]["previous_stop_reason"], "budget_exhausted"
+            )
+            self.assertEqual(
+                evidence[0]["safe_projection"]["resume_change"],
+                "wake_budget_limit_increased",
+            )
+
+            restarted.store.close()
+            final_restart = build_harness(database)
+            final_state = final_restart.store.p5_studio_snapshot(
+                admin_session.colleague_namespace()
+            )
+            self.assertEqual(final_state.run_state, PolicyRunState.ACTIVE)
+            final_restart.store.close()
+
+    def test_queued_wake_after_stop_is_restart_safe_governed_noop_without_provider_calls(
+        self,
+    ) -> None:
+        for restart_before_process, trigger_class, deterministic_noop, expected_stage in (
+            (False, "event", False, "pre_wake"),
+            (True, "timer", True, "post_model"),
+        ):
+            with (
+                self.subTest(
+                    restart_before_process=restart_before_process,
+                    trigger_class=trigger_class,
+                ),
+                tempfile.TemporaryDirectory(
+                    prefix="digital-colleagues-p5-queued-stop-"
+                ) as temporary,
+            ):
+                database = Path(temporary) / "state.sqlite"
+                harness, client, csrf = self._setup(database)
+                self._confirm_policy(
+                    client,
+                    csrf,
+                    key=f"queued-policy-{trigger_class}",
+                    policy_changes={
+                        "wake_limit": 1,
+                        "stop_conditions": ["admin_stop", "budget_exhausted"],
+                    },
+                )
+                work_id = self._assign_work(client, csrf, "work-queued-" + trigger_class)
+                queued = client.post(
+                    "/runtime/triggers",
+                    headers=self._headers(csrf),
+                    json={
+                        "work_id": work_id,
+                        "trigger_class": trigger_class,
+                        "deterministic_noop": deterministic_noop,
+                        "idempotency_key": "queued-wake-a-" + trigger_class,
+                    },
+                )
+                stopped = client.post(
+                    "/runtime/triggers",
+                    headers=self._headers(csrf),
+                    json={
+                        "work_id": work_id,
+                        "trigger_class": "timer" if trigger_class == "event" else "event",
+                        "deterministic_noop": False,
+                        "idempotency_key": "stop-wake-b-" + trigger_class,
+                    },
+                )
+                self.assertTrue(queued.json()["accepted"])
+                self.assertEqual(stopped.json()["policy_outcome"], "budget_exhausted")
+                cookie = client.cookies.get("dc_session")
+                if restart_before_process:
+                    harness.store.close()
+                    harness = build_harness(database)
+                    client = TestClient(harness.app())
+                    assert cookie is not None
+                    client.cookies.set("dc_session", cookie)
+                    session_response = client.get("/auth/session")
+                    self.assertEqual(session_response.status_code, 200, session_response.text)
+                    csrf = session_response.json()["csrf_token"]
+                processed = client.post(
+                    "/runtime/process",
+                    headers=self._headers(csrf),
+                    json={"idempotency_key": "process-queued-" + trigger_class},
+                )
+                self.assertEqual(processed.status_code, 200, processed.text)
+                self.assertEqual(processed.json()["decisions"], 1)
+                self.assertEqual(client.get("/studio/state").json()["proposals"], [])
+                policy_state = client.get("/p5/studio/state").json()["runtime_policy"]
+                stopped_outcomes = [
+                    item for item in policy_state["outcomes"] if item["outcome"] == "stopped"
+                ]
+                self.assertEqual(len(stopped_outcomes), 1)
+                self.assertEqual(stopped_outcomes[0]["stage"], expected_stage)
+                self.assertEqual(stopped_outcomes[0]["policy_revision"], 1)
+                self.assertEqual(stopped_outcomes[0]["mandate_revision"], 1)
+                self.assertEqual(harness.intelligence.call_count, 0)
+                self.assertEqual(harness.channel.call_count, 0)
+                harness.store.close()
 
     def test_disallowed_outside_hours_proactivity_notification_and_interruption_are_separate(
         self,

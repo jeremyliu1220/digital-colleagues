@@ -22,6 +22,8 @@ P5_BOUNDARIES = {
     "tests.p5.test_builder.P5BuilderTests.test_terminal_lifecycle_authority_input_and_mutation_guards_fail_closed": "p5_terminal_ambiguous_authority_guards",
     "tests.p5.test_policy.P5PolicyTests.test_working_hours_timezone_overlap_cross_midnight_and_dst_are_deterministic": "p5_working_hours_dst_validation",
     "tests.p5.test_policy.P5PolicyTests.test_budget_is_restart_safe_duplicate_class_cannot_evade_and_stop_requires_revision": "p5_durable_budget_stop_resume",
+    "tests.p5.test_policy.P5PolicyTests.test_stopped_state_survives_unrelated_confirmations_until_exact_explicit_resume": "p5_unrelated_confirmation_preserves_stop_exact_resume",
+    "tests.p5.test_policy.P5PolicyTests.test_queued_wake_after_stop_is_restart_safe_governed_noop_without_provider_calls": "p5_queued_wake_restart_stopped_no_provider_proposal",
     "tests.p5.test_policy.P5PolicyTests.test_disallowed_outside_hours_proactivity_notification_and_interruption_are_separate": "p5_trigger_working_hours_proactivity",
     "tests.p5.test_policy.P5PolicyTests.test_finite_stop_blocked_and_repeated_failure_escalations_are_typed": "p5_notification_interruption_typed_stop_escalation",
     "tests.p5.test_policy.P5PolicyTests.test_policy_change_makes_old_proposal_and_context_stale_before_approval_or_dispatch": "p5_stale_policy_proposal_context",

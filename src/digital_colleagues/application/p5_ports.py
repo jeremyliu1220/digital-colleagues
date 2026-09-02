@@ -21,6 +21,7 @@ from digital_colleagues.core.policy import (
     DurableTriggerKind,
     EscalationRecord,
     PolicyEnforcementRecord,
+    PolicyRunState,
     PolicyStage,
 )
 from digital_colleagues.core.principals import Principal
@@ -30,6 +31,10 @@ class P5PersistencePort(Protocol):
     def active_configuration(self, namespace: Namespace) -> tuple[Profile, Mandate]: ...
 
     def get_active_policy(self, namespace: Namespace) -> ColleaguePolicy | None: ...
+
+    def get_runtime_policy_state(
+        self, namespace: Namespace
+    ) -> tuple[ColleaguePolicy | None, PolicyRunState | None]: ...
 
     def get_draft(self, namespace: Namespace, draft_id: str) -> ColleagueDraft: ...
 

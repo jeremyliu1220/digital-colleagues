@@ -28,6 +28,11 @@ def check_policy(root: Path) -> dict[str, object]:
         "skips": 0,
         "durable_restart_safe_budget": True,
         "duplicate_trigger_evasion_refused": True,
+        "unrelated_confirmation_preserves_durable_stop": True,
+        "explicit_resume_requires_applicable_exact_policy_revision": True,
+        "queued_wake_stopped_before_provider_or_proposal": True,
+        "queued_wake_restart_governed_noop": True,
+        "stopped_provider_and_channel_call_counts": 0,
         "stale_policy_proposal_refused": True,
         "unauthorized_proposal_escape_target": 0,
     }

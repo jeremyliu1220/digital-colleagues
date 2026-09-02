@@ -131,6 +131,7 @@ class PolicyOutcomeKind(StrEnum):
     FINITE_WORK_TERMINAL_STOP = "finite_work_terminal_stop"
     BLOCKED_WORK_ESCALATE = "blocked_work_escalate"
     STOPPED = "stopped"
+    EXPLICIT_RESUME = "explicit_resume"
 
 
 @dataclass(frozen=True, slots=True)

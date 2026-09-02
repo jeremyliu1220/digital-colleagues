@@ -44,6 +44,7 @@ class P5Harness:
     builder: RevisionedColleagueBuilderService
     controller: P5RuntimeController
     channel: ReferenceChannel
+    intelligence: DeterministicIntelligence
 
     def app(self) -> FastAPI:
         app = create_p4_app(
@@ -90,8 +91,9 @@ def build_harness(database: Path, *, now: datetime = NOW) -> P5Harness:
         identifiers=identifiers,
     )
     channel = ReferenceChannel()
+    intelligence = DeterministicIntelligence()
     governed = GovernedObservedIntelligence(
-        inner=DeterministicIntelligence(),
+        inner=intelligence,
         store=store,
         identifiers=identifiers,
     )
@@ -125,6 +127,7 @@ def build_harness(database: Path, *, now: datetime = NOW) -> P5Harness:
         builder,
         controller,
         channel,
+        intelligence,
     )
 
 

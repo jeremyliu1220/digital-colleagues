@@ -102,6 +102,13 @@ class PolicyEdit:
     escalation_conditions: tuple[EscalationCondition, ...] | None = None
     failure_limit: int | None = None
     run_state: PolicyRunState | None = None
+    explicit_resume: bool = False
+
+    def __post_init__(self) -> None:
+        if type(self.explicit_resume) is not bool:
+            raise ValueError("explicit resume intent must be boolean")
+        if self.explicit_resume and self.run_state is not PolicyRunState.ACTIVE:
+            raise ValueError("explicit resume intent requires an explicit active run state")
 
 
 @dataclass(frozen=True, slots=True)

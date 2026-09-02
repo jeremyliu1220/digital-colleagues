@@ -140,6 +140,14 @@ def write_p5_evidence(
     runtime = results["compose_runtime"]
     if runtime.get("status") != "passed" or not runtime.get("cleanup", {}).get("passed"):
         raise EvidenceError("P5 evidence requires actual Compose runtime and cleanup")
+    if (
+        runtime.get("profile_only_stop_preservation_fault")
+        != "passed_without_policy_revision_or_resume"
+        or runtime.get("queued_wake_after_stop_fault")
+        != "governed_noop_without_proposal_after_restart"
+        or runtime.get("explicit_revisioned_resume") != "passed"
+    ):
+        raise EvidenceError("P5 evidence requires both durable-stop fault boundaries")
     readout = runtime.get("metric_readout")
     if not isinstance(readout, dict) or not isinstance(readout.get("metrics"), list):
         raise EvidenceError("P5 evidence requires revision-bound metric readout")
@@ -203,6 +211,8 @@ def write_p5_evidence(
             "stale_proposal": runtime["stale_proposal_fault"],
             "policy_enforcement": {
                 "budget_stop_escalation": runtime["budget_stop_escalation"],
+                "profile_only_stop_preservation": runtime["profile_only_stop_preservation_fault"],
+                "queued_wake_after_stop": runtime["queued_wake_after_stop_fault"],
                 "explicit_revisioned_resume": runtime["explicit_revisioned_resume"],
             },
         },

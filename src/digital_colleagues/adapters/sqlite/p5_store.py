@@ -13,6 +13,11 @@ from datetime import datetime
 from digital_colleagues.adapters.sqlite.codec import from_storage_json, to_storage_json
 from digital_colleagues.adapters.sqlite.p4_store import SQLiteP4Store
 from digital_colleagues.adapters.sqlite.store import _ns
+from digital_colleagues.application.contracts import (
+    AgendaClaim,
+    SemanticDecision,
+    SemanticOutcome,
+)
 from digital_colleagues.application.errors import (
     ConflictError,
     NotFoundError,
@@ -47,6 +52,7 @@ from digital_colleagues.core.policy import (
     StopCondition,
 )
 from digital_colleagues.core.principals import HumanRole, Principal, PrincipalKind
+from digital_colleagues.core.runtime import DecisionKind, WakeCycle
 from digital_colleagues.core.serialization import (
     contract_to_public_data,
     datetime_from_z,
@@ -86,6 +92,21 @@ class SQLiteP5Store(SQLiteP4Store):
         if len(policies) > 1:
             raise ConflictError("multiple active colleague policies were refused")
         return None if not policies else policies[0]
+
+    def get_runtime_policy_state(
+        self, namespace: Namespace
+    ) -> tuple[ColleaguePolicy | None, PolicyRunState | None]:
+        policy = self.get_active_policy(namespace)
+        row = self._connection.execute(
+            """
+            SELECT state FROM p5_run_states
+            WHERE tenant_id = ? AND namespace_scope = ? AND namespace_scope_id = ?
+            """,
+            _ns(namespace),
+        ).fetchone()
+        if row is not None:
+            return policy, PolicyRunState(row["state"])
+        return policy, None if policy is None else policy.run_state
 
     @staticmethod
     def _draft_from_row(row: sqlite3.Row) -> ColleagueDraft:
@@ -593,6 +614,113 @@ class SQLiteP5Store(SQLiteP4Store):
             ),
         )
 
+    @staticmethod
+    def _explicit_resume_change(
+        *,
+        reason: str,
+        current: ColleaguePolicy,
+        proposed: ColleaguePolicy,
+    ) -> str | None:
+        if (
+            current.run_state is PolicyRunState.STOPPED
+            and proposed.run_state is PolicyRunState.ACTIVE
+        ):
+            return "admin_run_state_activated"
+        if proposed.run_state is not PolicyRunState.ACTIVE:
+            return None
+        if reason == "budget_exhausted":
+            if StopCondition.BUDGET_EXHAUSTED in current.stop_conditions and (
+                StopCondition.BUDGET_EXHAUSTED not in proposed.stop_conditions
+            ):
+                return "budget_stop_condition_removed"
+            if current.wake_budget.period != proposed.wake_budget.period:
+                return "wake_budget_period_changed"
+            if proposed.wake_budget.limit > current.wake_budget.limit:
+                return "wake_budget_limit_increased"
+            return None
+        if reason == "outside_hours_stop":
+            if proposed.outside_hours is not OutsideHoursOutcome.STOP:
+                return "outside_hours_stop_removed"
+            if (
+                current.timezone != proposed.timezone
+                or current.weekly_windows != proposed.weekly_windows
+            ):
+                return "working_hours_changed"
+            return None
+        if reason == PolicyOutcomeKind.REPEATED_FAILURE_STOP.value:
+            if StopCondition.REPEATED_FAILURE in current.stop_conditions and (
+                StopCondition.REPEATED_FAILURE not in proposed.stop_conditions
+            ):
+                return "repeated_failure_stop_condition_removed"
+            if proposed.failure_limit > current.failure_limit:
+                return "failure_limit_increased"
+            return None
+        if reason == PolicyOutcomeKind.FINITE_WORK_TERMINAL_STOP.value:
+            if StopCondition.FINITE_WORK_TERMINAL in current.stop_conditions and (
+                StopCondition.FINITE_WORK_TERMINAL not in proposed.stop_conditions
+            ):
+                return "finite_work_stop_condition_removed"
+        return None
+
+    def _record_explicit_resume(
+        self,
+        connection: sqlite3.Connection,
+        *,
+        draft: ColleagueDraft,
+        policy: ColleaguePolicy,
+        actor: Principal,
+        occurred_at: datetime,
+        previous_stop_reason: str,
+        resume_change: str,
+    ) -> None:
+        projection = {
+            "outcome": PolicyOutcomeKind.EXPLICIT_RESUME.value,
+            "stage": PolicyStage.STOP.value,
+            "previous_stop_reason": previous_stop_reason,
+            "resume_change": resume_change,
+            "draft_id": draft.draft_id,
+            "draft_revision": draft.revision,
+        }
+        encoded = _safe_json(projection)
+        outcome_id = (
+            "policy-outcome:"
+            + hashlib.sha256(
+                f"{draft.draft_id}\0{draft.revision}\0explicit_resume".encode()
+            ).hexdigest()[:32]
+        )
+
+        self._insert_policy_outcome(
+            connection,
+            PolicyEnforcementRecord(
+                namespace=policy.namespace,
+                outcome_id=outcome_id,
+                policy_id=policy.policy_id,
+                policy_revision=policy.revision,
+                mandate_id=policy.mandate_id,
+                mandate_revision=policy.mandate_revision,
+                stage=PolicyStage.STOP,
+                outcome=PolicyOutcomeKind.EXPLICIT_RESUME,
+                trigger_class=None,
+                source_id=draft.draft_id,
+                actor=actor,
+                correlation_id=draft.correlation_id,
+                causation_id=draft.draft_id,
+                occurred_at=occurred_at,
+                safe_projection=FrozenJsonObject.from_mapping(projection),
+                payload_digest="sha256:" + hashlib.sha256(encoded.encode()).hexdigest(),
+            ),
+        )
+
+    @staticmethod
+    def _draft_requests_explicit_resume(draft: ColleagueDraft) -> bool:
+        return any(
+            item.section.value == "policy"
+            and item.path == "explicit_resume"
+            and item.classification.value == "expanded"
+            and item.after == FrozenJsonObject.from_mapping({"value": True})
+            for item in draft.diff
+        )
+
     def confirm_draft(
         self,
         *,
@@ -748,19 +876,86 @@ class SQLiteP5Store(SQLiteP4Store):
                     actor=actor,
                     occurred_at=occurred_at,
                 )
-                self._upsert_run_state(
-                    connection,
-                    policy=applied_policy,
-                    actor=actor,
-                    correlation_id=draft.correlation_id,
-                    causation_id=draft.draft_id,
-                    occurred_at=occurred_at,
-                    reason=(
-                        "explicit_resume"
-                        if applied_policy.run_state is PolicyRunState.ACTIVE
-                        else "explicit_admin_stop"
-                    ),
-                )
+                run = connection.execute(
+                    """
+                    SELECT state, reason FROM p5_run_states
+                    WHERE tenant_id = ? AND namespace_scope = ? AND namespace_scope_id = ?
+                    """,
+                    _ns(namespace),
+                ).fetchone()
+                if run is None:
+                    self._upsert_run_state(
+                        connection,
+                        policy=applied_policy,
+                        actor=actor,
+                        correlation_id=draft.correlation_id,
+                        causation_id=draft.draft_id,
+                        occurred_at=occurred_at,
+                        reason=(
+                            "explicit_admin_stop"
+                            if applied_policy.run_state is PolicyRunState.STOPPED
+                            else "policy_initialized"
+                        ),
+                    )
+                elif run["state"] == PolicyRunState.STOPPED.value:
+                    if current_policy is None:
+                        raise ConflictError("durable stopped state has no active policy")
+                    resume_change = self._explicit_resume_change(
+                        reason=run["reason"],
+                        current=current_policy,
+                        proposed=applied_policy,
+                    )
+                    resume_requested = self._draft_requests_explicit_resume(draft)
+                    if resume_requested and resume_change is None:
+                        raise ValidationError(
+                            "explicit resume must revise the applicable stop policy"
+                        )
+                    if resume_requested and resume_change is not None and policy_changed:
+                        self._upsert_run_state(
+                            connection,
+                            policy=applied_policy,
+                            actor=actor,
+                            correlation_id=draft.correlation_id,
+                            causation_id=draft.draft_id,
+                            occurred_at=occurred_at,
+                            reason="explicit_resume",
+                        )
+                        self._record_explicit_resume(
+                            connection,
+                            draft=draft,
+                            policy=applied_policy,
+                            actor=actor,
+                            occurred_at=occurred_at,
+                            previous_stop_reason=run["reason"],
+                            resume_change=resume_change,
+                        )
+                    elif policy_changed:
+                        self._upsert_run_state(
+                            connection,
+                            policy=replace(
+                                applied_policy,
+                                run_state=PolicyRunState.STOPPED,
+                            ),
+                            actor=actor,
+                            correlation_id=draft.correlation_id,
+                            causation_id=draft.draft_id,
+                            occurred_at=occurred_at,
+                            reason=run["reason"],
+                        )
+                elif policy_changed:
+                    self._upsert_run_state(
+                        connection,
+                        policy=applied_policy,
+                        actor=actor,
+                        correlation_id=draft.correlation_id,
+                        causation_id=draft.draft_id,
+                        occurred_at=occurred_at,
+                        reason=(
+                            "explicit_admin_stop"
+                            if applied_policy.run_state is PolicyRunState.STOPPED
+                            else "policy_revision_confirmed"
+                        ),
+                    )
                 result = ConfirmationResult(
                     draft_id=draft.draft_id,
                     draft_revision=draft.revision,
@@ -950,6 +1145,100 @@ class SQLiteP5Store(SQLiteP4Store):
                 record.namespace.require_exact(escalation.namespace)
                 self._insert_escalation(connection, escalation)
             return created
+
+    def _prepare_semantic_decision(
+        self,
+        connection: sqlite3.Connection,
+        claim: AgendaClaim,
+        semantic: SemanticDecision,
+    ) -> SemanticDecision:
+        semantic = super()._prepare_semantic_decision(connection, claim, semantic)
+        policy = self.get_active_policy(claim.namespace)
+        if policy is None:
+            return semantic
+        run = connection.execute(
+            """
+            SELECT state FROM p5_run_states
+            WHERE tenant_id = ? AND namespace_scope = ? AND namespace_scope_id = ?
+            """,
+            _ns(claim.namespace),
+        ).fetchone()
+        stopped = policy.run_state is PolicyRunState.STOPPED or (
+            run is not None and run["state"] == PolicyRunState.STOPPED.value
+        )
+        if not stopped:
+            return semantic
+        existing = connection.execute(
+            """
+            SELECT 1 FROM p5_policy_outcomes
+            WHERE tenant_id = ? AND namespace_scope = ? AND namespace_scope_id = ?
+              AND correlation_id = ? AND causation_id = ? AND outcome = ?
+            LIMIT 1
+            """,
+            (
+                *_ns(claim.namespace),
+                semantic.decision.correlation_id,
+                semantic.decision.agenda_item_id,
+                PolicyOutcomeKind.STOPPED.value,
+            ),
+        ).fetchone()
+        if existing is None:
+            wake = self._get_record(
+                connection,
+                claim.namespace,
+                "wake_cycle",
+                semantic.decision.wake_cycle_id,
+                WakeCycle,
+            )
+            projection = {
+                "outcome": PolicyOutcomeKind.STOPPED.value,
+                "stage": PolicyStage.POST_MODEL.value,
+                "persistence_revalidation": True,
+            }
+            encoded = _safe_json(projection)
+            self._insert_policy_outcome(
+                connection,
+                PolicyEnforcementRecord(
+                    namespace=policy.namespace,
+                    outcome_id=(
+                        "policy-outcome:"
+                        + hashlib.sha256(
+                            (
+                                semantic.decision.decision_id + "\0proposal-persistence\0stopped"
+                            ).encode()
+                        ).hexdigest()[:32]
+                    ),
+                    policy_id=policy.policy_id,
+                    policy_revision=policy.revision,
+                    mandate_id=policy.mandate_id,
+                    mandate_revision=policy.mandate_revision,
+                    stage=PolicyStage.POST_MODEL,
+                    outcome=PolicyOutcomeKind.STOPPED,
+                    trigger_class=(
+                        DurableTriggerKind.TIMER
+                        if wake.trigger_timer_occurrence_ids
+                        else DurableTriggerKind.EVENT
+                    ),
+                    source_id=wake.causation_id,
+                    actor=semantic.decision.actor,
+                    correlation_id=semantic.decision.correlation_id,
+                    causation_id=semantic.decision.agenda_item_id,
+                    occurred_at=semantic.decision.occurred_at,
+                    safe_projection=FrozenJsonObject.from_mapping(projection),
+                    payload_digest=("sha256:" + hashlib.sha256(encoded.encode()).hexdigest()),
+                ),
+            )
+        if semantic.proposal is None:
+            return semantic
+        decision = replace(
+            semantic.decision,
+            kind=DecisionKind.NO_ACTION,
+            rationale="Durable stopped state was revalidated before proposal persistence.",
+            proposed_effect_id=None,
+            policy_id=policy.policy_id,
+            policy_revision=policy.revision,
+        )
+        return SemanticDecision(SemanticOutcome.NO_OP, decision, None, semantic.request_id)
 
     def _record_for_admission(
         self,

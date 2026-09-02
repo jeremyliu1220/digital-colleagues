@@ -96,6 +96,7 @@ def _update_body(
     mission: str,
     wake_limit: int,
     policy_changes: dict[str, object] | None = None,
+    policy_replacement: dict[str, object] | None = None,
 ) -> dict[str, object]:
     profile = cast(dict[str, Any], draft["proposed_profile"])
     mandate = cast(dict[str, Any], draft["proposed_mandate"])
@@ -106,6 +107,8 @@ def _update_body(
     policy = _policy(wake_limit)
     if policy_changes is not None:
         policy.update(policy_changes)
+    if policy_replacement is not None:
+        policy = policy_replacement
     return {
         "profile": {
             "display_name": display_name,
@@ -161,6 +164,7 @@ def _create_update_review(
     mission: str,
     wake_limit: int,
     policy_changes: dict[str, object] | None = None,
+    policy_replacement: dict[str, object] | None = None,
 ) -> dict[str, Any]:
     created = _request(
         opener,
@@ -182,6 +186,7 @@ def _create_update_review(
             mission=mission,
             wake_limit=wake_limit,
             policy_changes=policy_changes,
+            policy_replacement=policy_replacement,
         ),
     )
     draft = cast(dict[str, Any], updated["draft"])
@@ -429,6 +434,16 @@ def check_compose_runtime(root: Path) -> dict[str, object]:
                 "idempotency_key": "compose-stale-approval",
             },
         )
+        _compose(
+            docker,
+            project,
+            ["stop", "worker"],
+            root=root,
+            environment=environment,
+        )
+        proposals_before_queued_stop = len(
+            _request(opener, api + "/studio/state").get("proposals", [])
+        )
         allowed = _request(
             opener,
             api + "/runtime/triggers",
@@ -437,7 +452,7 @@ def check_compose_runtime(root: Path) -> dict[str, object]:
             payload={
                 "work_id": work["work_id"],
                 "trigger_class": "timer",
-                "deterministic_noop": True,
+                "deterministic_noop": False,
                 "idempotency_key": "compose-budget-one",
             },
         )
@@ -463,6 +478,40 @@ def check_compose_runtime(root: Path) -> dict[str, object]:
         policy_record_types = {item["record_type"] for item in policy_audit["records"]}
         if not {"policy_outcome", "policy_escalation"}.issubset(policy_record_types):
             raise ComposeRuntimeError("P5 policy refusal audit was incomplete")
+        profile_only = _create_update_review(
+            opener,
+            api,
+            headers,
+            key="stopped-profile-only",
+            display_name="Runtime Atlas remains stopped",
+            mission="Use the winning exact policy revision",
+            wake_limit=1,
+            policy_replacement={},
+        )
+        profile_only_changes = [
+            (item["section"], item["path"])
+            for item in profile_only["diff"]
+            if item["classification"] != "unchanged"
+        ]
+        if profile_only_changes != [("profile", "display_name")]:
+            raise ComposeRuntimeError("profile-only stopped draft gained an authority change")
+        profile_confirmation = _request(
+            opener,
+            api + f"/colleagues/drafts/{profile_only['draft_id']}/confirm",
+            method="POST",
+            headers=headers,
+            payload=_confirmation(profile_only, "stopped-profile-only"),
+        )
+        profile_state = _request(opener, api + "/p5/studio/state")
+        if (
+            profile_confirmation["confirmation"]["policy_revision"] != 2
+            or profile_state["runtime_policy"]["run_state"] != "stopped"
+            or any(
+                item.get("outcome") == "explicit_resume"
+                for item in profile_state["runtime_policy"]["outcomes"]
+            )
+        ):
+            raise ComposeRuntimeError("profile-only confirmation implicitly resumed runtime")
         before_restart = _request(opener, api + "/p5/studio/state")
 
         _compose(
@@ -501,6 +550,43 @@ def check_compose_runtime(root: Path) -> dict[str, object]:
             raise ComposeRuntimeError(
                 "P5 restart lost active, draft, counter, stop, or escalation state"
             )
+        processed_queued = _request(
+            opener,
+            api + "/runtime/process",
+            method="POST",
+            headers=headers,
+            payload={"idempotency_key": "compose-process-stopped-queued-wake"},
+        )
+        after_queued_stop = _wait_json(
+            opener,
+            api + "/p5/studio/state",
+            predicate=lambda value: any(
+                item.get("outcome") == "stopped"
+                and item.get("stage") == "pre_wake"
+                and item.get("policy_revision") == 2
+                for item in value.get("runtime_policy", {}).get("outcomes", [])
+            ),
+        )
+        stopped_outcomes = [
+            item
+            for item in after_queued_stop["runtime_policy"]["outcomes"]
+            if item.get("outcome") == "stopped"
+            and item.get("stage") == "pre_wake"
+            and item.get("policy_revision") == 2
+        ]
+        if (
+            processed_queued.get("decisions") not in {0, 1}
+            or len(_request(opener, api + "/studio/state").get("proposals", []))
+            != proposals_before_queued_stop
+            or len(stopped_outcomes) != 1
+        ):
+            raise ComposeRuntimeError(
+                "a restarted stopped queued wake was not retained as a governed proposal-free no-op"
+            )
+        queued_audit = _request(opener, api + f"/audit/{allowed['correlation_id']}")
+        queued_types = {item["record_type"] for item in queued_audit["records"]}
+        if "policy_outcome" not in queued_types or "effect_proposal" in queued_types:
+            raise ComposeRuntimeError("stopped queued-wake causal history was incomplete")
         resume = _create_update_review(
             opener,
             api,
@@ -509,6 +595,11 @@ def check_compose_runtime(root: Path) -> dict[str, object]:
             display_name="Runtime Atlas P5.1",
             mission="Use the winning exact policy revision",
             wake_limit=2,
+            policy_replacement={
+                "wake_limit": 2,
+                "run_state": "active",
+                "explicit_resume": True,
+            },
         )
         _request(
             opener,
@@ -521,6 +612,18 @@ def check_compose_runtime(root: Path) -> dict[str, object]:
         if (
             resumed["active"]["policy_revision"] != 3
             or resumed["runtime_policy"]["run_state"] != "active"
+            or len(
+                [
+                    item
+                    for item in resumed["runtime_policy"]["outcomes"]
+                    if item.get("outcome") == "explicit_resume"
+                    and item.get("stage") == "stop"
+                    and item.get("policy_revision") == 3
+                    and item.get("safe_projection", {}).get("previous_stop_reason")
+                    == "budget_exhausted"
+                ]
+            )
+            != 1
         ):
             raise ComposeRuntimeError("explicit revisioned resume did not apply")
 
@@ -813,6 +916,8 @@ def check_compose_runtime(root: Path) -> dict[str, object]:
             "stale_draft_fault": "refused_409_and_persisted",
             "stale_proposal_fault": "refused_403_before_approval_dispatch",
             "budget_stop_escalation": "passed",
+            "profile_only_stop_preservation_fault": "passed_without_policy_revision_or_resume",
+            "queued_wake_after_stop_fault": "governed_noop_without_proposal_after_restart",
             "explicit_revisioned_resume": "passed",
             "typed_policy_controls": "working_hours_trigger_proactivity_interruption_passed",
             "policy_bound_dispatch": "passed",

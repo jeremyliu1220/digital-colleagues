@@ -6,10 +6,10 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Self
 
 from fastapi import FastAPI, HTTPException, Request
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from digital_colleagues.api.p4_app import SESSION_COOKIE
 from digital_colleagues.application.errors import ConflictError, ReplayConflictError
@@ -124,6 +124,13 @@ class PolicyEditMutation(_StrictMutation):
     escalation_conditions: list[EscalationCondition] | None = Field(default=None, max_length=4)
     failure_limit: int | None = Field(default=None, ge=1, le=100)
     run_state: PolicyRunState | None = None
+    explicit_resume: bool = False
+
+    @model_validator(mode="after")
+    def validate_explicit_resume(self) -> Self:
+        if self.explicit_resume and self.run_state is not PolicyRunState.ACTIVE:
+            raise ValueError("explicit resume requires an explicit active run state")
+        return self
 
 
 class DraftUpdateMutation(_StrictMutation):
@@ -276,6 +283,7 @@ def _update_request(body: DraftUpdateMutation) -> DraftUpdateRequest:
             ),
             failure_limit=body.policy.failure_limit,
             run_state=body.policy.run_state,
+            explicit_resume=body.policy.explicit_resume,
         ),
         expected_draft_revision=body.expected_draft_revision,
         idempotency_key=body.idempotency_key,

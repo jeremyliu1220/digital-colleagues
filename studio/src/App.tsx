@@ -708,6 +708,7 @@ type RevisionEdit = {
   interruption: string;
   outsideHours: string;
   runState: string;
+  explicitResume: boolean;
 };
 
 function editFromDraft(draft: DraftData): RevisionEdit {
@@ -734,6 +735,12 @@ function editFromDraft(draft: DraftData): RevisionEdit {
     interruption: draft.proposed_policy.interruption,
     outsideHours: draft.proposed_policy.outside_hours,
     runState: draft.proposed_policy.run_state,
+    explicitResume: draft.diff.some(
+      (item) =>
+        item.section === "policy" &&
+        item.path === "explicit_resume" &&
+        item.after.value === true,
+    ),
   };
 }
 
@@ -890,6 +897,7 @@ function RevisionedBuilder({
                 draft.proposed_policy.escalation_conditions,
               failure_limit: draft.proposed_policy.failure_limit,
               run_state: edit.runState,
+              explicit_resume: edit.explicitResume,
             },
             expected_draft_revision: draft.revision,
             idempotency_key: randomKey("update-draft"),
@@ -1228,6 +1236,19 @@ function RevisionedBuilder({
                 </label>
               ))}
             </fieldset>
+            {p5.runtime_policy?.run_state === "stopped" && (
+              <label>
+                <input
+                  type="checkbox"
+                  checked={edit.explicitResume}
+                  onChange={(event) =>
+                    setEdit({ ...edit, explicitResume: event.target.checked })
+                  }
+                />
+                Explicitly resume this stopped runtime with the reviewed
+                applicable policy revision
+              </label>
+            )}
           </section>
           <footer className="revision-actions">
             <button

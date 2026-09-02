@@ -64,7 +64,7 @@ from digital_colleagues.core.policy import (
     WeeklyWindow,
 )
 from digital_colleagues.core.principals import HumanRole, PrincipalKind
-from digital_colleagues.core.runtime import DecisionKind
+from digital_colleagues.core.runtime import Decision, DecisionKind
 from digital_colleagues.core.serialization import contract_to_public_data
 from digital_colleagues.governance.approvals import require_authoritative_human_role
 from digital_colleagues.governance.policy import within_working_hours
@@ -700,6 +700,21 @@ class RevisionedColleagueBuilderService:
             proposed_mandate,
             proposed_policy,
         )
+        if request.policy.explicit_resume:
+            _, runtime_state = self._store.get_runtime_policy_state(profile.namespace)
+            if runtime_state is not PolicyRunState.STOPPED:
+                raise ValidationError("explicit resume requires a durable stopped runtime")
+            diff = (
+                *diff,
+                _item(
+                    DiffSection.POLICY,
+                    "explicit_resume",
+                    False,
+                    True,
+                    authoritative=True,
+                    classification=DiffClassification.EXPANDED,
+                ),
+            )
         updated = ColleagueDraft(
             namespace=existing.namespace,
             draft_id=existing.draft_id,
@@ -803,17 +818,18 @@ def _policy_record(
     policy: ColleaguePolicy,
     request: IntelligenceRequest,
     outcome: PolicyOutcomeKind,
+    stage: PolicyStage = PolicyStage.POST_MODEL,
 ) -> PolicyEnforcementRecord:
     record = PolicyEnforcementRecord(
         namespace=request.namespace,
         outcome_id=identifiers.derive(
-            "policy-outcome", request.request_id, PolicyStage.POST_MODEL.value, outcome.value
+            "policy-outcome", request.request_id, stage.value, outcome.value
         ),
         policy_id=policy.policy_id,
         policy_revision=policy.revision,
         mandate_id=policy.mandate_id,
         mandate_revision=policy.mandate_revision,
-        stage=PolicyStage.POST_MODEL,
+        stage=stage,
         outcome=outcome,
         trigger_class=(
             DurableTriggerKind.TIMER
@@ -826,7 +842,7 @@ def _policy_record(
         causation_id=request.agenda_item.agenda_item_id,
         occurred_at=request.occurred_at,
         safe_projection=FrozenJsonObject.from_mapping(
-            {"outcome": outcome.value, "stage": PolicyStage.POST_MODEL.value}
+            {"outcome": outcome.value, "stage": stage.value}
         ),
         payload_digest=digests.digest("policy-outcome", request.request_id),
     )
@@ -856,6 +872,8 @@ class PolicyGovernedIntelligence:
         semantic: SemanticDecision,
         policy: ColleaguePolicy,
         outcome: PolicyOutcomeKind,
+        *,
+        stage: PolicyStage = PolicyStage.POST_MODEL,
     ) -> SemanticDecision:
         _policy_record(
             store=self._store,
@@ -864,6 +882,7 @@ class PolicyGovernedIntelligence:
             policy=policy,
             request=request,
             outcome=outcome,
+            stage=stage,
         )
         decision = replace(
             semantic.decision,
@@ -875,12 +894,58 @@ class PolicyGovernedIntelligence:
         )
         return SemanticDecision(SemanticOutcome.NO_OP, decision, None, semantic.request_id)
 
+    def _refuse_before_model(
+        self,
+        request: IntelligenceRequest,
+        policy: ColleaguePolicy,
+        outcome: PolicyOutcomeKind,
+    ) -> SemanticDecision:
+        _policy_record(
+            store=self._store,
+            identifiers=self._identifiers,
+            digests=self._digests,
+            policy=policy,
+            request=request,
+            outcome=outcome,
+            stage=PolicyStage.PRE_WAKE,
+        )
+        decision = Decision(
+            namespace=request.namespace,
+            decision_id=request.decision_id,
+            wake_cycle_id=request.wake_cycle.wake_cycle_id,
+            agenda_item_id=request.agenda_item.agenda_item_id,
+            kind=DecisionKind.NO_ACTION,
+            rationale=f"P5 policy produced {outcome.value} before model invocation.",
+            proposed_effect_id=None,
+            actor=request.model_principal,
+            correlation_id=request.agenda_item.correlation_id,
+            causation_id=request.agenda_item.agenda_item_id,
+            occurred_at=request.occurred_at,
+            revision=1,
+            policy_id=policy.policy_id,
+            policy_revision=policy.revision,
+        )
+        return SemanticDecision(SemanticOutcome.NO_OP, decision, None, request.request_id)
+
     def decide(self, request: IntelligenceRequest) -> SemanticDecision:
-        semantic = self._inner.decide(request)
-        policy = self._store.get_active_policy(request.namespace)
+        policy, run_state = self._store.get_runtime_policy_state(request.namespace)
         if policy is None:
             if request.policy_id is None:
-                return semantic
+                return self._inner.decide(request)
+            raise PermissionDeniedError("typed runtime policy disappeared")
+        binding = (policy.policy_id, policy.revision)
+        if binding != (request.policy_id, request.policy_revision):
+            return self._refuse_before_model(request, policy, PolicyOutcomeKind.STALE_POLICY)
+        if (policy.mandate_id, policy.mandate_revision) != (
+            request.mandate.mandate_id,
+            request.mandate.revision,
+        ):
+            return self._refuse_before_model(request, policy, PolicyOutcomeKind.STALE_POLICY)
+        if run_state is PolicyRunState.STOPPED:
+            return self._refuse_before_model(request, policy, PolicyOutcomeKind.STOPPED)
+        semantic = self._inner.decide(request)
+        policy, run_state = self._store.get_runtime_policy_state(request.namespace)
+        if policy is None:
             raise PermissionDeniedError("typed runtime policy disappeared")
         binding = (policy.policy_id, policy.revision)
         if binding != (request.policy_id, request.policy_revision):
@@ -890,6 +955,8 @@ class PolicyGovernedIntelligence:
             request.mandate.revision,
         ):
             return self._refuse(request, semantic, policy, PolicyOutcomeKind.STALE_POLICY)
+        if run_state is PolicyRunState.STOPPED:
+            return self._refuse(request, semantic, policy, PolicyOutcomeKind.STOPPED)
         if semantic.proposal is None:
             _policy_record(
                 store=self._store,

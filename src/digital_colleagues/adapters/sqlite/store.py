@@ -1223,6 +1223,7 @@ class SQLiteRuntimeStore:
     def commit_semantic_decision(self, claim: AgendaClaim, semantic: SemanticDecision) -> None:
         with self._transaction() as connection:
             row = self._require_agenda_claim(connection, claim)
+            semantic = self._prepare_semantic_decision(connection, claim, semantic)
             semantic.decision.namespace.require_exact(claim.namespace)
             if semantic.decision.agenda_item_id != claim.agenda_item.agenda_item_id:
                 raise ConflictError("semantic decision cites a different Agenda item")
@@ -1290,6 +1291,15 @@ class SQLiteRuntimeStore:
                 checkpoint_generation=claim.claimed_generation,
             )
             self._update_record(connection, finalized_wake, expected_revision=wake.revision)
+
+    def _prepare_semantic_decision(
+        self,
+        connection: sqlite3.Connection,
+        claim: AgendaClaim,
+        semantic: SemanticDecision,
+    ) -> SemanticDecision:
+        del connection, claim
+        return semantic
 
     def pending_agenda_count(self, namespace: Namespace) -> int:
         row = self._connection.execute(
