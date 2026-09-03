@@ -11,8 +11,8 @@
   "development_branch": "codex/p6-governance-hardening",
   "evidence_class": "synthetic_offline",
   "fixed_base": "f1dff72c3fb15b2fc7b3c7d989aa85e275cb31ac",
-  "generated_at": "2026-09-02T11:43:43.072951Z",
-  "implementation_commit": "4a3c89d20dc93cceebe11c15f3b772afd7b823e0",
+  "generated_at": "2026-09-03T03:39:25.441866Z",
+  "implementation_commit": "8f4d3cd577c31507cc2366d011f1d208fcf2abbc",
   "migration_007_digest": "sha256:ba572b74ffe7d16ed09ffd58791d7bb23b875806996ec897b2e73c82a593cf9c",
   "milestone": "P6",
   "results": {
@@ -39,7 +39,7 @@
       "gate": "p6_abuse_cases_clean",
       "safe_refusal_count": 1,
       "schema_version": 1,
-      "tests_run": 21,
+      "tests_run": 26,
       "unauthorized_proposal_escape_rate": {
         "denominator": 1,
         "evaluated_attempts": [
@@ -95,20 +95,23 @@
       "tests_run": 1
     },
     "authentication": {
+      "authorized_replay_revalidation": true,
+      "concurrent_http_replay_convergence": true,
       "digest_only_credentials": true,
       "errors": 0,
       "failures": 0,
       "gate": "p6_authentication_clean",
       "operator_plaintext_boundary": true,
+      "response_cache_crash_window_recovery": true,
       "role_membership_revision_revalidation": true,
       "schema_version": 1,
       "session_rotation_and_revocation": true,
       "single_use_atomic_consumption": true,
       "skips": 0,
-      "tests_run": 9
+      "tests_run": 11
     },
     "boundary": {
-      "bytes_scanned": 2595221,
+      "bytes_scanned": 2640128,
       "exceptions_applied": 0,
       "files_scanned": 291,
       "gate": "public_boundary_clean",
@@ -117,6 +120,8 @@
     },
     "change_approval": {
       "atomic_single_use_apply": true,
+      "authorized_replay_revalidation": true,
+      "concurrent_http_replay_convergence": true,
       "exact_revision_digest_base_heads": true,
       "expiry_stale_replay_refused": true,
       "gate": "p6_change_approval_clean",
@@ -124,7 +129,7 @@
       "role_elevation_governed": true,
       "schema_version": 1,
       "separate_durable_human_approver": true,
-      "tests_run": 5
+      "tests_run": 8
     },
     "compose": {
       "actual_runtime_gate": "separate_required",
@@ -155,7 +160,7 @@
       },
       "command": "python3 -B scripts/check_p6_compose_runtime.py .",
       "credentials_absent_from_service_logs": true,
-      "ended_at": "2026-09-02T11:41:55.021523Z",
+      "ended_at": "2026-09-03T03:37:33.943697Z",
       "environment": {
         "compose_version": "5.4.0",
         "container_bind": "0.0.0.0",
@@ -171,7 +176,7 @@
       "recovery_rotation": "old_session_refused_new_session_recovered",
       "schema_version": 1,
       "second_admin_transition": "consumed_once",
-      "started_at": "2026-09-02T11:41:35.352066Z",
+      "started_at": "2026-09-03T03:37:14.078760Z",
       "status": "passed"
     },
     "effect_approval": {
@@ -201,7 +206,7 @@
       "production_security": "not_claimed",
       "schema_version": 1,
       "second_admin_bootstrap_transition": "single_auditable_consumed",
-      "tests_run": 19,
+      "tests_run": 24,
       "two_person_exact_change": "passed",
       "unauthorized_proposal_escape_rate": {
         "denominator": 1,
@@ -391,7 +396,7 @@
       "base_commit": "259e5627c0a4d713934263efe18caf8c675a1669",
       "branch": "codex/p6-governance-hardening",
       "gate": "p5_repository_clean",
-      "head_commit": "4a3c89d20dc93cceebe11c15f3b772afd7b823e0",
+      "head_commit": "8f4d3cd577c31507cc2366d011f1d208fcf2abbc",
       "merge_base": "259e5627c0a4d713934263efe18caf8c675a1669",
       "migration_006_digest": "sha256:7909da4b0b3eb514222f1fd1068c19eb6e8b98d466a786b76c20ae7999e26bcd",
       "required_file_count": 29,
@@ -417,7 +422,7 @@
     },
     "provenance": {
       "gate": "p6_provenance_clean",
-      "implementation_tree_digest": "sha256:0c2dbee8b279e45bc79690934a16aaf98f5c75dfff79dad2e43c509e4ac9efc5",
+      "implementation_tree_digest": "sha256:364144f035fdbe58ee9dd8d25d1f2f537123ff65e6a7671edbaaeebef22825ac",
       "new_implementation_count": 69,
       "receipt_digest": "sha256:f900e09a262687a70bdb5f1ddc23c82c440d73c1d8a74df524545b45e7ab2acc",
       "schema_version": 1,
@@ -428,12 +433,14 @@
       "action_count": 14,
       "alternate_endpoint_bypass_refused": true,
       "auditor_read_export_only": true,
+      "cached_replay_reauthorization": true,
       "gate": "p6_rbac_namespace_clean",
       "human_only_roles": true,
       "role_count": 3,
       "schema_version": 1,
+      "scope_change_and_revocation_revalidation": true,
       "server_side_namespace_checks": true,
-      "tests_run": 3
+      "tests_run": 5
     },
     "repository": {
       "acceptance_commit": "5cf4d33d6d83d09ce8a9aa1a7b53bfb93dcd29a5",
@@ -442,7 +449,7 @@
       "base_commit": "f1dff72c3fb15b2fc7b3c7d989aa85e275cb31ac",
       "branch": "codex/p6-governance-hardening",
       "gate": "p6_repository_clean",
-      "head_commit": "4a3c89d20dc93cceebe11c15f3b772afd7b823e0",
+      "head_commit": "8f4d3cd577c31507cc2366d011f1d208fcf2abbc",
       "merge_base": "f1dff72c3fb15b2fc7b3c7d989aa85e275cb31ac",
       "migration_007_digest": "sha256:ba572b74ffe7d16ed09ffd58791d7bb23b875806996ec897b2e73c82a593cf9c",
       "required_file_count": 35,
@@ -467,7 +474,7 @@
   },
   "schema_version": 1,
   "status": "development_complete_awaiting_independent_acceptance",
-  "tree_digest": "sha256:eca51fbfc8445831ea7d976aebf93773b4d691fa433a9d2488c115c23f1f8994",
+  "tree_digest": "sha256:96eff979c887f0e46f3f4396930c24923f2b0a5af487667b80e5e35b391215ca",
   "unittest": {
     "errors": 0,
     "expected_failures": 0,
@@ -547,7 +554,12 @@
       "p6_audit_export_scope_bound_redaction_restart",
       "p6_browser_credential_replay_restart",
       "p6_browser_mutation_inventory_replay",
+      "p6_business_commit_response_cache_crash_window",
+      "p6_cached_replay_formal_privilege_downgrade",
+      "p6_cached_replay_scope_change_revocation",
       "p6_change_replay_membership_apply_restart",
+      "p6_concurrent_governance_replay_restart",
+      "p6_concurrent_http_replay_convergence_rebound_restart",
       "p6_concurrent_token_atomic_winner",
       "p6_direct_credential_time_concurrent_replay",
       "p6_draft_separation_exact_single_use_profile_only",
@@ -765,7 +777,9 @@
       "tests.p5.test_policy.P5PolicyTests.test_working_hours_timezone_overlap_cross_midnight_and_dst_are_deterministic",
       "tests.p6.test_authentication_rbac.P6AuthenticationRbacTests.test_active_colleague_and_revoke_browser_mutations_are_replay_safe",
       "tests.p6.test_authentication_rbac.P6AuthenticationRbacTests.test_browser_credential_replay_is_canonical_and_restart_durable",
+      "tests.p6.test_authentication_rbac.P6AuthenticationRbacTests.test_business_commit_without_generic_response_cache_retries_once",
       "tests.p6.test_authentication_rbac.P6AuthenticationRbacTests.test_concurrent_enrollment_consumption_has_exactly_one_atomic_winner",
+      "tests.p6.test_authentication_rbac.P6AuthenticationRbacTests.test_concurrent_http_enrollment_replay_converges_rebound_and_restart",
       "tests.p6.test_authentication_rbac.P6AuthenticationRbacTests.test_direct_credential_replay_ignores_server_time_and_concurrent_retry",
       "tests.p6.test_authentication_rbac.P6AuthenticationRbacTests.test_recovery_rotates_session_and_revoked_expired_or_guessed_tokens_fail",
       "tests.p6.test_authentication_rbac.P6AuthenticationRbacTests.test_role_and_membership_revisions_are_checked_on_every_session_use",
@@ -773,8 +787,11 @@
       "tests.p6.test_authentication_rbac.P6AuthenticationRbacTests.test_scoped_roles_matrix_api_authority_injection_and_idor_fail_closed",
       "tests.p6.test_authentication_rbac.P6AuthenticationRbacTests.test_second_admin_transition_is_single_use_and_credentials_are_digest_only",
       "tests.p6.test_change_approval.P6ChangeApprovalTests.test_authority_draft_requires_exact_other_admin_approval_and_is_single_use",
+      "tests.p6.test_change_approval.P6ChangeApprovalTests.test_cached_admin_replays_require_current_authority_after_formal_downgrade",
+      "tests.p6.test_change_approval.P6ChangeApprovalTests.test_cached_colleague_replay_fails_after_scope_change_and_revocation",
       "tests.p6.test_change_approval.P6ChangeApprovalTests.test_change_replay_and_membership_apply_binding_survive_restart",
       "tests.p6.test_change_approval.P6ChangeApprovalTests.test_concurrent_change_decisions_have_one_atomic_terminal_winner",
+      "tests.p6.test_change_approval.P6ChangeApprovalTests.test_concurrent_http_governance_mutations_converge_and_survive_restart",
       "tests.p6.test_change_approval.P6ChangeApprovalTests.test_direct_change_workflow_separation_stale_binding_and_membership_revocation",
       "tests.p6.test_change_approval.P6ChangeApprovalTests.test_expired_and_rejected_changes_are_durable_terminal_refusals",
       "tests.p6.test_effect_audit.P6EffectAuditTests.test_audit_export_is_scoped_bounded_redacted_authorized_and_restart_stable",
@@ -811,7 +828,7 @@
       "tests.runtime.test_p3_runtime.RuntimeSemanticsTests.test_wake_cycle_bounds_preserve_pending_work_and_agenda_takeover_fences_stale_owner",
       "tests.runtime.test_timer_runtime.TimerRuntimeTests.test_durable_timer_due_replay_restart_fencing_causation_and_namespace_isolation"
     ],
-    "tests_run": 235,
+    "tests_run": 240,
     "unexpected_successes": 0
   },
   "verified_gates": [
