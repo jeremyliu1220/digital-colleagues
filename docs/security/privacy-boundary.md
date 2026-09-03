@@ -139,4 +139,32 @@ provider identifiers, raw diagnostics, secrets, and live/personal data are prohi
 
 P6 public evidence remains synthetic/offline. It cannot be labeled human or live-provider
 evidence and does not establish production privacy, security, compliance, tenant isolation,
-or enterprise IAM. These are contract requirements until the P6 Gate passes.
+or enterprise IAM. The P6 Gate has passed; those exclusions remain.
+
+## P7 optional-adapter boundary
+
+P7 public fixtures use synthetic tenant, colleague, work, destination, payload, and result
+values against a controlled IP-loopback stub. The stub, its acknowledgements, and its
+runtime receipts are synthetic/offline evidence, never live-provider evidence. Public
+artifacts record human and live-provider evaluation as `not_evaluated`.
+
+Optional credentials are opaque values created under an OS temporary directory for tests,
+read only at the adapter composition edge, and removed during cleanup. Normal operation
+prefers an operator-created Git-ignored read-only credential file. The public composition
+root does not accept credential values through environment variables. Credentials and
+credential paths are excluded from JSON bodies, SQLite, audit, API/Studio, exception text,
+stdout/stderr, service logs, command arguments, and evidence.
+
+Model requests contain only a minimal versioned namespace/work/agenda/allowed-boundary
+projection. Session cookies, CSRF, bootstrap/enrollment/recovery values or digests, full
+audit export, unrelated namespaces, local paths, and private governance material are never
+sent. Channel requests contain the exact effect payload required for an already approved
+dispatch; only safe classifications and irreversible digests return to durable
+ActionResult/audit records. Raw adapter response bodies are not persisted or emitted.
+
+URL validation rejects userinfo, query, fragment, redirect, non-HTTPS production endpoint,
+and non-loopback test HTTP. Diagnostics expose only allowlisted categories, protocol/result
+classifications, and digests. Provider/account/workspace/channel/conversation/message IDs,
+live payloads, live receipts, real endpoints, and personal acceptance results remain
+forbidden from the public tree. Live acceptance requires separate authorization and
+non-public storage and cannot replace the P7 synthetic contract Gate.

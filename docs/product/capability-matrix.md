@@ -26,13 +26,15 @@ deferred capabilities are described only as a non-committing
 | Exact-effect proposal inbox | Yes | P4 accepted main baseline | Displays and decides the exact `EffectProposal` revision and digests; human approval remains required |
 | Colleague-experience evaluation points | Yes | P4 accepted main baseline | Durable sources distinguish observed, not applicable, and not evaluated; five-minute and human-improvement claims remain unevaluated |
 | Revisioned policy builder | Yes | P5 accepted main baseline | Inert exact-revision Profile/Mandate/policy drafts; typed deterministic working hours, triggers, proactivity, notification/interruption, budgets, stop, and escalation |
-| Local multi-user governance | Yes | P6 contract fixed; implementation not yet gated | Typed RBAC, enrollment/recovery, two-person authority change, approval expiry, scoped audit export, and abuse coverage; no enterprise-IAM or production-security claim |
+| Local multi-user governance | Yes | P6 accepted main baseline | Typed RBAC, enrollment/recovery, two-person authority change, approval expiry, scoped audit export, and abuse coverage; no enterprise-IAM or production-security claim |
 | Semantic Memory | No | Post-v0.1 outlook only | Not a v0.1 commitment and never an authority source |
 | Skill Learning or governed Skill system | No | Post-v0.1 outlook only | Requires an independent gate, provenance, permissions, versioning, and rollback |
 | Shared knowledge or multi-person collaboration | No | Post-v0.1 outlook only | Requires namespace, ownership, authorization, revocation, and abuse testing |
 | Self-initiated autonomy | No | Deferred beyond earlier post-v0.1 stages | Consider only after separately gated memory, proactivity, collaboration, and Skill work |
-| Real model providers | Optional | P7 planned | Not required for the deterministic reference path; separate live-provider acceptance does not establish real-provider pilot readiness |
-| Live chat or email providers | Optional | P7 planned | Not required for the deterministic reference path; live-provider acceptance remains separate and does not establish real-provider pilot readiness |
+| Provider-neutral HTTP JSON model adapter | Optional | P7 contract fixed; implementation not yet gated | Explicit opt-in behind stable port; offline loopback contract only; no named-provider claim |
+| Provider-neutral HTTP JSON channel adapter | Optional | P7 contract fixed; implementation not yet gated | Exact-approved effects, ambiguity/reconciliation, explicit opt-in; no live-delivery claim |
+| Real model providers | Optional | Separate live acceptance not evaluated | Not required for deterministic reference path; generic HTTP contract is not named-provider compatibility |
+| Live chat or email providers | Optional | Separate live acceptance not evaluated | No named channel is implemented or claimed; live acceptance remains non-public and separate |
 | PostgreSQL or distributed stores | No | Not implemented | Port seam only |
 | High availability | No | Not claimed | Not designed or claimed in v0.1 |
 | Production tenant isolation | No | Not claimed | Local reference topology only |

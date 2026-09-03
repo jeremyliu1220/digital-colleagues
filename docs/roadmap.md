@@ -6,16 +6,15 @@ Each milestone stops at its gate. A later milestone must not begin automatically
 
 Current checkpoint:
 
-- P5 has been accepted and fast-forward merged into `main`.
-- The P5 post-merge Gate hotfix has been merged.
-- The accepted `main` baseline is
-  `f1dff72c3fb15b2fc7b3c7d989aa85e275cb31ac`.
-- Historical P0–P5 acceptance, artifacts, evidence, receipts, and migrations remain
+- P6 has passed independent acceptance and was fast-forward merged into `main`.
+- The accepted P6 `main` baseline is
+  `7e6f4c4dc50b675afb60b6e160fe4f15312dd6c8`.
+- Historical P0–P6 acceptance, artifacts, evidence, receipts, and migrations remain
   unchanged.
-- P6 governance hardening starts from that fixed base. Its acceptance contract is fixed,
-  but implementation has not passed the P6 Gate and must not be described as complete,
-  accepted, or production-secure.
-- P7 has not started.
+- P7 optional-adapter development starts from that fixed base. Its acceptance contract is
+  fixed; its implementation has not passed the P7 Gate and must not be described as
+  complete, accepted, live-provider compatible, or production-ready.
+- P8 has not started.
 
 Rebaseline boundary:
 
@@ -127,9 +126,12 @@ without implementing capabilities that do not exist in v0.1.
 Exit: the documented local security test suite passes; production security is still not
 claimed.
 
-Current development status: the P6 acceptance contract, ADR 0005, and security Golden Path
-are fixed from the accepted P5 base. Product implementation and P6 evidence must pass the
-documented Gates before P6 may be described as development complete. P7 remains unstarted.
+Accepted result: P6 is accepted and merged. It implements typed local RBAC, versioned
+membership and session authority, enrollment/recovery, two-person exact governance change,
+approval expiry and revalidation, bounded audit export, abuse coverage, migration 007,
+role-aware Studio views, and isolated Compose evidence. Historical P0–P6 records and
+migrations remain unchanged. Acceptance does not establish enterprise IAM, production
+security/privacy, tenancy isolation, compliance, or production readiness.
 
 ## P7 — Optional adapters
 
@@ -139,6 +141,13 @@ live acceptance. The reference path remains deterministic. Semantic Memory is no
 for P7.
 
 Exit: reference behavior stays deterministic and optional adapter contracts pass.
+
+Current development status: the P7 acceptance contract, ADR 0006, and adapter Golden Path
+are fixed from the accepted P6 base. P7 will add provider-neutral HTTP JSON model and
+channel adapters with strict startup opt-in, safe credentials, loopback-only public tests,
+ambiguity/reconciliation, and no migration 008. Product implementation and evidence must
+pass the documented Gates before P7 may be described as development complete. P8 remains
+unstarted.
 
 ## P8 — Release and operational readiness
 

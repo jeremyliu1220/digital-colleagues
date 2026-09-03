@@ -4,14 +4,14 @@
 
 ## Scope and claim boundary
 
-This model defines requirements for the v0.1 local reference topology. P5 mechanically
-tested the local P4 bootstrap/session boundary plus revisioned draft, policy, namespace,
-authority, replay, deterministic execution, SQLite, outbox, and safe-audit controls. P6 is
-required to test typed RBAC, versioned membership, enrollment/recovery, proposer/approver
-separation, approval expiry, scoped export, and abuse cases. Until its Gate passes those
-are requirements, not verified controls. Neither milestone establishes product security or
-privacy effectiveness. Encryption at rest,
-OIDC, SSO, SCIM, distributed isolation, and high availability remain gaps.
+This model defines requirements for the v0.1 local reference topology. P6 mechanically
+tested the local bootstrap/session boundary, revisioned policy, typed RBAC, versioned
+membership, enrollment/recovery, proposer/approver separation, approval expiry, scoped
+export, namespace/abuse refusal, deterministic execution, SQLite, outbox, and safe audit.
+P7 adds contract tests for explicitly optional HTTP JSON adapters using a controlled
+loopback stub. Passing either milestone does not establish product security or privacy
+effectiveness. Encryption at rest, OIDC, SSO, SCIM, distributed isolation, named-provider
+compatibility, and high availability remain gaps.
 
 ## Assets
 
@@ -72,6 +72,16 @@ OIDC, SSO, SCIM, distributed isolation, and high availability remain gaps.
 | Live data used as public fixture | Explicit denylist and separate live acceptance storage |
 | Dependency compromise | Locked dependencies, license review, provenance, and release inventory in later gates |
 | Local denial of service | Input limits, bounded wake work, SQLite busy handling, and operator recovery |
+| Adapter mode injection | Exact startup allowlists; browser, Studio, model, and API input cannot select an adapter |
+| SSRF or endpoint rebinding | Fixed operator endpoint; HTTPS required except explicit IP-loopback tests; no content-derived URL |
+| Credential disclosure at adapter edge | Read-only opaque file, adapter-only access, no value in URL/body/log/error/audit/evidence |
+| Redirect or TLS downgrade | Redirects refused; certificate verification always enabled; no disable flag |
+| Provider authority injection | Strict response field set; reconstruct every authoritative binding server-side; post-model policy check |
+| Provider-directed execution | Finite semantic JSON only; no tool execution, callback, code, browsing, or dynamic import |
+| Oversized or malformed provider response | Bounded byte read, exact JSON types/fields/content type, typed safe failure |
+| Retry duplicates an uncertain effect | Post-submit timeout/disconnect is ambiguous; no blind retry; reconcile before retry |
+| Provider rebinds idempotency | Existing effect key binds canonical effect digest; conflicts fail closed |
+| External egress during public tests | Explicit IP-literal loopback allowlist plus negative socket/endpoint tests |
 
 ## Authentication requirements
 
@@ -90,6 +100,10 @@ evidence pass.
 - Browser compromise can act within a valid session.
 - The deterministic provider does not validate the safety of real model output.
 - A reference channel does not validate real provider delivery or privacy behavior.
+- The loopback P7 stub does not validate a named provider's protocol, retention, delivery,
+  reliability, privacy, security, or future behavior.
+- An operator who enables an adapter chooses an external disclosure boundary; P7 reduces
+  fields and validates responses but cannot control a remote service.
 - One SQLite writer and one-host Compose topology do not provide availability guarantees.
 
 These are explicit limitations, not deferred claims.

@@ -214,7 +214,7 @@ dispatch. Durable namespaced counters prevent restart, replay, duplicate-event, 
 trigger-class budget evasion. Typed stop state requires an explicit confirmed revision to
 resume; escalation is a safe local record, not approval or an external effect.
 
-## P6 planned local governance topology
+## P6 accepted local governance topology
 
 The fixed P6 contract adds a centralized typed action matrix, independently revisioned
 HUMAN membership, and session bindings to the current role and membership revisions.
@@ -234,9 +234,44 @@ transaction. One narrow, auditable second-Admin bootstrap transition resolves th
 two-person deadlock and closes permanently after successful use.
 
 Audit export is a bounded read port with explicit namespace, UTC range, record types,
-limit, deterministic ordering, versioned safe records, and redaction. These are P6 design
-requirements until the P6 Gate passes; they are not a production-security or tenant-
-isolation claim.
+limit, deterministic ordering, versioned safe records, and redaction. The P6 Gate passed
+on the accepted `7e6f4c4dc50b675afb60b6e160fe4f15312dd6c8` baseline; this is still not a
+production-security or tenant-isolation claim.
+
+## P7 optional adapter topology
+
+P7 keeps `DeterministicIntelligence` and `ReferenceChannel` as composition defaults and
+adds allowlisted `http_json_v1` implementations behind the unchanged intelligence and
+channel ports. The adapters are stateless. No migration 008 is added, and existing SQLite
+proposal, approval, attempt, ActionResult, reconciliation, replay, policy, RBAC, lease, and
+fencing records remain authoritative.
+
+```text
+unchanged application ports
+        |                         default, network-free
+        +-- intelligence -------- DeterministicIntelligence
+        |       `-- opt-in ------- HTTP JSON model adapter --> fixed endpoint
+        `-- channel ------------- ReferenceChannel
+                `-- opt-in ------- HTTP JSON channel adapter -> fixed endpoint
+```
+
+Only adapter/composition modules may read startup environment, credential files, URLs, or
+perform HTTP/TLS I/O. Exact mode allowlists prohibit dynamic imports. Network modes require
+protocol `dc-http-json-v1`, a fixed validated endpoint, a read-only opaque credential file,
+bounded connect/read/total timeouts, request/response byte limits, redirect refusal, and TLS
+verification. Test-only HTTP is restricted to explicit IP-literal loopback.
+
+The model wire response is an untrusted finite semantic projection. Server code reconstructs
+namespace, principals, identifiers, time, Mandate/policy revisions, effect validity,
+constraints, and idempotency before the existing policy layer revalidates it. The channel
+adapter receives only an exact-approved, dispatch-revalidated `ChannelEffect`. Post-submit
+uncertainty becomes `ambiguous`; reconciliation permits retry only for reliable
+`confirmed_absent`, and otherwise returns `still_unknown`.
+
+Public adapter evidence is synthetic/offline and uses an isolated loopback stub. It is not
+named-provider or live-delivery evidence. Default Compose remains deterministic; an
+explicit optional profile/config supplies the adapter selection and temporary read-only
+credentials for the isolated P7 runtime Gate.
 
 ## Causal audit chain
 

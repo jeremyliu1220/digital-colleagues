@@ -8,12 +8,11 @@ Digital Colleagues is an open-source, local-first control plane and reference st
 making an AI coworker's identity, delegated authority, responsibilities, finite work,
 approvals, effects, persistence, and audit causality explicit and testable.
 
-> **Project status — P5 accepted; P6 governance hardening is in development.** P5 and its
-> post-merge Gate hotfix are merged in `main` at the fixed P6 base
-> `f1dff72c3fb15b2fc7b3c7d989aa85e275cb31ac`. P6 has a fixed acceptance contract but has
-> not passed its Gate and is not accepted or secure-by-claim. P7 has not started. Real
-> providers, production security, distributed operation, measured human improvement, and
-> a proven five-minute limit are not claimed.
+> **Project status — P6 accepted; P7 optional adapters are in development.** P6 is merged
+> in `main` at the fixed P7 base `7e6f4c4dc50b675afb60b6e160fe4f15312dd6c8`.
+> P7 has a fixed acceptance contract but has not passed its Gate. Named-provider
+> compatibility, live delivery, production security, distributed operation, measured human
+> improvement, and a proven five-minute limit are not claimed.
 
 ## What makes a digital colleague different?
 
@@ -36,19 +35,21 @@ The target is a local deterministic reference implementation—not enterprise IA
 production tenancy isolation, high availability, compliance certification, or a hosted
 service.
 
-## Accepted P5 baseline and P6 contract
+## Accepted P6 baseline and P7 contract
 
 P5 retained the accepted P4 local Compose and Studio path and added an inert, revisioned
 Profile/Mandate/policy draft. A local Admin reviews explicit defaults and a classified
 before/after diff, confirms the exact base revisions and digest, and then exercises
 working-hours, trigger, proactivity, notification/interruption, wake-budget, stop, resume,
 escalation, stale-draft, and stale-proposal behavior. See the
-[P5 operator guide](docs/p5/golden-path.md). P6 now fixes the local multi-user governance
-requirements in its [acceptance contract](docs/p6/acceptance.md) and
-[security Golden Path](docs/p6/security-golden-path.md). These are development contracts,
-not evidence that P6 has passed.
+[P5 operator guide](docs/p5/golden-path.md). P6 adds accepted local multi-user governance,
+two-person authority changes, recovery, approval revalidation, and bounded audit export.
+P7 fixes the provider-neutral optional-adapter requirements in its
+[acceptance contract](docs/p7/acceptance.md), [ADR 0006](docs/adr/0006-optional-provider-and-channel-adapters.md),
+and [adapter Golden Path](docs/p7/adapter-golden-path.md). These P7 documents are a
+development contract, not evidence that P7 has passed or any named provider works.
 
-## Verify P5
+## P7 development verification
 
 Prerequisites are Python 3.12+, Node.js 22.12+, npm, and Make.
 
@@ -57,13 +58,14 @@ make check
 make studio-dev
 ```
 
-`make check` resolves the exact lock in an OS temporary workspace, then runs Python and
-Studio lint, type checks, tests and build plus the public-boundary, repository, provenance,
-architecture, migration, builder, policy, static Compose, Studio, and all retained P0–P4
-regression gates. All test databases and package environments remain outside the repository.
-The separate `make p5-compose-runtime` target requires Docker and performs the actual
-isolated start/recreate/recovery/policy/dispatch/stop/cleanup Gate. Evidence generation
-requires that runtime Gate to pass.
+`make check` currently resolves the exact lock in an OS temporary workspace, then runs
+Python and Studio lint, type checks, tests and build plus the public-boundary and all
+retained P0–P6 gates. P7 implementation will extend it with the model/channel contract,
+configuration, abuse, static Compose, and loopback Golden Path gates. All test databases,
+package environments, stubs, and temporary credentials remain outside the repository. The
+separate `make p7-compose-runtime` target requires Docker and must perform the actual
+isolated optional-adapter start/recreate/ambiguity/reconciliation/stop/cleanup Gate before
+P7 evidence can be written.
 
 Useful focused commands:
 
@@ -92,6 +94,30 @@ make p5-studio
 make p5-compose
 make p5-compose-runtime
 make p5-golden
+make p6-repository
+make p6-provenance
+make p6-architecture
+make p6-migrations
+make p6-authentication
+make p6-rbac
+make p6-change-approval
+make p6-effect-approval
+make p6-audit-export
+make p6-abuse
+make p6-studio
+make p6-compose
+make p6-compose-runtime
+make p6-golden
+make p7-repository
+make p7-provenance
+make p7-architecture
+make p7-model-adapter
+make p7-channel-adapter
+make p7-configuration
+make p7-abuse
+make p7-compose
+make p7-compose-runtime
+make p7-golden
 make p3-provenance
 make p3-architecture
 make p3-migrations
@@ -99,10 +125,11 @@ make p3-persistence
 make p3-runtime
 make p3-golden
 make bootstrap
-make evidence-p5
+make evidence-p7
 ```
 
-No command requires provider credentials or live data. Do not put either in this tree.
+No public Gate requires provider credentials or live data. P7 uses only temporary synthetic
+loopback credentials. Do not put live credentials or data in this tree.
 See [local development](docs/development.md) for exact commands and troubleshooting. The
 accepted P0–P4 evidence remains historical and must not be rebuilt from the P5 tree.
 
@@ -121,6 +148,8 @@ tests/p2/                P2 evidence and summary gates
 tests/p3/                restart Golden Path and synthetic fixtures
 tests/p4/                authentication, metrics, Studio API, and recovery fixtures
 tests/p5/                revisioned builder, typed policy, migration, and recovery fixtures
+tests/p6/                local RBAC, recovery, change approval, export, and abuse fixtures
+tests/p7/                offline optional-adapter contracts, configuration, and abuse fixtures
 tests/persistence/       SQLite migration, namespace, transaction, and fencing tests
 tests/runtime/           Agenda, authorization, outbox, ambiguity, and crash tests
 tests/api/               in-process typed FastAPI mapping tests
@@ -130,9 +159,9 @@ provenance/              fixed-revision source and scanner manifests
 artifacts/               machine-readable milestone summaries
 ```
 
-The private parent research repository remains read-only. P5 history, acceptance,
-artifacts, evidence, migration 006, and its provenance receipt remain unchanged. P6 starts
-from the accepted public P5 baseline and may migrate no parent working-tree content.
+The private parent research repository remains read-only. P0-P6 history, acceptance,
+artifacts, evidence, migrations 001-007, and provenance receipts remain unchanged. P7 starts
+from the accepted public P6 baseline and may migrate no parent working-tree content.
 
 ## Contributing and security
 
