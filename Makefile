@@ -2,11 +2,11 @@
 
 PYTHON ?= python3
 
-.PHONY: help bootstrap lint typecheck test build check boundary scaffold p2-repository p2-provenance p2-architecture p2-core p3-repository p3-provenance p3-architecture p3-migrations p3-persistence p3-runtime p3-golden p4-repository p4-provenance p4-architecture p4-migrations p4-authentication p4-studio p4-compose p4-compose-runtime p4-golden p5-repository p5-provenance p5-architecture p5-migrations p5-builder p5-policy p5-studio p5-compose p5-compose-runtime p5-golden p6-repository p6-provenance p6-architecture p6-migrations p6-authentication p6-rbac p6-change-approval p6-effect-approval p6-audit-export p6-abuse p6-studio p6-compose p6-compose-runtime p6-golden evidence-p1 evidence-p2 evidence-p3 evidence-p4 evidence-p5 evidence-p6 studio-dev
+.PHONY: help bootstrap lint typecheck test build check boundary scaffold p2-repository p2-provenance p2-architecture p2-core p3-repository p3-provenance p3-architecture p3-migrations p3-persistence p3-runtime p3-golden p4-repository p4-provenance p4-architecture p4-migrations p4-authentication p4-studio p4-compose p4-compose-runtime p4-golden p5-repository p5-provenance p5-architecture p5-migrations p5-builder p5-policy p5-studio p5-compose p5-compose-runtime p5-golden p6-repository p6-provenance p6-architecture p6-migrations p6-authentication p6-rbac p6-change-approval p6-effect-approval p6-audit-export p6-abuse p6-studio p6-compose p6-compose-runtime p6-golden p7-repository p7-provenance p7-architecture p7-model-adapter p7-channel-adapter p7-configuration p7-abuse p7-compose p7-compose-runtime p7-golden evidence-p1 evidence-p2 evidence-p3 evidence-p4 evidence-p5 evidence-p6 evidence-p7 studio-dev
 
 help:
 	@echo "bootstrap    Resolve locked tools in an isolated temporary workspace"
-	@echo "check        Run every current P6 gate plus retained P0-P5 regressions"
+	@echo "check        Run every current P7 gate plus retained P0-P6 regressions"
 	@echo "lint         Run Python and Studio lint/format checks"
 	@echo "typecheck    Run Python and Studio type checking"
 	@echo "test         Run Python and Studio tests"
@@ -56,31 +56,42 @@ help:
 	@echo "p6-compose   Validate static local P6 topology"
 	@echo "p6-compose-runtime Run actual P6 restart/recovery/cleanup Gate"
 	@echo "p6-golden    Run the synthetic/offline P6 security Golden Path"
+	@echo "p7-repository Validate trusted P7 ancestry and immutable acceptance"
+	@echo "p7-provenance Validate complete P7 implementation provenance"
+	@echo "p7-architecture Validate P7 dependencies and adapter-edge capabilities"
+	@echo "p7-model-adapter Validate the provider-neutral model wire contract"
+	@echo "p7-channel-adapter Validate exact-effect channel and reconciliation"
+	@echo "p7-configuration Validate explicit opt-in, endpoint, and credential bounds"
+	@echo "p7-abuse     Validate P7 adapter abuse-case refusals"
+	@echo "p7-compose   Validate deterministic default and optional profile"
+	@echo "p7-compose-runtime Run actual no-egress P7 adapter and retained P6 runtime"
+	@echo "p7-golden    Run the synthetic/offline P7 adapter Golden Path"
 	@echo "evidence-p1  Run all gates and rebuild the P1 evidence summary"
 	@echo "evidence-p2  Run all gates and atomically rebuild P2 evidence"
 	@echo "evidence-p3  Run all gates and atomically write P3 evidence"
 	@echo "evidence-p4  Run all gates and atomically write P4 evidence"
 	@echo "evidence-p5  Run all gates and atomically write P5 evidence"
 	@echo "evidence-p6  Run all gates and atomically write P6 evidence"
+	@echo "evidence-p7  Run all gates and atomically write P7 evidence"
 	@echo "studio-dev   Start an isolated preview of the static Studio shell"
 
 bootstrap:
-	$(PYTHON) -B -m scripts.run_p6_toolchain --scope bootstrap
+	$(PYTHON) -B -m scripts.run_p7_toolchain --scope bootstrap
 
 lint:
-	$(PYTHON) -B -m scripts.run_p6_toolchain --scope lint
+	$(PYTHON) -B -m scripts.run_p7_toolchain --scope lint
 
 typecheck:
-	$(PYTHON) -B -m scripts.run_p6_toolchain --scope typecheck
+	$(PYTHON) -B -m scripts.run_p7_toolchain --scope typecheck
 
 test:
-	$(PYTHON) -B -m scripts.run_p6_toolchain --scope test
+	$(PYTHON) -B -m scripts.run_p7_toolchain --scope test
 
 build:
-	$(PYTHON) -B -m scripts.run_p6_toolchain --scope build
+	$(PYTHON) -B -m scripts.run_p7_toolchain --scope build
 
 check:
-	$(PYTHON) -B -m scripts.run_p6_toolchain --scope all
+	$(PYTHON) -B -m scripts.run_p7_toolchain --scope all
 
 boundary:
 	$(PYTHON) -B scripts/check_public_boundary.py .
@@ -220,6 +231,36 @@ p6-compose-runtime:
 p6-golden:
 	$(PYTHON) -B -m scripts.run_p6_toolchain --scope golden
 
+p7-repository:
+	$(PYTHON) -B -m scripts.run_p7_toolchain --scope repository
+
+p7-provenance:
+	$(PYTHON) -B -m scripts.run_p7_toolchain --scope provenance
+
+p7-architecture:
+	$(PYTHON) -B -m scripts.run_p7_toolchain --scope architecture
+
+p7-model-adapter:
+	$(PYTHON) -B -m scripts.run_p7_toolchain --scope model-adapter
+
+p7-channel-adapter:
+	$(PYTHON) -B -m scripts.run_p7_toolchain --scope channel-adapter
+
+p7-configuration:
+	$(PYTHON) -B -m scripts.run_p7_toolchain --scope configuration
+
+p7-abuse:
+	$(PYTHON) -B -m scripts.run_p7_toolchain --scope abuse
+
+p7-compose:
+	$(PYTHON) -B -m scripts.run_p7_toolchain --scope compose
+
+p7-compose-runtime:
+	$(PYTHON) -B scripts/check_p7_compose_runtime.py .
+
+p7-golden:
+	$(PYTHON) -B -m scripts.run_p7_toolchain --scope golden
+
 evidence-p1:
 	$(PYTHON) -B scripts/run_p1_toolchain.py --scope all --write-evidence
 
@@ -237,6 +278,9 @@ evidence-p5:
 
 evidence-p6:
 	$(PYTHON) -B -m scripts.run_p6_toolchain --scope all --write-evidence
+
+evidence-p7:
+	$(PYTHON) -B -m scripts.run_p7_toolchain --scope all --write-evidence
 
 studio-dev:
 	$(PYTHON) -B -m scripts.run_p5_toolchain --studio-dev

@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: Apache-2.0
+
+FROM python:3.13-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app/src
+
+WORKDIR /app
+
+COPY requirements/p4.lock /app/requirements/p4.lock
+RUN python -m pip install --no-cache-dir -r /app/requirements/p4.lock
+
+COPY migrations /app/migrations
+COPY src /app/src
+COPY scripts /app/scripts
+COPY tests /app/tests
+
+RUN groupadd --gid 10001 digital-colleagues \
+    && useradd --uid 10001 --gid 10001 --no-create-home digital-colleagues
+
+USER 10001:10001
+
+CMD ["python", "-B", "scripts/check_p7_container_runtime.py", "/run/secrets/p7-credential"]

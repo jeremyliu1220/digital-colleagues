@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: Apache-2.0
+
+services:
+  p7-adapter-gate:
+    profiles:
+      - optional-adapters
+    build:
+      context: .
+      dockerfile: Dockerfile.p7
+    command:
+      - python
+      - -B
+      - scripts/check_p7_container_runtime.py
+      - /run/secrets/p7-credential
+    volumes:
+      - ${DC_P7_CREDENTIAL_FILE:?set a temporary read-only credential file}:/run/secrets/p7-credential:ro
+    network_mode: none
+    read_only: true
+    tmpfs:
+      - /tmp
+    restart: "no"

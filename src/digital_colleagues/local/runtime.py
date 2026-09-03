@@ -5,11 +5,10 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
-from digital_colleagues.adapters.channel.reference import ReferenceChannel
-from digital_colleagues.adapters.intelligence.deterministic import DeterministicIntelligence
 from digital_colleagues.adapters.sqlite.p6_store import SQLiteP6Store
 from digital_colleagues.adapters.system.deterministic import StableHashIdentifier
 from digital_colleagues.api.p4_app import create_p4_app
@@ -36,6 +35,7 @@ from digital_colleagues.application.p6_services import (
     P6DispatchAuthorizer,
     P6RuntimeController,
 )
+from digital_colleagues.local.p7_adapters import build_selected_adapters
 from digital_colleagues.local.security import (
     CredentialDigests,
     SecureTokenSource,
@@ -55,12 +55,18 @@ class LocalRuntime:
     controller: P6RuntimeController
     changes: P6ChangeService
     audit: P6AuditService
+    model_adapter_mode: str
+    channel_adapter_mode: str
 
     def close(self) -> None:
         self.store.close()
 
 
-def build_local_runtime(state_directory: Path) -> LocalRuntime:
+def build_local_runtime(
+    state_directory: Path,
+    *,
+    adapter_environment: Mapping[str, str] | None = None,
+) -> LocalRuntime:
     state_directory.mkdir(mode=0o700, parents=True, exist_ok=True)
     clock = UtcClock()
     store = SQLiteP6Store(
@@ -95,8 +101,9 @@ def build_local_runtime(state_directory: Path) -> LocalRuntime:
         identifiers=identifiers,
     )
     builder = P6BuilderService(inner=inner_builder, authentication=authentication)
+    intelligence, channel, selection = build_selected_adapters(adapter_environment or {})
     governed = GovernedObservedIntelligence(
-        inner=DeterministicIntelligence(),
+        inner=intelligence,
         store=store,
         identifiers=identifiers,
     )
@@ -109,7 +116,7 @@ def build_local_runtime(state_directory: Path) -> LocalRuntime:
             identifiers=identifiers,
             digests=digests,
         ),
-        channel=ReferenceChannel(),
+        channel=channel,
         clock=clock,
         identifiers=identifiers,
         digests=digests,
@@ -155,6 +162,8 @@ def build_local_runtime(state_directory: Path) -> LocalRuntime:
         controller=controller,
         changes=changes,
         audit=audit,
+        model_adapter_mode=selection.model_mode.value,
+        channel_adapter_mode=selection.channel_mode.value,
     )
 
 
@@ -162,7 +171,7 @@ def build_app_from_environment() -> object:
     state_directory = Path(os.environ.get("DC_STATE_DIR", "/state"))
     expected_origin = os.environ.get("DC_EXPECTED_ORIGIN", "http://127.0.0.1:4173")
     secure_cookie = os.environ.get("DC_SECURE_COOKIE", "0") == "1"
-    runtime = build_local_runtime(state_directory)
+    runtime = build_local_runtime(state_directory, adapter_environment=os.environ)
     app = create_p4_app(
         authentication=runtime.authentication,
         colleagues=runtime.colleagues,  # type: ignore[arg-type]
@@ -172,8 +181,8 @@ def build_app_from_environment() -> object:
         expected_origin=expected_origin,
         secure_cookie=secure_cookie,
     )
-    app.title = "Digital Colleagues P6 governance hardening API"
-    app.version = "0.0.0-p6"
+    app.title = "Digital Colleagues P7 optional adapters API"
+    app.version = "0.0.0-p7"
     install_p5_routes(
         app,
         authentication=runtime.authentication,
