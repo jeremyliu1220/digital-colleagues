@@ -185,11 +185,36 @@ def install_p6_routes(
         *,
         session: AuthenticatedSession,
         action: str,
+        authorization_action: AuthorizationAction,
+        namespace: Namespace,
         idempotency_key: str,
         binding: dict[str, object],
         operation: Callable[[], dict[str, object]],
     ) -> dict[str, object]:
-        canonical = json.dumps(binding, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+        def authorize_current() -> None:
+            authentication.authorize(
+                session=session,
+                action=authorization_action,
+                namespace=namespace,
+            )
+
+        def restore(replay: object) -> dict[str, object]:
+            restored = contract_to_public_data(replay)
+            if not isinstance(restored, dict):
+                raise ReplayConflictError("P6 mutation replay result shape is invalid")
+            return restored
+
+        authorize_current()
+        canonical = json.dumps(
+            {
+                "authorization_action": authorization_action.value,
+                "namespace": contract_to_public_data(namespace),
+                "request": binding,
+            },
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        )
         try:
             replay, request_digest = authentication.mutation_replay(
                 session=session,
@@ -200,10 +225,8 @@ def install_p6_routes(
         except ConflictError as error:
             raise ReplayConflictError("P6 mutation idempotency key was rebound") from error
         if replay is not None:
-            restored = contract_to_public_data(replay)
-            if not isinstance(restored, dict):
-                raise ReplayConflictError("P6 mutation replay result shape is invalid")
-            return restored
+            authorize_current()
+            return restore(replay)
         result = operation()
         try:
             authentication.record_mutation(
@@ -214,7 +237,21 @@ def install_p6_routes(
                 result=result,
             )
         except ConflictError as error:
-            raise ReplayConflictError("P6 mutation idempotency key raced") from error
+            try:
+                winner, _ = authentication.mutation_replay(
+                    session=session,
+                    action=action,
+                    idempotency_key=idempotency_key,
+                    request_binding=canonical,
+                )
+            except ConflictError as rebound:
+                raise ReplayConflictError("P6 mutation idempotency key was rebound") from rebound
+            if winner is None:
+                raise ReplayConflictError(
+                    "P6 mutation replay winner could not be recovered"
+                ) from error
+            authorize_current()
+            return restore(winner)
         return result
 
     @app.middleware("http")
@@ -388,6 +425,8 @@ def install_p6_routes(
         return replayable(
             session=session,
             action="p6:set-active-colleague",
+            authorization_action=AuthorizationAction.READ_COLLEAGUE,
+            namespace=Namespace.colleague(session.tenant_id, body.colleague_id),
             idempotency_key=body.idempotency_key,
             binding={"active_scope_id": body.colleague_id},
             operation=operation,
@@ -416,6 +455,8 @@ def install_p6_routes(
         return replayable(
             session=session,
             action="p6:authorize-enrollment",
+            authorization_action=AuthorizationAction.MANAGE_CREDENTIAL,
+            namespace=Namespace.tenant(session.tenant_id),
             idempotency_key=idempotency_key,
             binding={
                 "role": role.value,
@@ -476,6 +517,8 @@ def install_p6_routes(
         return replayable(
             session=session,
             action="p6:authorize-recovery",
+            authorization_action=AuthorizationAction.MANAGE_CREDENTIAL,
+            namespace=Namespace.tenant(session.tenant_id),
             idempotency_key=body.idempotency_key,
             binding={"principal_id": body.principal_id},
             operation=operation,
@@ -498,6 +541,8 @@ def install_p6_routes(
         return replayable(
             session=session,
             action="p6:revoke-credential",
+            authorization_action=AuthorizationAction.MANAGE_CREDENTIAL,
+            namespace=Namespace.tenant(session.tenant_id),
             idempotency_key=body.idempotency_key,
             binding={"credential_id": credential_id},
             operation=operation,
@@ -522,6 +567,8 @@ def install_p6_routes(
         return replayable(
             session=session,
             action="p6:propose-change",
+            authorization_action=AuthorizationAction.PROPOSE_CHANGE,
+            namespace=session.colleague_namespace(),
             idempotency_key=body.idempotency_key,
             binding={
                 "change_kind": "draft",
@@ -552,6 +599,8 @@ def install_p6_routes(
         return replayable(
             session=session,
             action="p6:propose-change",
+            authorization_action=AuthorizationAction.PROPOSE_CHANGE,
+            namespace=Namespace.tenant(session.tenant_id),
             idempotency_key=body.idempotency_key,
             binding={
                 "change_kind": "membership",
@@ -578,6 +627,8 @@ def install_p6_routes(
         return replayable(
             session=session,
             action="p6:propose-change",
+            authorization_action=AuthorizationAction.PROPOSE_CHANGE,
+            namespace=Namespace.tenant(session.tenant_id),
             idempotency_key=body.idempotency_key,
             binding={"change_kind": "admin_enrollment"},
             operation=operation,
@@ -620,6 +671,8 @@ def install_p6_routes(
         return replayable(
             session=session,
             action="p6:decide-change",
+            authorization_action=AuthorizationAction.DECIDE_CHANGE,
+            namespace=namespace,
             idempotency_key=body.idempotency_key,
             binding={
                 "scope": scope,
@@ -661,6 +714,8 @@ def install_p6_routes(
         return replayable(
             session=session,
             action="p6:apply-change",
+            authorization_action=AuthorizationAction.APPLY_CHANGE,
+            namespace=session.colleague_namespace(),
             idempotency_key=body.idempotency_key,
             binding={
                 "scope": "colleague",
@@ -688,6 +743,8 @@ def install_p6_routes(
         return replayable(
             session=session,
             action="p6:apply-change",
+            authorization_action=AuthorizationAction.APPLY_CHANGE,
+            namespace=Namespace.tenant(session.tenant_id),
             idempotency_key=body.idempotency_key,
             binding={
                 "scope": "tenant",

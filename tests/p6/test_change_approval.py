@@ -6,6 +6,7 @@ import tempfile
 import threading
 import unittest
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import replace
 from datetime import timedelta
 from pathlib import Path
 from typing import cast
@@ -22,7 +23,11 @@ from digital_colleagues.application.errors import (
     StaleConflictError,
 )
 from digital_colleagues.application.p4_contracts import InitialColleagueRequest
-from digital_colleagues.application.p6_contracts import ChangeDecisionRequest
+from digital_colleagues.application.p6_contracts import (
+    ChangeDecisionRequest,
+    EnrollmentAuthorizationRequest,
+    RecoveryAuthorizationRequest,
+)
 from digital_colleagues.application.p6_services import P6ChangeService
 from digital_colleagues.core.common import FrozenJsonObject
 from digital_colleagues.core.governance import (
@@ -33,7 +38,14 @@ from digital_colleagues.core.governance import (
 )
 from digital_colleagues.core.principals import HumanRole
 from tests.p5.fixtures import initial_colleague_body, update_body
-from tests.p6.fixtures import NOW, ORIGIN, ROOT, build_harness
+from tests.p6.fixtures import (
+    NOW,
+    ORIGIN,
+    ROOT,
+    build_harness,
+    concurrent_http_posts,
+    initial_request,
+)
 from tests.p6.test_authentication_rbac import bootstrap, enroll
 
 
@@ -544,6 +556,583 @@ class P6ChangeApprovalTests(unittest.TestCase):
                 1,
             )
             final.store.close()
+
+    def test_cached_admin_replays_require_current_authority_after_formal_downgrade(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory(prefix="digital-colleagues-p6-replay-downgrade-") as name:
+            harness = build_harness(Path(name) / "state.sqlite")
+            first_cookie, first = bootstrap(harness)
+            _, second = enroll(
+                harness,
+                issuer=first,
+                role=HumanRole.TENANT_ADMIN,
+                scopes=("*",),
+                key="downgrade-second-admin",
+            )
+            third_proposal = harness.changes.propose_admin_enrollment(
+                session=first.session,
+                idempotency_key="downgrade-third-admin-proposal",
+            )
+            _, third_decision = harness.changes.decide(
+                session=second.session_grant.session,
+                namespace=third_proposal.namespace,
+                proposal_id=third_proposal.proposal_id,
+                request=ChangeDecisionRequest(
+                    proposal_revision=third_proposal.revision,
+                    proposal_digest=third_proposal.canonical_digest,
+                    choice=ChangeChoice.APPROVE,
+                    idempotency_key="downgrade-third-admin-decision",
+                ),
+            )
+            _, third = enroll(
+                harness,
+                issuer=first,
+                role=HumanRole.TENANT_ADMIN,
+                scopes=("*",),
+                key="downgrade-third-admin-enrollment",
+                decision_id=third_decision.decision_id,
+            )
+
+            first_client = TestClient(harness.app())
+            first_client.cookies.set("dc_session", first_cookie)
+            first_headers = self.headers(first.csrf_token)
+            enrollment_body = {
+                "colleague_ids": ["colleague:alpha"],
+                "idempotency_key": "downgrade-cached-enrollment",
+            }
+            enrollment_response = first_client.post(
+                "/governance/enrollments/users",
+                headers=first_headers,
+                json=enrollment_body,
+            )
+            self.assertEqual(enrollment_response.status_code, 201, enrollment_response.text)
+            enrollment_id = enrollment_response.json()["credential"]["credential_id"]
+            enrollment_token = harness.authentication.retrieve_operator_credential(enrollment_id)
+            user = harness.authentication.exchange_enrollment(enrollment_token)
+
+            recovery_body = {
+                "principal_id": user.membership.principal_id,
+                "idempotency_key": "downgrade-cached-recovery",
+            }
+            recovery_response = first_client.post(
+                "/governance/recovery", headers=first_headers, json=recovery_body
+            )
+            self.assertEqual(recovery_response.status_code, 201, recovery_response.text)
+
+            disposable = harness.authentication.authorize_enrollment(
+                session=first.session,
+                request=EnrollmentAuthorizationRequest(
+                    role=HumanRole.COLLEAGUE_USER,
+                    colleague_ids=("colleague:alpha",),
+                    idempotency_key="downgrade-disposable-credential",
+                ),
+            )
+            revoke_path = f"/governance/credentials/{disposable.credential_id}/revoke"
+            revoke_body = {"idempotency_key": "downgrade-cached-revoke"}
+            revoke_response = first_client.post(
+                revoke_path, headers=first_headers, json=revoke_body
+            )
+            self.assertEqual(revoke_response.status_code, 200, revoke_response.text)
+
+            proposal_body = {
+                "target_principal_id": user.membership.principal_id,
+                "proposed_role": "auditor",
+                "proposed_status": "active",
+                "proposed_colleague_ids": ["colleague:alpha"],
+                "idempotency_key": "downgrade-cached-proposal",
+            }
+            proposal_response = first_client.post(
+                "/governance/memberships/proposals",
+                headers=first_headers,
+                json=proposal_body,
+            )
+            self.assertEqual(proposal_response.status_code, 201, proposal_response.text)
+
+            applied_proposal = harness.changes.propose_membership(
+                session=second.session_grant.session,
+                target_principal_id=user.membership.principal_id,
+                role=HumanRole.AUDITOR,
+                status=MembershipStatus.ACTIVE,
+                colleague_ids=("colleague:alpha",),
+                idempotency_key="downgrade-applied-proposal",
+            )
+            decision_path = f"/governance/changes/tenant/{applied_proposal.proposal_id}/decision"
+            decision_body = {
+                "proposal_revision": applied_proposal.revision,
+                "proposal_digest": applied_proposal.canonical_digest,
+                "choice": "approve",
+                "idempotency_key": "downgrade-cached-decision",
+            }
+            decision_response = first_client.post(
+                decision_path, headers=first_headers, json=decision_body
+            )
+            self.assertEqual(decision_response.status_code, 201, decision_response.text)
+            decision_id = decision_response.json()["decision"]["decision_id"]
+            apply_path = f"/governance/changes/tenant/{applied_proposal.proposal_id}/apply"
+            apply_body = {
+                "decision_id": decision_id,
+                "idempotency_key": "downgrade-cached-apply",
+            }
+            apply_response = first_client.post(apply_path, headers=first_headers, json=apply_body)
+            self.assertEqual(apply_response.status_code, 200, apply_response.text)
+
+            second_client = TestClient(harness.app())
+            second_client.cookies.set("dc_session", second.session_grant.session_credential)
+            current_admin_body = {
+                "colleague_ids": ["colleague:beta"],
+                "idempotency_key": "current-admin-replay",
+            }
+            current_admin_first = second_client.post(
+                "/governance/enrollments/users",
+                headers=self.headers(second.session_grant.csrf_token),
+                json=current_admin_body,
+            )
+            current_admin_replay = second_client.post(
+                "/governance/enrollments/users",
+                headers=self.headers(second.session_grant.csrf_token),
+                json=current_admin_body,
+            )
+            self.assertEqual(current_admin_first.status_code, 201, current_admin_first.text)
+            self.assertEqual(current_admin_replay.status_code, 201, current_admin_replay.text)
+            self.assertEqual(current_admin_replay.json(), current_admin_first.json())
+
+            downgrade = harness.changes.propose_membership(
+                session=third.session_grant.session,
+                target_principal_id=first.session.principal.principal_id,
+                role=HumanRole.AUDITOR,
+                status=MembershipStatus.ACTIVE,
+                colleague_ids=("colleague:alpha",),
+                idempotency_key="formal-first-admin-downgrade",
+            )
+            _, downgrade_decision = harness.changes.decide(
+                session=second.session_grant.session,
+                namespace=downgrade.namespace,
+                proposal_id=downgrade.proposal_id,
+                request=ChangeDecisionRequest(
+                    proposal_revision=downgrade.revision,
+                    proposal_digest=downgrade.canonical_digest,
+                    choice=ChangeChoice.APPROVE,
+                    idempotency_key="formal-first-admin-downgrade-decision",
+                ),
+            )
+            downgraded = harness.changes.apply_membership(
+                session=third.session_grant.session,
+                proposal_id=downgrade.proposal_id,
+                decision_id=downgrade_decision.decision_id,
+                idempotency_key="formal-first-admin-downgrade-apply",
+            )
+            self.assertEqual(downgraded.roles, (HumanRole.AUDITOR,))
+            recovery = harness.authentication.authorize_recovery(
+                session=second.session_grant.session,
+                request=RecoveryAuthorizationRequest(
+                    principal_id=first.session.principal.principal_id,
+                    idempotency_key="downgraded-admin-recovery",
+                ),
+            )
+            recovery_token = harness.authentication.retrieve_operator_credential(
+                recovery.credential_id
+            )
+            recovered = harness.authentication.exchange_recovery(recovery_token)
+            self.assertEqual(recovered.membership.roles, (HumanRole.AUDITOR,))
+            downgraded_client = TestClient(harness.app())
+            downgraded_client.cookies.set("dc_session", recovered.session_grant.session_credential)
+            downgraded_headers = self.headers(recovered.session_grant.csrf_token)
+            cached_requests = (
+                ("/governance/enrollments/users", enrollment_body, enrollment_response.text),
+                ("/governance/recovery", recovery_body, recovery_response.text),
+                (revoke_path, revoke_body, revoke_response.text),
+                (
+                    "/governance/memberships/proposals",
+                    proposal_body,
+                    proposal_response.text,
+                ),
+                (decision_path, decision_body, decision_response.text),
+                (apply_path, apply_body, apply_response.text),
+            )
+            for path, body, cached_text in cached_requests:
+                refused = downgraded_client.post(path, headers=downgraded_headers, json=body)
+                self.assertEqual(refused.status_code, 403, refused.text)
+                self.assertNotEqual(refused.text, cached_text)
+                for secret_metadata in (
+                    enrollment_id,
+                    recovery_response.json()["credential"]["credential_id"],
+                    disposable.credential_id,
+                    proposal_response.json()["proposal"]["proposal_id"],
+                    decision_id,
+                    user.membership.membership_id,
+                ):
+                    self.assertNotIn(secret_metadata, refused.text)
+            harness.store.close()
+
+    def test_cached_colleague_replay_fails_after_scope_change_and_revocation(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="digital-colleagues-p6-replay-scope-") as name:
+            harness = build_harness(Path(name) / "state.sqlite")
+            _, first = bootstrap(harness)
+            _, second = enroll(
+                harness,
+                issuer=first,
+                role=HumanRole.TENANT_ADMIN,
+                scopes=("*",),
+                key="scope-second-admin",
+            )
+            alpha, _, _ = harness.colleagues.create(
+                session=first.session,
+                request=replace(initial_request(), idempotency_key="scope-alpha-colleague"),
+            )
+            alpha_id = alpha.namespace.scope_id
+            beta_id = "colleague:beta"
+            assert alpha_id is not None
+            _, auditor = enroll(
+                harness,
+                issuer=first,
+                role=HumanRole.AUDITOR,
+                scopes=(alpha_id,),
+                key="scope-auditor",
+            )
+            alpha_client = TestClient(harness.app())
+            alpha_client.cookies.set("dc_session", auditor.session_grant.session_credential)
+            alpha_body = dict(
+                colleague_id=alpha_id,
+                idempotency_key="cached-alpha-colleague",
+            )
+            alpha_response = alpha_client.post(
+                "/governance/session/active-colleague",
+                headers=self.headers(auditor.session_grant.csrf_token),
+                json=alpha_body,
+            )
+            self.assertEqual(alpha_response.status_code, 200, alpha_response.text)
+
+            scope_change = harness.changes.propose_membership(
+                session=first.session,
+                target_principal_id=auditor.membership.principal_id,
+                role=HumanRole.AUDITOR,
+                status=MembershipStatus.ACTIVE,
+                colleague_ids=(beta_id,),
+                idempotency_key="formal-auditor-scope-change",
+            )
+            _, scope_decision = harness.changes.decide(
+                session=second.session_grant.session,
+                namespace=scope_change.namespace,
+                proposal_id=scope_change.proposal_id,
+                request=ChangeDecisionRequest(
+                    proposal_revision=scope_change.revision,
+                    proposal_digest=scope_change.canonical_digest,
+                    choice=ChangeChoice.APPROVE,
+                    idempotency_key="formal-auditor-scope-decision",
+                ),
+            )
+            harness.changes.apply_membership(
+                session=first.session,
+                proposal_id=scope_change.proposal_id,
+                decision_id=scope_decision.decision_id,
+                idempotency_key="formal-auditor-scope-apply",
+            )
+            recovery = harness.authentication.authorize_recovery(
+                session=first.session,
+                request=RecoveryAuthorizationRequest(
+                    principal_id=auditor.membership.principal_id,
+                    idempotency_key="scope-change-recovery",
+                ),
+            )
+            recovered_token = harness.authentication.retrieve_operator_credential(
+                recovery.credential_id
+            )
+            recovered = harness.authentication.exchange_recovery(recovered_token)
+            beta_client = TestClient(harness.app())
+            beta_client.cookies.set("dc_session", recovered.session_grant.session_credential)
+            old_alpha_replay = beta_client.post(
+                "/governance/session/active-colleague",
+                headers=self.headers(recovered.session_grant.csrf_token),
+                json=alpha_body,
+            )
+            self.assertEqual(old_alpha_replay.status_code, 403, old_alpha_replay.text)
+            self.assertNotIn(alpha_id, old_alpha_replay.text)
+
+            _, revoked_auditor = enroll(
+                harness,
+                issuer=first,
+                role=HumanRole.AUDITOR,
+                scopes=(alpha_id,),
+                key="revoked-replay-auditor",
+            )
+            revoked_client = TestClient(harness.app())
+            revoked_client.cookies.set(
+                "dc_session", revoked_auditor.session_grant.session_credential
+            )
+            revoked_body = dict(
+                colleague_id=alpha_id,
+                idempotency_key="cached-revoked-colleague",
+            )
+            cached_before_revocation = revoked_client.post(
+                "/governance/session/active-colleague",
+                headers=self.headers(revoked_auditor.session_grant.csrf_token),
+                json=revoked_body,
+            )
+            self.assertEqual(
+                cached_before_revocation.status_code,
+                200,
+                cached_before_revocation.text,
+            )
+            revoked = harness.changes.propose_membership(
+                session=first.session,
+                target_principal_id=revoked_auditor.membership.principal_id,
+                role=HumanRole.AUDITOR,
+                status=MembershipStatus.REVOKED,
+                colleague_ids=(alpha_id,),
+                idempotency_key="formal-auditor-revocation",
+            )
+            _, revoked_decision = harness.changes.decide(
+                session=second.session_grant.session,
+                namespace=revoked.namespace,
+                proposal_id=revoked.proposal_id,
+                request=ChangeDecisionRequest(
+                    proposal_revision=revoked.revision,
+                    proposal_digest=revoked.canonical_digest,
+                    choice=ChangeChoice.APPROVE,
+                    idempotency_key="formal-auditor-revocation-decision",
+                ),
+            )
+            harness.changes.apply_membership(
+                session=first.session,
+                proposal_id=revoked.proposal_id,
+                decision_id=revoked_decision.decision_id,
+                idempotency_key="formal-auditor-revocation-apply",
+            )
+            revoked_replay = revoked_client.post(
+                "/governance/session/active-colleague",
+                headers=self.headers(revoked_auditor.session_grant.csrf_token),
+                json=revoked_body,
+            )
+            self.assertEqual(revoked_replay.status_code, 403, revoked_replay.text)
+            self.assertNotIn(alpha_id, revoked_replay.text)
+            harness.store.close()
+
+    def test_concurrent_http_governance_mutations_converge_and_survive_restart(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="digital-colleagues-p6-governance-race-") as name:
+            database = Path(name) / "state.sqlite"
+            first_store = build_harness(database)
+            first_cookie, first = bootstrap(first_store)
+            _, second = enroll(
+                first_store,
+                issuer=first,
+                role=HumanRole.TENANT_ADMIN,
+                scopes=("*",),
+                key="governance-race-second-admin",
+            )
+            _, user = enroll(
+                first_store,
+                issuer=first,
+                role=HumanRole.COLLEAGUE_USER,
+                scopes=("colleague:alpha",),
+                key="governance-race-user",
+            )
+            second_store = build_harness(database)
+
+            recovery_body = {
+                "principal_id": user.membership.principal_id,
+                "idempotency_key": "concurrent-http-recovery",
+            }
+            recovery_responses = concurrent_http_posts(
+                first_store,
+                second_store,
+                session_credential=first_cookie,
+                csrf_token=first.csrf_token,
+                paths=("/governance/recovery", "/governance/recovery"),
+                bodies=(recovery_body, recovery_body),
+                action="p6:authorize-recovery",
+                idempotency_key="concurrent-http-recovery",
+            )
+            self.assertEqual([response.status_code for response in recovery_responses], [201, 201])
+            self.assertEqual(recovery_responses[0].json(), recovery_responses[1].json())
+            recovery_id = recovery_responses[0].json()["credential"]["credential_id"]
+
+            revoke_path = f"/governance/credentials/{recovery_id}/revoke"
+            revoke_body = {"idempotency_key": "concurrent-http-revoke"}
+            revoke_responses = concurrent_http_posts(
+                first_store,
+                second_store,
+                session_credential=first_cookie,
+                csrf_token=first.csrf_token,
+                paths=(revoke_path, revoke_path),
+                bodies=(revoke_body, revoke_body),
+                action="p6:revoke-credential",
+                idempotency_key="concurrent-http-revoke",
+            )
+            self.assertEqual([response.status_code for response in revoke_responses], [200, 200])
+            self.assertEqual(revoke_responses[0].json(), revoke_responses[1].json())
+
+            proposal_body = {
+                "target_principal_id": user.membership.principal_id,
+                "proposed_role": "auditor",
+                "proposed_status": "active",
+                "proposed_colleague_ids": ["colleague:alpha"],
+                "idempotency_key": "concurrent-http-proposal",
+            }
+            proposal_responses = concurrent_http_posts(
+                first_store,
+                second_store,
+                session_credential=first_cookie,
+                csrf_token=first.csrf_token,
+                paths=(
+                    "/governance/memberships/proposals",
+                    "/governance/memberships/proposals",
+                ),
+                bodies=(proposal_body, proposal_body),
+                action="p6:propose-change",
+                idempotency_key="concurrent-http-proposal",
+            )
+            self.assertEqual([response.status_code for response in proposal_responses], [201, 201])
+            self.assertEqual(proposal_responses[0].json(), proposal_responses[1].json())
+            proposal = proposal_responses[0].json()["proposal"]
+
+            decision_path = f"/governance/changes/tenant/{proposal['proposal_id']}/decision"
+            decision_body = {
+                "proposal_revision": proposal["revision"],
+                "proposal_digest": proposal["canonical_digest"],
+                "choice": "approve",
+                "idempotency_key": "concurrent-http-decision",
+            }
+            decision_responses = concurrent_http_posts(
+                first_store,
+                second_store,
+                session_credential=second.session_grant.session_credential,
+                csrf_token=second.session_grant.csrf_token,
+                paths=(decision_path, decision_path),
+                bodies=(decision_body, decision_body),
+                action="p6:decide-change",
+                idempotency_key="concurrent-http-decision",
+            )
+            self.assertEqual([response.status_code for response in decision_responses], [201, 201])
+            self.assertEqual(decision_responses[0].json(), decision_responses[1].json())
+            decision = decision_responses[0].json()["decision"]
+
+            apply_path = f"/governance/changes/tenant/{proposal['proposal_id']}/apply"
+            apply_body = {
+                "decision_id": decision["decision_id"],
+                "idempotency_key": "concurrent-http-apply",
+            }
+            apply_responses = concurrent_http_posts(
+                first_store,
+                second_store,
+                session_credential=first_cookie,
+                csrf_token=first.csrf_token,
+                paths=(apply_path, apply_path),
+                bodies=(apply_body, apply_body),
+                action="p6:apply-change",
+                idempotency_key="concurrent-http-apply",
+            )
+            self.assertEqual([response.status_code for response in apply_responses], [200, 200])
+            self.assertEqual(apply_responses[0].json(), apply_responses[1].json())
+
+            self.assertEqual(
+                first_store.store._connection.execute(  # noqa: SLF001
+                    "SELECT COUNT(*) FROM p6_governance_credentials WHERE credential_id = ?",
+                    (recovery_id,),
+                ).fetchone()[0],
+                1,
+            )
+            audit_counts = dict(
+                first_store.store._connection.execute(  # noqa: SLF001
+                    "SELECT action, COUNT(*) FROM p6_governance_audit "
+                    "WHERE action IN ('recovery_authorized', 'credential_revoked', "
+                    "'change_proposed', 'change_decided', 'membership_changed') "
+                    "GROUP BY action"
+                ).fetchall()
+            )
+            self.assertEqual(
+                audit_counts,
+                {
+                    "change_decided": 1,
+                    "change_proposed": 1,
+                    "credential_revoked": 1,
+                    "membership_changed": 1,
+                    "recovery_authorized": 1,
+                },
+            )
+            self.assertEqual(
+                first_store.store._connection.execute(  # noqa: SLF001
+                    "SELECT COUNT(*) FROM p6_change_proposals WHERE proposal_id = ?",
+                    (proposal["proposal_id"],),
+                ).fetchone()[0],
+                1,
+            )
+            self.assertEqual(
+                first_store.store._connection.execute(  # noqa: SLF001
+                    "SELECT COUNT(*) FROM p6_change_decisions WHERE decision_id = ?",
+                    (decision["decision_id"],),
+                ).fetchone()[0],
+                1,
+            )
+            self.assertEqual(
+                first_store.store.membership_for_principal(
+                    "tenant-local", user.membership.principal_id
+                ).membership_revision,
+                2,
+            )
+            replay_keys = {
+                "concurrent-http-recovery",
+                "concurrent-http-revoke",
+                "concurrent-http-proposal",
+                "concurrent-http-decision",
+                "concurrent-http-apply",
+            }
+            recorded_keys = {
+                row[0]
+                for row in first_store.store._connection.execute(  # noqa: SLF001
+                    "SELECT idempotency_key FROM p4_mutation_replay "
+                    "WHERE idempotency_key LIKE 'concurrent-http-%'"
+                ).fetchall()
+            }
+            self.assertEqual(recorded_keys, replay_keys)
+            originals = (
+                recovery_responses[0].json(),
+                revoke_responses[0].json(),
+                proposal_responses[0].json(),
+                decision_responses[0].json(),
+                apply_responses[0].json(),
+            )
+            first_store.store.close()
+            second_store.store.close()
+
+            restarted = build_harness(database, now=NOW + timedelta(minutes=1))
+            first_client = TestClient(restarted.app())
+            first_client.cookies.set("dc_session", first_cookie)
+            second_client = TestClient(restarted.app())
+            second_client.cookies.set("dc_session", second.session_grant.session_credential)
+            replays = (
+                first_client.post(
+                    "/governance/recovery",
+                    headers=self.headers(first.csrf_token),
+                    json=recovery_body,
+                ),
+                first_client.post(
+                    revoke_path,
+                    headers=self.headers(first.csrf_token),
+                    json=revoke_body,
+                ),
+                first_client.post(
+                    "/governance/memberships/proposals",
+                    headers=self.headers(first.csrf_token),
+                    json=proposal_body,
+                ),
+                second_client.post(
+                    decision_path,
+                    headers=self.headers(second.session_grant.csrf_token),
+                    json=decision_body,
+                ),
+                first_client.post(
+                    apply_path,
+                    headers=self.headers(first.csrf_token),
+                    json=apply_body,
+                ),
+            )
+            self.assertEqual(
+                [response.status_code for response in replays],
+                [201, 200, 201, 201, 200],
+            )
+            self.assertEqual(tuple(response.json() for response in replays), originals)
+            restarted.store.close()
 
     def test_expired_and_rejected_changes_are_durable_terminal_refusals(self) -> None:
         with tempfile.TemporaryDirectory(prefix="digital-colleagues-p6-terminal-") as name:

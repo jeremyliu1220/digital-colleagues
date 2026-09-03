@@ -29,6 +29,8 @@ def check_change_approval(root: Path) -> dict[str, object]:
         "atomic_single_use_apply": True,
         "profile_only_distinction": True,
         "role_elevation_governed": True,
+        "authorized_replay_revalidation": True,
+        "concurrent_http_replay_convergence": True,
     }
 
 

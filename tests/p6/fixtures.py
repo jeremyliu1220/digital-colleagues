@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
+import threading
+from collections.abc import Callable, Mapping
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
+from unittest.mock import patch
 
 from fastapi import FastAPI
+from fastapi.testclient import TestClient
+from httpx import Response
 
 from digital_colleagues.adapters.channel.reference import ReferenceChannel
 from digital_colleagues.adapters.intelligence.deterministic import DeterministicIntelligence
@@ -201,3 +207,64 @@ def initial_request() -> InitialColleagueRequest:
         ),
         idempotency_key=cast(str, body["idempotency_key"]),
     )
+
+
+def concurrent_http_posts(
+    left: P6Harness,
+    right: P6Harness,
+    *,
+    session_credential: str,
+    csrf_token: str,
+    paths: tuple[str, str],
+    bodies: tuple[Mapping[str, object], Mapping[str, object]],
+    action: str,
+    idempotency_key: str,
+) -> tuple[Response, Response]:
+    """Force two independent HTTP clients through the same replay-miss window."""
+
+    barrier = threading.Barrier(2)
+
+    def synchronized(
+        original: Callable[..., tuple[FrozenJsonObject | None, str]],
+    ) -> Callable[..., tuple[FrozenJsonObject | None, str]]:
+        def invoke(**kwargs: Any) -> tuple[FrozenJsonObject | None, str]:
+            outcome = original(**kwargs)
+            if (
+                kwargs["action"] == action
+                and kwargs["idempotency_key"] == idempotency_key
+                and outcome[0] is None
+            ):
+                barrier.wait(timeout=5)
+            return outcome
+
+        return invoke
+
+    clients = (TestClient(left.app()), TestClient(right.app()))
+    headers = {"Origin": ORIGIN, "X-CSRF-Token": csrf_token}
+    for client in clients:
+        client.cookies.set("dc_session", session_credential)
+
+    def send(index: int) -> Response:
+        return cast(
+            Response,
+            clients[index].post(paths[index], headers=headers, json=bodies[index]),
+        )
+
+    with (
+        patch.object(
+            left.authentication,
+            "mutation_replay",
+            side_effect=synchronized(left.authentication.mutation_replay),
+        ),
+        patch.object(
+            right.authentication,
+            "mutation_replay",
+            side_effect=synchronized(right.authentication.mutation_replay),
+        ),
+        ThreadPoolExecutor(max_workers=2) as executor,
+    ):
+        futures = [executor.submit(send, index) for index in range(2)]
+        return cast(
+            tuple[Response, Response],
+            tuple(future.result(timeout=15) for future in futures),
+        )

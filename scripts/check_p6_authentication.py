@@ -30,6 +30,9 @@ def check_authentication(root: Path) -> dict[str, object]:
         "single_use_atomic_consumption": True,
         "session_rotation_and_revocation": True,
         "role_membership_revision_revalidation": True,
+        "authorized_replay_revalidation": True,
+        "concurrent_http_replay_convergence": True,
+        "response_cache_crash_window_recovery": True,
         "operator_plaintext_boundary": True,
     }
 

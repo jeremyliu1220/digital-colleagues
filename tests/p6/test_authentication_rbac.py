@@ -9,6 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from datetime import timedelta
 from pathlib import Path
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
@@ -35,7 +36,14 @@ from digital_colleagues.core.governance import (
 from digital_colleagues.core.namespace import Namespace
 from digital_colleagues.core.principals import HumanRole, Principal
 from digital_colleagues.governance.rbac import action_matrix, authorize_action
-from tests.p6.fixtures import NOW, ORIGIN, P6Harness, build_harness, initial_request
+from tests.p6.fixtures import (
+    NOW,
+    ORIGIN,
+    P6Harness,
+    build_harness,
+    concurrent_http_posts,
+    initial_request,
+)
 
 
 def bootstrap(harness: P6Harness) -> tuple[str, SessionGrant]:
@@ -782,6 +790,196 @@ class P6AuthenticationRbacTests(unittest.TestCase):
             self.assertEqual(row["state"], "consumed")
             self.assertIsNotNone(row["consumed_principal_id"])
             recovered.close()
+
+    def test_concurrent_http_enrollment_replay_converges_rebound_and_restart(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="digital-colleagues-p6-http-race-") as name:
+            database = Path(name) / "state.sqlite"
+            first = build_harness(database)
+            first_cookie, first_grant = bootstrap(first)
+            second = build_harness(database)
+            body = {
+                "colleague_ids": ["colleague:alpha"],
+                "idempotency_key": "concurrent-http-enrollment",
+            }
+            responses = concurrent_http_posts(
+                first,
+                second,
+                session_credential=first_cookie,
+                csrf_token=first_grant.csrf_token,
+                paths=(
+                    "/governance/enrollments/users",
+                    "/governance/enrollments/users",
+                ),
+                bodies=(body, body),
+                action="p6:authorize-enrollment",
+                idempotency_key="concurrent-http-enrollment",
+            )
+            self.assertEqual([response.status_code for response in responses], [201, 201])
+            self.assertEqual(responses[0].json(), responses[1].json())
+            credential_id = responses[0].json()["credential"]["credential_id"]
+            self.assertEqual(
+                first.store._connection.execute(  # noqa: SLF001
+                    "SELECT COUNT(*) FROM p6_governance_credentials WHERE credential_id = ?",
+                    (credential_id,),
+                ).fetchone()[0],
+                1,
+            )
+            self.assertEqual(
+                first.store._connection.execute(  # noqa: SLF001
+                    "SELECT COUNT(*) FROM p6_governance_audit "
+                    "WHERE action = 'enrollment_authorized' AND record_id = ?",
+                    (credential_id,),
+                ).fetchone()[0],
+                1,
+            )
+            self.assertEqual(
+                first.store._connection.execute(  # noqa: SLF001
+                    "SELECT COUNT(*) FROM p4_mutation_replay "
+                    "WHERE action = 'p6:authorize-enrollment' AND idempotency_key = ?",
+                    ("concurrent-http-enrollment",),
+                ).fetchone()[0],
+                1,
+            )
+
+            rebound_key = "concurrent-http-rebound"
+            rebound = concurrent_http_posts(
+                first,
+                second,
+                session_credential=first_cookie,
+                csrf_token=first_grant.csrf_token,
+                paths=(
+                    "/governance/enrollments/users",
+                    "/governance/enrollments/auditors",
+                ),
+                bodies=(
+                    {
+                        "colleague_ids": ["colleague:alpha"],
+                        "idempotency_key": rebound_key,
+                    },
+                    {
+                        "colleague_ids": ["colleague:alpha"],
+                        "idempotency_key": rebound_key,
+                    },
+                ),
+                action="p6:authorize-enrollment",
+                idempotency_key=rebound_key,
+            )
+            self.assertEqual(sorted(response.status_code for response in rebound), [201, 409])
+            rebound_credential_id = first.identifiers.derive(
+                "credential",
+                "enrollment",
+                first_grant.session.principal.principal_id,
+                rebound_key,
+            )
+            self.assertEqual(
+                first.store._connection.execute(  # noqa: SLF001
+                    "SELECT COUNT(*) FROM p6_governance_credentials WHERE credential_id = ?",
+                    (rebound_credential_id,),
+                ).fetchone()[0],
+                1,
+            )
+            self.assertEqual(
+                first.store._connection.execute(  # noqa: SLF001
+                    "SELECT COUNT(*) FROM p6_governance_audit "
+                    "WHERE action = 'enrollment_authorized' AND record_id = ?",
+                    (rebound_credential_id,),
+                ).fetchone()[0],
+                1,
+            )
+            self.assertEqual(
+                first.store._connection.execute(  # noqa: SLF001
+                    "SELECT COUNT(*) FROM p4_mutation_replay "
+                    "WHERE action = 'p6:authorize-enrollment' AND idempotency_key = ?",
+                    (rebound_key,),
+                ).fetchone()[0],
+                1,
+            )
+            original = responses[0].json()
+            first.store.close()
+            second.store.close()
+
+            restarted = build_harness(database, now=NOW + timedelta(minutes=1))
+            replay_client = TestClient(restarted.app())
+            replay_client.cookies.set("dc_session", first_cookie)
+            replay = replay_client.post(
+                "/governance/enrollments/users",
+                headers={"Origin": ORIGIN, "X-CSRF-Token": first_grant.csrf_token},
+                json=body,
+            )
+            self.assertEqual(replay.status_code, 201, replay.text)
+            self.assertEqual(replay.json(), original)
+            restarted.store.close()
+
+    def test_business_commit_without_generic_response_cache_retries_once(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="digital-colleagues-p6-crash-window-") as name:
+            harness = build_harness(Path(name) / "state.sqlite")
+            first_cookie, first = bootstrap(harness)
+            client = TestClient(harness.app())
+            client.cookies.set("dc_session", first_cookie)
+            headers = {"Origin": ORIGIN, "X-CSRF-Token": first.csrf_token}
+            body = {
+                "colleague_ids": ["colleague:alpha"],
+                "idempotency_key": "commit-before-response-cache",
+            }
+            with patch.object(
+                harness.authentication,
+                "record_mutation",
+                side_effect=ConflictError("injected response-cache interruption"),
+            ):
+                interrupted = client.post(
+                    "/governance/enrollments/users", headers=headers, json=body
+                )
+            self.assertEqual(interrupted.status_code, 409, interrupted.text)
+            credential_id = harness.identifiers.derive(
+                "credential",
+                "enrollment",
+                first.session.principal.principal_id,
+                "commit-before-response-cache",
+            )
+            self.assertEqual(
+                harness.store._connection.execute(  # noqa: SLF001
+                    "SELECT COUNT(*) FROM p6_governance_credentials WHERE credential_id = ?",
+                    (credential_id,),
+                ).fetchone()[0],
+                1,
+            )
+            self.assertEqual(
+                harness.store._connection.execute(  # noqa: SLF001
+                    "SELECT COUNT(*) FROM p4_mutation_replay "
+                    "WHERE action = 'p6:authorize-enrollment' AND idempotency_key = ?",
+                    ("commit-before-response-cache",),
+                ).fetchone()[0],
+                0,
+            )
+            retry = client.post("/governance/enrollments/users", headers=headers, json=body)
+            replay = client.post("/governance/enrollments/users", headers=headers, json=body)
+            self.assertEqual(retry.status_code, 201, retry.text)
+            self.assertEqual(replay.status_code, 201, replay.text)
+            self.assertEqual(retry.json(), replay.json())
+            self.assertEqual(
+                harness.store._connection.execute(  # noqa: SLF001
+                    "SELECT COUNT(*) FROM p6_governance_credentials WHERE credential_id = ?",
+                    (credential_id,),
+                ).fetchone()[0],
+                1,
+            )
+            self.assertEqual(
+                harness.store._connection.execute(  # noqa: SLF001
+                    "SELECT COUNT(*) FROM p6_governance_audit "
+                    "WHERE action = 'enrollment_authorized' AND record_id = ?",
+                    (credential_id,),
+                ).fetchone()[0],
+                1,
+            )
+            self.assertEqual(
+                harness.store._connection.execute(  # noqa: SLF001
+                    "SELECT COUNT(*) FROM p4_mutation_replay "
+                    "WHERE action = 'p6:authorize-enrollment' AND idempotency_key = ?",
+                    ("commit-before-response-cache",),
+                ).fetchone()[0],
+                1,
+            )
+            harness.store.close()
 
 
 if __name__ == "__main__":

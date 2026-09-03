@@ -59,6 +59,10 @@ def check_rbac(root: Path) -> dict[str, object]:
         "test_role_and_membership_revisions_are_checked_on_every_session_use",
         "tests.p6.test_authentication_rbac.P6AuthenticationRbacTests."
         "test_scoped_auditor_projection_excludes_tenant_and_other_colleague_metadata",
+        "tests.p6.test_change_approval.P6ChangeApprovalTests."
+        "test_cached_admin_replays_require_current_authority_after_formal_downgrade",
+        "tests.p6.test_change_approval.P6ChangeApprovalTests."
+        "test_cached_colleague_replay_fails_after_scope_change_and_revocation",
     )
     return {
         "schema_version": 1,
@@ -70,6 +74,8 @@ def check_rbac(root: Path) -> dict[str, object]:
         "server_side_namespace_checks": True,
         "auditor_read_export_only": True,
         "alternate_endpoint_bypass_refused": True,
+        "cached_replay_reauthorization": True,
+        "scope_change_and_revocation_revalidation": True,
     }
 
 
