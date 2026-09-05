@@ -863,7 +863,7 @@ class P4RuntimeController:
         )
         materialized = wake.materialize_next(namespace)
         result = wake.run(namespace)
-        dispatched = DispatchService(
+        dispatcher = DispatchService(
             store=self._store,
             channel=self._channel,
             clock=self._clock,
@@ -872,12 +872,18 @@ class P4RuntimeController:
             owner_id="worker:p4-dispatch",
             mandate_id=context.mandate_id,
             policy_authorizer=self._dispatch_authorizer,
-        ).dispatch_once(namespace)
+        )
+        reconciled = dispatcher.reconcile_once(namespace)
+        dispatched = dispatcher.dispatch_once(namespace)
         return {
             "trigger_materialized": materialized is not None,
             "wake_selected": result.selected_count,
             "decisions": result.decision_count,
             "pending": result.pending_count,
+            "reconciled": reconciled.dispatched,
+            "reconciliation_outcome": (
+                reconciled.outcome.value if reconciled.outcome is not None else None
+            ),
             "dispatched": dispatched.dispatched,
             "action_result_id": dispatched.action_result_id,
         }

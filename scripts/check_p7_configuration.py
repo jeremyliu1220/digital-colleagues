@@ -33,6 +33,8 @@ def check_configuration(root: Path) -> dict[str, object]:
         "loopback_http": "explicit_test_only",
         "credential_boundary": "read_only_file",
         "credential_environment_values": False,
+        "validation_before_state_or_services": True,
+        "later_construction_failure_closes_store": True,
     }
 
 

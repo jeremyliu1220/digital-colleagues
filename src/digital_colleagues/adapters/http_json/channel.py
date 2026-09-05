@@ -111,13 +111,10 @@ def _projection(kind: str, classification: str) -> FrozenJsonObject:
 
 
 def _failure_outcome(failure: AdapterFailure) -> ChannelOutcome:
-    if failure.after_submit and failure.category in {
-        AdapterFailureCategory.AUTHORITY_INJECTION,
-        AdapterFailureCategory.CONNECT_FAILURE,
-        AdapterFailureCategory.DISCONNECTED,
-        AdapterFailureCategory.INVALID_RESPONSE,
-        AdapterFailureCategory.OVERSIZED_RESPONSE,
-        AdapterFailureCategory.TIMEOUT,
+    if failure.after_submit and failure.category not in {
+        AdapterFailureCategory.UNAUTHORIZED,
+        AdapterFailureCategory.REDIRECT_REFUSED,
+        AdapterFailureCategory.HTTP_FAILURE,
     }:
         kind = ChannelOutcomeKind.AMBIGUOUS
     elif failure.category in {
@@ -260,24 +257,39 @@ class HttpJsonChannel:
                 allowed=ChannelOutcomeKind,
             )
             assert isinstance(raw_kind, ChannelOutcomeKind)
+            kind = (
+                ChannelOutcomeKind.AMBIGUOUS
+                if raw_kind is ChannelOutcomeKind.RETRYABLE_FAILURE
+                else raw_kind
+            )
+            effective_classification = (
+                "unknown" if kind is ChannelOutcomeKind.AMBIGUOUS else classification
+            )
             return ChannelOutcome(
-                raw_kind,
-                _projection(raw_kind.value, classification),
+                kind,
+                _projection(kind.value, effective_classification),
                 _digest(
                     {
                         "binding": binding,
-                        "classification": classification,
-                        "result": raw_kind.value,
+                        "classification": effective_classification,
+                        "result": kind.value,
                     }
                 ),
             )
         except AdapterFailure as exc:
             return _failure_outcome(exc)
 
-    def reconcile(self, effect_idempotency_key: str) -> ReconciliationOutcome:
+    def reconcile(
+        self,
+        effect_idempotency_key: str,
+        binding_digest: str | None = None,
+    ) -> ReconciliationOutcome:
         self.reconciliation_count += 1
-        binding = self._bindings.get(effect_idempotency_key)
-        if binding is None:
+        if (
+            binding_digest is None
+            or not binding_digest.startswith("sha256:")
+            or len(binding_digest) != 71
+        ):
             kind = ReconciliationKind.STILL_UNKNOWN
             return ReconciliationOutcome(
                 kind,
@@ -287,6 +299,19 @@ class HttpJsonChannel:
                     "binding_unavailable_after_restart",
                 ),
             )
+        existing = self._bindings.get(effect_idempotency_key)
+        if existing is not None and existing != binding_digest:
+            kind = ReconciliationKind.STILL_UNKNOWN
+            return ReconciliationOutcome(
+                kind,
+                _projection(kind.value, "idempotency_rebinding"),
+                safe_digest(
+                    AdapterFailureCategory.AUTHORITY_INJECTION,
+                    "idempotency_rebinding",
+                ),
+            )
+        binding = binding_digest
+        self._bindings[effect_idempotency_key] = binding
         document = reconciliation_request_document(effect_idempotency_key, binding)
         try:
             response = self._transport.post(document, idempotency_key=effect_idempotency_key)

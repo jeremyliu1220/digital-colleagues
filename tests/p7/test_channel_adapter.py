@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import tempfile
+import time
 import unittest
 from dataclasses import replace
 from pathlib import Path
@@ -64,11 +65,19 @@ class P7ChannelAdapterTests(unittest.TestCase):
             adapter = HttpJsonChannel(settings(stub.endpoint, credential))
             for channel_kind in channel_kinds:
                 stub.enqueue(StubBehavior(document=channel_response(channel_kind.value)))
-                self.assertEqual(adapter.apply(channel_effect()).kind, channel_kind)
+                expected = (
+                    ChannelOutcomeKind.AMBIGUOUS
+                    if channel_kind is ChannelOutcomeKind.RETRYABLE_FAILURE
+                    else channel_kind
+                )
+                self.assertEqual(adapter.apply(channel_effect()).kind, expected)
             for reconciliation_kind in reconciliation_kinds:
                 stub.enqueue(StubBehavior(document=channel_response(reconciliation_kind.value)))
                 self.assertEqual(
-                    adapter.reconcile(channel_effect().effect_idempotency_key).kind,
+                    adapter.reconcile(
+                        channel_effect().effect_idempotency_key,
+                        channel_effect().proposal.proposal_digest,
+                    ).kind,
                     reconciliation_kind,
                 )
 
@@ -100,8 +109,8 @@ class P7ChannelAdapterTests(unittest.TestCase):
         cases = (
             (StubBehavior(status=401, raw_body=b"private"), ChannelOutcomeKind.PERMANENT_FAILURE),
             (StubBehavior(status=403, raw_body=b"private"), ChannelOutcomeKind.PERMANENT_FAILURE),
-            (StubBehavior(status=429, raw_body=b"private"), ChannelOutcomeKind.RETRYABLE_FAILURE),
-            (StubBehavior(status=503, raw_body=b"private"), ChannelOutcomeKind.RETRYABLE_FAILURE),
+            (StubBehavior(status=429, raw_body=b"private"), ChannelOutcomeKind.AMBIGUOUS),
+            (StubBehavior(status=503, raw_body=b"private"), ChannelOutcomeKind.AMBIGUOUS),
             (StubBehavior(status=302), ChannelOutcomeKind.PERMANENT_FAILURE),
             (StubBehavior(raw_body=b"{"), ChannelOutcomeKind.AMBIGUOUS),
             (
@@ -159,7 +168,7 @@ class P7ChannelAdapterTests(unittest.TestCase):
             )
             self.assertEqual(len(stub.state.requests), 1)
 
-    def test_reconciliation_failure_and_fresh_restart_never_invent_absence(self) -> None:
+    def test_reconciliation_uses_durable_binding_after_fresh_restart(self) -> None:
         with (
             tempfile.TemporaryDirectory(prefix="digital-colleagues-p7-reconcile-") as temporary,
             LoopbackStub() as stub,
@@ -169,14 +178,58 @@ class P7ChannelAdapterTests(unittest.TestCase):
             stub.enqueue(StubBehavior(document=channel_response("ambiguous")))
             self.assertEqual(adapter.apply(channel_effect()).kind, ChannelOutcomeKind.AMBIGUOUS)
             stub.enqueue(StubBehavior(status=503, raw_body=b"private receipt"))
-            unknown = adapter.reconcile(channel_effect().effect_idempotency_key)
+            effect = channel_effect()
+            unknown = adapter.reconcile(
+                effect.effect_idempotency_key,
+                effect.proposal.proposal_digest,
+            )
             self.assertEqual(unknown.kind, ReconciliationKind.STILL_UNKNOWN)
             requests_before_restart = len(stub.state.requests)
             restarted = HttpJsonChannel(settings(stub.endpoint, credential))
-            after_restart = restarted.reconcile(channel_effect().effect_idempotency_key)
+            stub.enqueue(StubBehavior(document=channel_response("still_unknown")))
+            after_restart = restarted.reconcile(
+                effect.effect_idempotency_key,
+                effect.proposal.proposal_digest,
+            )
             self.assertEqual(after_restart.kind, ReconciliationKind.STILL_UNKNOWN)
-            self.assertEqual(len(stub.state.requests), requests_before_restart)
+            self.assertEqual(len(stub.state.requests), requests_before_restart + 1)
+            document = stub.state.requests[-1]["document"]
+            assert isinstance(document, dict)
+            self.assertEqual(document["effect_idempotency_key"], effect.effect_idempotency_key)
+            self.assertEqual(document["effect_binding_digest"], effect.proposal.proposal_digest)
+            wrong = "sha256:" + ("0" * 64)
+            refused = restarted.reconcile(effect.effect_idempotency_key, wrong)
+            self.assertEqual(refused.kind, ReconciliationKind.STILL_UNKNOWN)
+            self.assertEqual(len(stub.state.requests), requests_before_restart + 1)
             self.assertNotIn("private receipt", str(unknown.safe_projection))
+
+    def test_total_deadline_stops_slow_drip_body(self) -> None:
+        with (
+            tempfile.TemporaryDirectory(prefix="digital-colleagues-p7-deadline-") as temporary,
+            LoopbackStub() as stub,
+        ):
+            credential = credential_file(Path(temporary))
+            stub.enqueue(
+                StubBehavior(
+                    document=channel_response("succeeded"),
+                    drip_chunk_size=20,
+                    drip_interval_seconds=0.03,
+                )
+            )
+            started = time.monotonic()
+            outcome = HttpJsonChannel(
+                settings(
+                    stub.endpoint,
+                    credential,
+                    connect_timeout=0.05,
+                    read_timeout=0.06,
+                    total_timeout=0.10,
+                )
+            ).apply(channel_effect())
+            elapsed = time.monotonic() - started
+            self.assertEqual(outcome.kind, ChannelOutcomeKind.AMBIGUOUS)
+            self.assertGreaterEqual(elapsed, 0.08)
+            self.assertLess(elapsed, 0.17)
 
     def test_authority_fields_in_acknowledgement_are_refused(self) -> None:
         with (

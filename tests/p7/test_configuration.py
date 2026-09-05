@@ -5,6 +5,7 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from digital_colleagues.adapters.channel.reference import ReferenceChannel
 from digital_colleagues.adapters.http_json.channel import HttpJsonChannel
@@ -16,7 +17,9 @@ from digital_colleagues.adapters.http_json.configuration import (
 from digital_colleagues.adapters.http_json.errors import AdapterFailure
 from digital_colleagues.adapters.http_json.model import HttpJsonIntelligence
 from digital_colleagues.adapters.intelligence.deterministic import DeterministicIntelligence
+from digital_colleagues.adapters.sqlite.p6_store import SQLiteP6Store
 from digital_colleagues.local.p7_adapters import build_selected_adapters
+from digital_colleagues.local.runtime import build_local_runtime
 from tests.p7.fixtures import credential_file, environment, settings
 
 
@@ -144,6 +147,44 @@ class P7ConfigurationTests(unittest.TestCase):
                 load_adapter_selection(model_only)
             with self.assertRaises(AdapterFailure):
                 load_adapter_selection(channel_only)
+
+    def test_malformed_credential_fails_before_state_or_service_construction(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="digital-colleagues-p7-early-") as temporary:
+            root = Path(temporary)
+            credential = root / "credential"
+            credential.write_bytes(b"invalid\x00credential")
+            credential.chmod(0o400)
+            state = root / "state"
+            values = environment("http://127.0.0.1:47111/v1/adapter", credential)
+            with (
+                patch(
+                    "digital_colleagues.local.runtime.P6AuthenticationService"
+                ) as service_constructor,
+                self.assertRaises(AdapterFailure),
+            ):
+                build_local_runtime(state, adapter_environment=values)
+            self.assertFalse(state.exists())
+            service_constructor.assert_not_called()
+
+    def test_later_service_construction_failure_closes_sqlite(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="digital-colleagues-p7-close-") as temporary:
+            state = Path(temporary) / "state"
+            original_close = SQLiteP6Store.close
+            with (
+                patch(
+                    "digital_colleagues.local.runtime.P6AuthenticationService",
+                    side_effect=RuntimeError("synthetic construction failure"),
+                ),
+                patch.object(
+                    SQLiteP6Store,
+                    "close",
+                    autospec=True,
+                    side_effect=original_close,
+                ) as close,
+                self.assertRaisesRegex(RuntimeError, "synthetic construction failure"),
+            ):
+                build_local_runtime(state)
+            close.assert_called_once()
 
 
 if __name__ == "__main__":

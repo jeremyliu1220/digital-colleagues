@@ -38,9 +38,14 @@ NETWORK_FILES = {
 }
 STABLE_CONTRACTS = {
     "src/digital_colleagues/application/contracts.py",
-    "src/digital_colleagues/application/ports.py",
     "src/digital_colleagues/core",
     "src/digital_colleagues/governance",
+}
+CORRECTIVE_APPLICATION_FILES = {
+    "src/digital_colleagues/application/errors.py",
+    "src/digital_colleagues/application/p4_services.py",
+    "src/digital_colleagues/application/ports.py",
+    "src/digital_colleagues/application/services.py",
 }
 
 
@@ -105,6 +110,13 @@ def check_architecture(root: Path) -> dict[str, object]:
         raise ArchitectureError("P7 bounded network transport files are incomplete")
     if any(not _unchanged(root, relative) for relative in STABLE_CONTRACTS):
         raise ArchitectureError("P7 changed a stable core/application/governance contract")
+    changed_application = {
+        document.relative_to(root).as_posix()
+        for document in (root / "src/digital_colleagues/application").glob("*.py")
+        if not _unchanged(root, document.relative_to(root).as_posix())
+    }
+    if changed_application - CORRECTIVE_APPLICATION_FILES:
+        raise ArchitectureError("P7 corrective application changes escaped their finite allowlist")
     if not _unchanged(root, "migrations"):
         raise ArchitectureError("P7 added or changed a migration")
     runtime = (root / "src/digital_colleagues/local/runtime.py").read_text(encoding="utf-8")
@@ -120,6 +132,18 @@ def check_architecture(root: Path) -> dict[str, object]:
         )
     ):
         raise ArchitectureError("P7 explicit composition root is incomplete")
+    ports = (root / "src/digital_colleagues/application/ports.py").read_text(encoding="utf-8")
+    services = (root / "src/digital_colleagues/application/services.py").read_text(encoding="utf-8")
+    if any(
+        token not in ports + services
+        for token in (
+            "binding_digest",
+            "ExternalAdapterError",
+            "adapter_failure_committed",
+            "bundle.proposal.proposal_digest",
+        )
+    ):
+        raise ArchitectureError("P7 recovery or durable adapter failure contract is incomplete")
     return {
         "schema_version": 1,
         "gate": "p7_architecture_clean",
@@ -129,6 +153,9 @@ def check_architecture(root: Path) -> dict[str, object]:
         "provider_sdk_imports": 0,
         "dynamic_imports": 0,
         "stable_contract_drift": 0,
+        "backward_compatible_reconciliation_binding": True,
+        "bounded_durable_adapter_failure": True,
+        "corrective_application_files": sorted(changed_application),
         "migration_008": False,
         "configuration_at_composition_edge": True,
         "dependency_direction": "pure_core_to_application_governance_to_ports_and_adapters",

@@ -236,7 +236,11 @@ class IntelligencePort(Protocol):
 class ReferenceChannelPort(Protocol):
     def apply(self, effect: ChannelEffect) -> ChannelOutcome: ...
 
-    def reconcile(self, effect_idempotency_key: str) -> ReconciliationOutcome: ...
+    def reconcile(
+        self,
+        effect_idempotency_key: str,
+        binding_digest: str | None = None,
+    ) -> ReconciliationOutcome: ...
 
 
 class DispatchAuthorizationPort(Protocol):

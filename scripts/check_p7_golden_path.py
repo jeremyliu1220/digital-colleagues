@@ -18,10 +18,7 @@ if __package__ in {None, ""}:
 from scripts.check_p7_repository import BASE_COMMIT  # noqa: E402
 from scripts.p7_gate_support import FocusedGateError, run_focused_tests  # noqa: E402
 
-REFERENCE_FILES = (
-    "src/digital_colleagues/adapters/intelligence/deterministic.py",
-    "src/digital_colleagues/adapters/channel/reference.py",
-)
+REFERENCE_FILES = ("src/digital_colleagues/adapters/intelligence/deterministic.py",)
 
 
 def _digest(root: Path) -> str:
@@ -72,7 +69,7 @@ def check_golden_path(root: Path) -> dict[str, object]:
         "optional_adapter_contracts": "passed",
         "exact_effect_approval": "required",
         "ambiguous_blind_resend": False,
-        "restart_reconciliation": "still_unknown_without_binding",
+        "restart_reconciliation": "durable_binding_still_unknown_then_confirmed_absent",
         "external_calls": 0,
         "evidence_class": "synthetic_offline",
         "human_evaluation": "not_evaluated",

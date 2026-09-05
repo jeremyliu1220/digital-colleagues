@@ -39,6 +39,8 @@ class StubBehavior:
     content_type: str = "application/json"
     delay_seconds: float = 0
     disconnect_after_read: bool = False
+    drip_chunk_size: int = 0
+    drip_interval_seconds: float = 0
 
 
 @dataclass(slots=True)
@@ -98,7 +100,14 @@ class LoopbackStub:
                 self.send_header("Content-Length", str(len(response)))
                 self.end_headers()
                 try:
-                    self.wfile.write(response)
+                    if behavior.drip_chunk_size:
+                        for offset in range(0, len(response), behavior.drip_chunk_size):
+                            self.wfile.write(response[offset : offset + behavior.drip_chunk_size])
+                            self.wfile.flush()
+                            if offset + behavior.drip_chunk_size < len(response):
+                                time.sleep(behavior.drip_interval_seconds)
+                    else:
+                        self.wfile.write(response)
                 except (BrokenPipeError, ConnectionResetError):
                     pass
 

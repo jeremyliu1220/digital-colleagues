@@ -128,36 +128,55 @@ class HttpJsonTransport:
         }
         if idempotency_key is not None:
             headers["Idempotency-Key"] = idempotency_key
+        started = time.monotonic()
+        deadline = started + self._settings.total_timeout_seconds
+
+        def remaining_timeout(*, read_bound: bool = False) -> float:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise AdapterFailure(
+                    AdapterFailureCategory.TIMEOUT,
+                    result_class="total_deadline_exceeded",
+                    after_submit=True,
+                )
+            if read_bound:
+                return min(self._settings.read_timeout_seconds, remaining)
+            return remaining
+
+        connect_timeout = min(
+            self._settings.connect_timeout_seconds,
+            max(0.001, deadline - time.monotonic()),
+        )
         connection: http.client.HTTPConnection
         if parsed.scheme == "https":
             connection = http.client.HTTPSConnection(
                 host,
                 port,
-                timeout=self._settings.connect_timeout_seconds,
+                timeout=connect_timeout,
                 context=ssl.create_default_context(),
             )
         else:
             connection = http.client.HTTPConnection(
                 host,
                 port,
-                timeout=self._settings.connect_timeout_seconds,
+                timeout=connect_timeout,
             )
-        started = time.monotonic()
         try:
             try:
                 connection.connect()
             except (OSError, http.client.HTTPException) as exc:
                 raise _network_failure(exc, after_submit=False) from None
-            remaining = self._settings.total_timeout_seconds - (time.monotonic() - started)
-            if remaining <= 0:
+            if time.monotonic() >= deadline:
                 raise AdapterFailure(
                     AdapterFailureCategory.TIMEOUT,
                     result_class="not_submitted",
                 )
             if connection.sock is not None:
-                connection.sock.settimeout(min(self._settings.read_timeout_seconds, remaining))
+                connection.sock.settimeout(remaining_timeout(read_bound=True))
             try:
                 connection.request("POST", parsed.path or "/", body=body, headers=headers)
+                if connection.sock is not None:
+                    connection.sock.settimeout(remaining_timeout(read_bound=True))
                 response = connection.getresponse()
             except (OSError, http.client.HTTPException) as exc:
                 raise _network_failure(exc, after_submit=True) from None
@@ -172,7 +191,20 @@ class HttpJsonTransport:
             if status != 200:
                 return HttpJsonResponse(status=status, content_type=content_type)
             try:
-                response_body = response.read(self._settings.maximum_response_bytes + 1)
+                chunks: list[bytes] = []
+                received = 0
+                limit = self._settings.maximum_response_bytes + 1
+                while received < limit:
+                    if connection.sock is not None:
+                        connection.sock.settimeout(remaining_timeout(read_bound=True))
+                    else:
+                        remaining_timeout(read_bound=True)
+                    chunk = response.read1(min(8_192, limit - received))
+                    if not chunk:
+                        break
+                    chunks.append(chunk)
+                    received += len(chunk)
+                response_body = b"".join(chunks)
             except (OSError, http.client.HTTPException) as exc:
                 raise _network_failure(exc, after_submit=True) from None
             if len(response_body) > self._settings.maximum_response_bytes:

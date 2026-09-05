@@ -1,6 +1,186 @@
 # SPDX-License-Identifier: Apache-2.0
 
 services:
+  p7-stub:
+    profiles:
+      - optional-adapters
+    build:
+      context: .
+      dockerfile: Dockerfile.p7
+    command:
+      - python
+      - -B
+      - scripts/p7_compose_stub.py
+    expose:
+      - "8000"
+      - "8080"
+      - "8091"
+    networks:
+      - p7-isolated
+    read_only: true
+    tmpfs:
+      - /tmp
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8091/health', timeout=2).read()
+      interval: 1s
+      timeout: 3s
+      retries: 30
+    restart: "no"
+
+  p7-api:
+    profiles:
+      - optional-adapters
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command:
+      - python
+      - -m
+      - uvicorn
+      - digital_colleagues.local.asgi:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --no-access-log
+    environment: &p7-adapter-environment
+      DC_CHANNEL_ADAPTER: http_json_v1
+      DC_CHANNEL_CREDENTIAL_FILE: /run/secrets/p7-credential
+      DC_CHANNEL_ENDPOINT: http://127.0.0.1:8090/v1/adapter
+      DC_CHANNEL_PROTOCOL: dc-http-json-v1
+      DC_EXPECTED_ORIGIN: http://127.0.0.1:${DC_P7_STUDIO_PORT}
+      DC_MODEL_ADAPTER: http_json_v1
+      DC_MODEL_CREDENTIAL_FILE: /run/secrets/p7-credential
+      DC_MODEL_ENDPOINT: http://127.0.0.1:8090/v1/adapter
+      DC_MODEL_PROTOCOL: dc-http-json-v1
+      DC_P7_ALLOW_LOOPBACK_HTTP: "1"
+      DC_P7_CONNECT_TIMEOUT_SECONDS: "1"
+      DC_P7_MAX_PRE_SUBMIT_RETRIES: "0"
+      DC_P7_MAX_REQUEST_BYTES: "16384"
+      DC_P7_MAX_RESPONSE_BYTES: "16384"
+      DC_P7_READ_TIMEOUT_SECONDS: "1"
+      DC_P7_TOTAL_TIMEOUT_SECONDS: "2"
+      DC_STATE_DIR: /state
+      PYTHONDONTWRITEBYTECODE: "1"
+    depends_on:
+      p7-stub:
+        condition: service_healthy
+    network_mode: service:p7-stub
+    volumes:
+      - p7-state:/state
+      - ${DC_P7_CREDENTIAL_FILE:?set a temporary read-only credential file}:/run/secrets/p7-credential:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2).read()
+      interval: 1s
+      timeout: 3s
+      retries: 30
+    restart: "no"
+
+  p7-worker:
+    profiles:
+      - optional-adapters
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command:
+      - python
+      - -m
+      - digital_colleagues.local.worker
+    environment:
+      <<: *p7-adapter-environment
+    depends_on:
+      p7-api:
+        condition: service_healthy
+    network_mode: service:p7-stub
+    volumes:
+      - p7-state:/state
+      - ${DC_P7_CREDENTIAL_FILE:?set a temporary read-only credential file}:/run/secrets/p7-credential:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+    restart: "no"
+
+  p7-studio:
+    profiles:
+      - optional-adapters
+    build:
+      context: studio
+      dockerfile: Dockerfile.p7
+    depends_on:
+      p7-api:
+        condition: service_healthy
+    network_mode: service:p7-stub
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx
+      - /var/run
+    restart: "no"
+
+  p7-ingress:
+    profiles:
+      - optional-adapters
+    build:
+      context: .
+      dockerfile: Dockerfile.p7
+    command:
+      - python
+      - -B
+      - scripts/p7_compose_ingress.py
+    depends_on:
+      p7-api:
+        condition: service_healthy
+      p7-studio:
+        condition: service_started
+      p7-stub:
+        condition: service_healthy
+    networks:
+      - p7-isolated
+      - p7-published
+    ports:
+      - "127.0.0.1:${DC_P7_API_PORT:?set a temporary API port}:18000"
+      - "127.0.0.1:${DC_P7_STUDIO_PORT:?set a temporary Studio port}:18080"
+      - "127.0.0.1:${DC_P7_STUB_PORT:?set a temporary stub control port}:18091"
+    read_only: true
+    tmpfs:
+      - /tmp
+    restart: "no"
+
+  p7-operator:
+    profiles:
+      - optional-adapters
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command:
+      - python
+      - -m
+      - digital_colleagues.local.operator
+      - bootstrap-token
+    environment:
+      DC_STATE_DIR: /state
+      PYTHONDONTWRITEBYTECODE: "1"
+    depends_on:
+      p7-stub:
+        condition: service_healthy
+    network_mode: service:p7-stub
+    volumes:
+      - p7-state:/state
+    read_only: true
+    tmpfs:
+      - /tmp
+    restart: "no"
+
   p7-adapter-gate:
     profiles:
       - optional-adapters
@@ -19,3 +199,11 @@ services:
     tmpfs:
       - /tmp
     restart: "no"
+
+networks:
+  p7-isolated:
+    internal: true
+  p7-published:
+
+volumes:
+  p7-state:

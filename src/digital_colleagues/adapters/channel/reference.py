@@ -41,7 +41,12 @@ class ReferenceChannel:
         projection = FrozenJsonObject.from_mapping({"adapter": "reference", "outcome": kind.value})
         return ChannelOutcome(kind, projection, _digest(kind.value, effect.effect_idempotency_key))
 
-    def reconcile(self, effect_idempotency_key: str) -> ReconciliationOutcome:
+    def reconcile(
+        self,
+        effect_idempotency_key: str,
+        binding_digest: str | None = None,
+    ) -> ReconciliationOutcome:
+        del binding_digest
         self.reconciliation_count += 1
         projection = FrozenJsonObject.from_mapping(
             {"adapter": "reference", "reconciliation": self.reconciliation.value}

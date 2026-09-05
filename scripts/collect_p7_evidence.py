@@ -175,11 +175,14 @@ def write_p7_evidence(
         raise EvidenceError("P7 repository history or residue boundary is incomplete")
     runtime = results.get("compose_runtime", {})
     cleanup = runtime.get("cleanup") if isinstance(runtime, dict) else None
-    adapter_container = runtime.get("adapter_container") if isinstance(runtime, dict) else None
+    optional_topology = runtime.get("optional_topology") if isinstance(runtime, dict) else None
     if (
         runtime.get("status") != "passed"
         or runtime.get("unexpected_external_egress") != 0
         or runtime.get("live_provider_evidence") != "not_evaluated"
+        or runtime.get("human_acceptance_evidence") != "not_evaluated"
+        or runtime.get("fresh_service_recreate_count") != 2
+        or optional_topology != ["p7-stub", "p7-api", "p7-worker", "p7-studio"]
         or not isinstance(cleanup, dict)
         or cleanup.get("passed") is not True
         or cleanup.get("containers_remaining") != 0
@@ -187,8 +190,6 @@ def write_p7_evidence(
         or cleanup.get("volumes_remaining") != 0
         or cleanup.get("credential_files_remaining") != 0
         or cleanup.get("stub_processes_remaining") != 0
-        or not isinstance(adapter_container, dict)
-        or adapter_container.get("status") != "passed"
     ):
         raise EvidenceError("P7 actual Compose runtime or cleanup is incomplete")
     abuse = results.get("abuse", {})

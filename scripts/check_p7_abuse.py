@@ -49,7 +49,13 @@ def check_abuse(root: Path) -> dict[str, object]:
         "tests.p7.test_channel_adapter.P7ChannelAdapterTests."
         "test_authority_fields_in_acknowledgement_are_refused",
         "tests.p7.test_runtime_integration.P7RuntimeIntegrationTests."
-        "test_ambiguous_dispatch_is_not_resent_and_restart_stays_unknown",
+        "test_restart_reconciles_unknown_then_absent_before_bounded_retry",
+        "tests.p7.test_runtime_integration.P7RuntimeIntegrationTests."
+        "test_submitted_503_is_never_blindly_resent",
+        "tests.p7.test_runtime_integration.P7RuntimeIntegrationTests."
+        "test_provider_failure_commits_bounded_safe_causal_stop_across_restart",
+        "tests.p7.test_runtime_integration.P7RuntimeIntegrationTests."
+        "test_one_model_failure_does_not_stop_other_bounded_work",
         "tests.p6.test_effect_audit.P6EffectAuditTests."
         "test_effect_dispatch_revalidates_current_membership_and_expiry",
         "tests.runtime.test_outbox_binding",

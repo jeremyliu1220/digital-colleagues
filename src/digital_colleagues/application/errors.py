@@ -2,6 +2,8 @@
 
 """Stable framework-neutral application failures."""
 
+from __future__ import annotations
+
 
 class ApplicationError(RuntimeError):
     """Base failure safe for typed edge mapping."""
@@ -37,3 +39,22 @@ class PersistenceError(ApplicationError):
 
 class AmbiguousEffectError(ApplicationError):
     """An effect requires reconciliation before any further dispatch."""
+
+
+class ExternalAdapterError(ApplicationError):
+    """A provider-neutral adapter failure safe for durable causal recording."""
+
+    def __init__(self, *, failure_category: str, diagnostic_digest: str) -> None:
+        if (
+            not failure_category
+            or len(failure_category) > 128
+            or not failure_category.replace("_", "").isalnum()
+            or not diagnostic_digest.startswith("sha256:")
+            or len(diagnostic_digest) != 71
+        ):
+            raise ValueError("external adapter failure metadata is invalid")
+        self.failure_category = failure_category
+        self.diagnostic_digest = diagnostic_digest
+        self.args = (
+            f"external adapter failure category={failure_category} digest={diagnostic_digest}",
+        )

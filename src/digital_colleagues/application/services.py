@@ -24,6 +24,7 @@ from digital_colleagues.application.contracts import (
 )
 from digital_colleagues.application.errors import (
     ConflictError,
+    ExternalAdapterError,
     PermissionDeniedError,
     ValidationError,
 )
@@ -320,6 +321,37 @@ class WakeService:
                 self._store.commit_semantic_decision(claim, semantic)
                 self._checkpoint.hit("decision_committed")
                 decisions += 1
+            except ExternalAdapterError as exc:
+                failure_decision = Decision(
+                    namespace=request.namespace,
+                    decision_id=request.decision_id,
+                    wake_cycle_id=request.wake_cycle.wake_cycle_id,
+                    agenda_item_id=request.agenda_item.agenda_item_id,
+                    kind=DecisionKind.DEFER_ITEM,
+                    rationale=(
+                        "Optional intelligence failure stopped after one bounded attempt: "
+                        f"category={exc.failure_category} digest={exc.diagnostic_digest}."
+                    ),
+                    proposed_effect_id=None,
+                    actor=request.model_principal,
+                    correlation_id=request.agenda_item.correlation_id,
+                    causation_id=request.agenda_item.agenda_item_id,
+                    occurred_at=request.occurred_at,
+                    revision=1,
+                    policy_id=request.policy_id,
+                    policy_revision=request.policy_revision,
+                )
+                self._store.commit_semantic_decision(
+                    claim,
+                    SemanticDecision(
+                        SemanticOutcome.WAIT,
+                        failure_decision,
+                        None,
+                        request.request_id,
+                    ),
+                )
+                self._checkpoint.hit("adapter_failure_committed")
+                decisions += 1
             except Exception:
                 self._store.release_agenda(claim)
                 raise
@@ -547,22 +579,26 @@ class DispatchService:
         if claim is None:
             return DispatchResult(False, None, None)
         bundle = self._validate_exact_effect(namespace, claim)
-        outcome = self._channel.reconcile(bundle.effect_idempotency_key)
+        outcome = self._channel.reconcile(
+            bundle.effect_idempotency_key,
+            bundle.proposal.proposal_digest,
+        )
         next_attempt_id = None
-        if (
-            outcome.kind is ReconciliationKind.CONFIRMED_ABSENT
-            and claim.attempt_number < bundle.maximum_attempts
-        ):
-            next_attempt_id = self._identifiers.derive(
-                "attempt", claim.proposal_id, str(claim.attempt_number + 1)
-            )
+        if outcome.kind is ReconciliationKind.CONFIRMED_ABSENT:
+            # Provider reconciliation is I/O. Re-read every durable authority and
+            # exact-effect binding after it returns, before authorizing a retry.
+            bundle = self._validate_exact_effect(namespace, claim)
+            if claim.attempt_number < bundle.maximum_attempts:
+                next_attempt_id = self._identifiers.derive(
+                    "attempt", claim.proposal_id, str(claim.attempt_number + 1)
+                )
         result_id = self._identifiers.derive("result", claim.effect_attempt_id, outcome.kind.value)
         result = self._store.reconcile_ambiguous(
             claim,
             outcome=outcome,
             action_result_id=result_id,
             result_actor=self._result_actor,
-            occurred_at=now,
+            occurred_at=self._clock.now(),
             next_attempt_id=next_attempt_id,
         )
         mapped = (

@@ -8,6 +8,8 @@ import hashlib
 import json
 from enum import StrEnum
 
+from digital_colleagues.application.errors import ExternalAdapterError
+
 PROTOCOL_VERSION = "dc-http-json-v1"
 
 
@@ -42,7 +44,7 @@ def safe_digest(category: AdapterFailureCategory, result_class: str) -> str:
     return "sha256:" + hashlib.sha256(encoded).hexdigest()
 
 
-class AdapterFailure(RuntimeError):
+class AdapterFailure(ExternalAdapterError):
     """An adapter failure whose string form contains no endpoint, body, or credential."""
 
     def __init__(
@@ -58,7 +60,6 @@ class AdapterFailure(RuntimeError):
         self.after_submit = after_submit
         self.diagnostic_digest = safe_digest(category, result_class)
         super().__init__(
-            "optional adapter failure "
-            f"category={category.value} protocol={PROTOCOL_VERSION} "
-            f"result={result_class} digest={self.diagnostic_digest}"
+            failure_category=category.value,
+            diagnostic_digest=self.diagnostic_digest,
         )

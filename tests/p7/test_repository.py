@@ -171,8 +171,15 @@ class P7RepositoryGateTests(unittest.TestCase):
                         "status": "passed",
                         "unexpected_external_egress": 0,
                         "live_provider_evidence": "not_evaluated",
+                        "human_acceptance_evidence": "not_evaluated",
+                        "fresh_service_recreate_count": 2,
+                        "optional_topology": [
+                            "p7-stub",
+                            "p7-api",
+                            "p7-worker",
+                            "p7-studio",
+                        ],
                         "cleanup": cleanup,
-                        "adapter_container": {"status": "passed"},
                     },
                     "abuse": {
                         "authority_expansions": 0,

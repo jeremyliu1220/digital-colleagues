@@ -11,9 +11,6 @@ from pathlib import Path
 
 from digital_colleagues.adapters.sqlite.p6_store import SQLiteP6Store
 from digital_colleagues.adapters.system.deterministic import StableHashIdentifier
-from digital_colleagues.api.p4_app import create_p4_app
-from digital_colleagues.api.p5_app import install_p5_routes
-from digital_colleagues.api.p6_app import install_p6_routes
 from digital_colleagues.application.p4_services import (
     GovernedObservedIntelligence,
     InitialColleagueService,
@@ -67,6 +64,9 @@ def build_local_runtime(
     *,
     adapter_environment: Mapping[str, str] | None = None,
 ) -> LocalRuntime:
+    # Fully parse adapter configuration and read credentials before creating a
+    # state directory, opening SQLite, running migrations, or constructing services.
+    intelligence, channel, selection = build_selected_adapters(adapter_environment or {})
     state_directory.mkdir(mode=0o700, parents=True, exist_ok=True)
     clock = UtcClock()
     store = SQLiteP6Store(
@@ -74,83 +74,86 @@ def build_local_runtime(
         migrations_path=Path(__file__).resolve().parents[3] / "migrations",
         clock=clock,
     )
-    digests = CredentialDigests()
-    tokens = SecureTokenSource()
-    identifiers = StableHashIdentifier("p4-local")
-    authentication = P6AuthenticationService(
-        store=store,
-        clock=clock,
-        tokens=tokens,
-        digests=digests,
-        identifiers=identifiers,
-        tenant_id="tenant-local",
-    )
-    inner_colleagues = InitialColleagueService(
-        store=store,
-        runtime_store=store,
-        identifiers=identifiers,
-        clock=clock,
-    )
-    colleagues = P6ColleagueService(
-        inner=inner_colleagues,
-        authentication=authentication,
-    )
-    inner_builder = RevisionedColleagueBuilderService(
-        store=store,
-        clock=clock,
-        identifiers=identifiers,
-    )
-    builder = P6BuilderService(inner=inner_builder, authentication=authentication)
-    intelligence, channel, selection = build_selected_adapters(adapter_environment or {})
-    governed = GovernedObservedIntelligence(
-        inner=intelligence,
-        store=store,
-        identifiers=identifiers,
-    )
-    inner_controller = P4RuntimeController(
-        store=store,
-        studio_store=store,
-        intelligence=PolicyGovernedIntelligence(
-            inner=governed,
-            store=store,
-            identifiers=identifiers,
-            digests=digests,
-        ),
-        channel=channel,
-        clock=clock,
-        identifiers=identifiers,
-        digests=digests,
-        dispatch_authorizer=P6DispatchAuthorizer(
-            p5=P5DispatchAuthorizer(store),
+    try:
+        digests = CredentialDigests()
+        tokens = SecureTokenSource()
+        identifiers = StableHashIdentifier("p4-local")
+        authentication = P6AuthenticationService(
             store=store,
             clock=clock,
-        ),
-    )
-    policy_controller = P5RuntimeController(
-        inner=inner_controller,
-        store=store,
-        clock=clock,
-        identifiers=identifiers,
-    )
-    controller = P6RuntimeController(
-        inner=policy_controller,
-        authentication=authentication,
-    )
-    changes = P6ChangeService(
-        store=store,
-        draft_store=store,
-        builder=inner_builder,
-        authentication=authentication,
-        clock=clock,
-        identifiers=identifiers,
-        digests=digests,
-    )
-    audit = P6AuditService(
-        store=store,
-        authentication=authentication,
-        clock=clock,
-        identifiers=identifiers,
-    )
+            tokens=tokens,
+            digests=digests,
+            identifiers=identifiers,
+            tenant_id="tenant-local",
+        )
+        inner_colleagues = InitialColleagueService(
+            store=store,
+            runtime_store=store,
+            identifiers=identifiers,
+            clock=clock,
+        )
+        colleagues = P6ColleagueService(
+            inner=inner_colleagues,
+            authentication=authentication,
+        )
+        inner_builder = RevisionedColleagueBuilderService(
+            store=store,
+            clock=clock,
+            identifiers=identifiers,
+        )
+        builder = P6BuilderService(inner=inner_builder, authentication=authentication)
+        governed = GovernedObservedIntelligence(
+            inner=intelligence,
+            store=store,
+            identifiers=identifiers,
+        )
+        inner_controller = P4RuntimeController(
+            store=store,
+            studio_store=store,
+            intelligence=PolicyGovernedIntelligence(
+                inner=governed,
+                store=store,
+                identifiers=identifiers,
+                digests=digests,
+            ),
+            channel=channel,
+            clock=clock,
+            identifiers=identifiers,
+            digests=digests,
+            dispatch_authorizer=P6DispatchAuthorizer(
+                p5=P5DispatchAuthorizer(store),
+                store=store,
+                clock=clock,
+            ),
+        )
+        policy_controller = P5RuntimeController(
+            inner=inner_controller,
+            store=store,
+            clock=clock,
+            identifiers=identifiers,
+        )
+        controller = P6RuntimeController(
+            inner=policy_controller,
+            authentication=authentication,
+        )
+        changes = P6ChangeService(
+            store=store,
+            draft_store=store,
+            builder=inner_builder,
+            authentication=authentication,
+            clock=clock,
+            identifiers=identifiers,
+            digests=digests,
+        )
+        audit = P6AuditService(
+            store=store,
+            authentication=authentication,
+            clock=clock,
+            identifiers=identifiers,
+        )
+    except Exception:
+        store.close()
+        raise
     return LocalRuntime(
         state_directory=state_directory,
         store=store,
@@ -168,6 +171,11 @@ def build_local_runtime(
 
 
 def build_app_from_environment() -> object:
+    # Keep the headless runtime constructor importable without the HTTP edge.
+    from digital_colleagues.api.p4_app import create_p4_app
+    from digital_colleagues.api.p5_app import install_p5_routes
+    from digital_colleagues.api.p6_app import install_p6_routes
+
     state_directory = Path(os.environ.get("DC_STATE_DIR", "/state"))
     expected_origin = os.environ.get("DC_EXPECTED_ORIGIN", "http://127.0.0.1:4173")
     secure_cookie = os.environ.get("DC_SECURE_COOKIE", "0") == "1"

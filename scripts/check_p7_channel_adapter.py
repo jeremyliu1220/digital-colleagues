@@ -22,7 +22,9 @@ def check_channel_adapter(root: Path) -> dict[str, object]:
         root,
         "tests.p7.test_channel_adapter",
         "tests.p7.test_runtime_integration.P7RuntimeIntegrationTests."
-        "test_ambiguous_dispatch_is_not_resent_and_restart_stays_unknown",
+        "test_restart_reconciles_unknown_then_absent_before_bounded_retry",
+        "tests.p7.test_runtime_integration.P7RuntimeIntegrationTests."
+        "test_submitted_503_is_never_blindly_resent",
         "tests.runtime.test_outbox_binding",
     )
     return {
@@ -39,6 +41,9 @@ def check_channel_adapter(root: Path) -> dict[str, object]:
         ],
         "reconciliation": ["confirmed_absent", "confirmed_applied", "still_unknown"],
         "post_submit_timeout": "ambiguous",
+        "submitted_429_or_5xx": "ambiguous",
+        "unproven_retryable_wire_result": "ambiguous",
+        "restart_binding_source": "durable_exact_effect",
         "blind_resend": False,
         "idempotency_rebinding_refused": True,
         "raw_provider_body_persisted": False,
