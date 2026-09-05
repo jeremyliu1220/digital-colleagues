@@ -26,12 +26,20 @@
     "public_boundary_exceptions": 0,
     "safe_refusals": 16,
     "schema_version": 1,
-    "tests_run": 16,
+    "tests_run": 21,
     "unexpected_external_egress": 0
   },
   "acceptance_commit": "9df79441c8fb9f8c41b47114f42643a290df35a6",
   "architecture": {
+    "backward_compatible_reconciliation_binding": true,
+    "bounded_durable_adapter_failure": true,
     "configuration_at_composition_edge": true,
+    "corrective_application_files": [
+      "src/digital_colleagues/application/errors.py",
+      "src/digital_colleagues/application/p4_services.py",
+      "src/digital_colleagues/application/ports.py",
+      "src/digital_colleagues/application/services.py"
+    ],
     "dependency_direction": "pure_core_to_application_governance_to_ports_and_adapters",
     "dynamic_imports": 0,
     "files_checked": 68,
@@ -67,8 +75,11 @@
       "confirmed_applied",
       "still_unknown"
     ],
+    "restart_binding_source": "durable_exact_effect",
     "schema_version": 1,
-    "tests_run": 11
+    "submitted_429_or_5xx": "ambiguous",
+    "tests_run": 13,
+    "unproven_retryable_wire_result": "ambiguous"
   },
   "claim": "optional_adapter_contracts_passed",
   "claim_exclusions": [
@@ -84,84 +95,27 @@
   ],
   "compose": {
     "actual_runtime_gate": "separate_required",
-    "adapter_gate_network": "none_with_process_local_loopback",
+    "adapter_gate_network": "internal_shared_loopback_namespace",
     "credential_mount": "read_only",
     "default_channel": "reference",
     "default_model": "deterministic",
     "default_network_provider": false,
     "gate": "p7_compose_static_clean",
+    "host_ingress": "loopback_only_tcp_forwarder",
     "optional_profile": "optional-adapters",
     "published_bind": "127.0.0.1",
     "retained_p6_gate": "p6_compose_static_clean",
+    "runtime_services": [
+      "p7-api",
+      "p7-studio",
+      "p7-stub",
+      "p7-worker"
+    ],
     "schema_version": 1
   },
   "compose_runtime": {
-    "adapter_container": {
-      "credential_mount": "read_only_bounded",
-      "default_routes": 0,
-      "evidence_class": "synthetic_offline",
-      "gate": "p7_container_runtime_clean",
-      "schema_version": 1,
-      "status": "passed",
-      "stub_processes_remaining": 0,
-      "unexpected_external_egress": 0,
-      "unittest": {
-        "errors": 0,
-        "expected_failures": 0,
-        "failures": 0,
-        "fault_boundaries": [
-          "p7_ambiguous_no_blind_resend",
-          "p7_channel_exact_binding_replay",
-          "p7_channel_post_submit_ambiguity",
-          "p7_credential_file_boundary",
-          "p7_default_deterministic_reference",
-          "p7_deterministic_regression",
-          "p7_endpoint_ssrf_refusal",
-          "p7_exact_approval_integration",
-          "p7_explicit_opt_in_fail_closed",
-          "p7_failure_causal_restart",
-          "p7_model_authority_injection_refusal",
-          "p7_model_authority_rebinding",
-          "p7_model_malformed_oversize",
-          "p7_model_transport_failures",
-          "p7_reconciliation_restart_unknown"
-        ],
-        "gate_passed": true,
-        "skipped": 0,
-        "test_ids": [
-          "tests.p7.test_channel_adapter.P7ChannelAdapterTests.test_all_finite_channel_and_reconciliation_results_are_mapped",
-          "tests.p7.test_channel_adapter.P7ChannelAdapterTests.test_authority_binding_and_idempotency_rebinding_fail_before_network",
-          "tests.p7.test_channel_adapter.P7ChannelAdapterTests.test_authority_fields_in_acknowledgement_are_refused",
-          "tests.p7.test_channel_adapter.P7ChannelAdapterTests.test_reconciliation_failure_and_fresh_restart_never_invent_absence",
-          "tests.p7.test_channel_adapter.P7ChannelAdapterTests.test_status_malformed_oversize_and_redirect_failures_are_safe_and_finite",
-          "tests.p7.test_channel_adapter.P7ChannelAdapterTests.test_success_carries_exact_binding_and_existing_idempotency_header",
-          "tests.p7.test_channel_adapter.P7ChannelAdapterTests.test_timeout_and_disconnect_after_submission_are_ambiguous",
-          "tests.p7.test_channel_adapter.P7ChannelAdapterTests.test_untrusted_result_classification_is_not_persisted_or_returned",
-          "tests.p7.test_configuration.P7ConfigurationTests.test_credential_must_be_regular_bounded_non_writable_file",
-          "tests.p7.test_configuration.P7ConfigurationTests.test_default_selection_is_deterministic_and_network_free",
-          "tests.p7.test_configuration.P7ConfigurationTests.test_explicit_loopback_selection_constructs_both_optional_adapters",
-          "tests.p7.test_configuration.P7ConfigurationTests.test_https_is_required_outside_explicit_loopback_tests",
-          "tests.p7.test_configuration.P7ConfigurationTests.test_protocol_timeout_size_and_retry_bounds_are_fail_closed",
-          "tests.p7.test_configuration.P7ConfigurationTests.test_unknown_modes_missing_fields_and_stray_network_settings_fail_closed",
-          "tests.p7.test_configuration.P7ConfigurationTests.test_unused_adapter_settings_are_rejected_with_one_optional_adapter",
-          "tests.p7.test_configuration.P7ConfigurationTests.test_url_userinfo_query_fragment_scheme_and_non_loopback_http_are_refused",
-          "tests.p7.test_model_adapter.P7ModelAdapterTests.test_finite_non_proposal_outcomes_create_no_effect",
-          "tests.p7.test_model_adapter.P7ModelAdapterTests.test_http_statuses_have_typed_safe_failures",
-          "tests.p7.test_model_adapter.P7ModelAdapterTests.test_malformed_duplicate_non_json_content_and_oversize_fail_safely",
-          "tests.p7.test_model_adapter.P7ModelAdapterTests.test_success_reconstructs_all_authority_from_the_server_request",
-          "tests.p7.test_model_adapter.P7ModelAdapterTests.test_timeout_disconnect_redirect_connect_dns_and_tls_are_typed",
-          "tests.p7.test_model_adapter.P7ModelAdapterTests.test_unknown_fields_authority_injection_and_unknown_outcome_fail_closed",
-          "tests.p7.test_model_adapter.P7ModelAdapterTests.test_wrong_principal_and_oversized_request_make_no_network_call",
-          "tests.p7.test_runtime_integration.P7RuntimeIntegrationTests.test_ambiguous_dispatch_is_not_resent_and_restart_stays_unknown",
-          "tests.p7.test_runtime_integration.P7RuntimeIntegrationTests.test_default_reference_semantic_output_is_unchanged",
-          "tests.p7.test_runtime_integration.P7RuntimeIntegrationTests.test_optional_model_exact_human_approval_and_channel_complete_existing_path",
-          "tests.p7.test_runtime_integration.P7RuntimeIntegrationTests.test_provider_failure_preserves_pending_causal_work_across_restart"
-        ],
-        "tests_run": 27,
-        "unexpected_successes": 0
-      }
-    },
-    "adapter_protocol": "dc-http-json-v1",
+    "auxiliary_container_gate": "p7_container_runtime_clean",
+    "bounded_effect_attempts": 2,
     "cleanup": {
       "containers_remaining": 0,
       "credential_files_remaining": 0,
@@ -172,21 +126,38 @@
       "volumes_remaining": 0
     },
     "command": "python3 -B scripts/check_p7_compose_runtime.py .",
-    "credentials_absent_from_output": true,
-    "default_path": "deterministic_reference",
-    "ended_at": "2026-09-03T07:09:30.280221Z",
+    "credentials_absent_from_service_logs": true,
+    "default_path": "deterministic_reference_retained",
+    "ended_at": "2026-09-05T06:59:06.465041Z",
     "environment": {
       "compose_version": "5.4.0",
-      "container_network": "none_with_process_local_loopback",
+      "container_network": "internal_shared_loopback_namespace",
       "docker_server_version": "29.7.2",
-      "host": "darwin"
+      "host": "darwin",
+      "published_bind": "127.0.0.1"
     },
     "evidence_class": "synthetic_offline",
-    "exact_effect_approval": "retained_and_exercised",
+    "fresh_service_recreate_count": 2,
     "gate": "p7_compose_runtime_clean",
+    "human_acceptance_evidence": "not_evaluated",
+    "initial_service_count": 5,
     "live_provider_evidence": "not_evaluated",
+    "loopback_ingress": "host_only_tcp_forwarder",
     "normal_stop": true,
-    "restart_replay": "durable_still_unknown",
+    "optional_topology": [
+      "p7-stub",
+      "p7-api",
+      "p7-worker",
+      "p7-studio"
+    ],
+    "provider_request_sequence": [
+      "semantic_decision",
+      "channel_effect",
+      "channel_reconciliation",
+      "channel_reconciliation",
+      "channel_effect"
+    ],
+    "restart_reconciliation": "still_unknown_then_confirmed_absent",
     "retained_p6_runtime": {
       "cleanup": {
         "containers_remaining": 0,
@@ -195,17 +166,12 @@
         "passed": true,
         "volumes_remaining": 0
       },
-      "exact_change_approval": "separate_admin_applied_once",
       "gate": "p6_compose_runtime_clean",
-      "recovery_rotation": "old_session_refused_new_session_recovered",
       "status": "passed"
     },
     "schema_version": 1,
-    "started_at": "2026-09-03T07:09:06.857551Z",
-    "startup": "explicit_optional_profile",
+    "started_at": "2026-09-05T06:58:34.579225Z",
     "status": "passed",
-    "success_and_refusal_paths": "passed",
-    "timeout_disconnect": "ambiguous_no_blind_resend",
     "unexpected_external_egress": 0
   },
   "configuration": {
@@ -219,6 +185,7 @@
     "default_model": "deterministic",
     "dynamic_import": false,
     "gate": "p7_configuration_clean",
+    "later_construction_failure_closes_store": true,
     "loopback_http": "explicit_test_only",
     "model_modes": [
       "deterministic",
@@ -226,8 +193,9 @@
     ],
     "redirects": "refused",
     "schema_version": 1,
-    "tests_run": 8,
-    "tls_verification": true
+    "tests_run": 10,
+    "tls_verification": true,
+    "validation_before_state_or_services": true
   },
   "development_branch": "codex/p7-optional-adapters",
   "evidence_classes": {
@@ -236,13 +204,13 @@
     "live_provider": "not_evaluated"
   },
   "fixed_base": "7e6f4c4dc50b675afb60b6e160fe4f15312dd6c8",
-  "generated_at": "2026-09-03T07:11:29.274798Z",
+  "generated_at": "2026-09-05T07:01:10.385884Z",
   "golden_path": {
     "ambiguous_blind_resend": false,
     "claim": "optional_adapter_contracts_passed",
     "default_channel": "ReferenceChannel",
     "default_model": "DeterministicIntelligence",
-    "deterministic_reference_digest": "sha256:18ee7fa0d513a57b74bab4f367275a5cd814b221de17ac36eddf0223035c3c19",
+    "deterministic_reference_digest": "sha256:6e914d86af385cc531f3029ddc89ad3ca329e6d673ddef1b23595ed0d647a1c9",
     "deterministic_reference_unchanged": true,
     "evidence_class": "synthetic_offline",
     "exact_effect_approval": "required",
@@ -252,9 +220,9 @@
     "live_provider_evidence": "not_evaluated",
     "optional_adapter_contracts": "passed",
     "protocol_version": "dc-http-json-v1",
-    "restart_reconciliation": "still_unknown_without_binding",
+    "restart_reconciliation": "durable_binding_still_unknown_then_confirmed_absent",
     "schema_version": 1,
-    "tests_run": 4
+    "tests_run": 6
   },
   "historical_boundary": {
     "historical_evidence_collectors_run": false,
@@ -262,7 +230,7 @@
     "migrations_001_through_007_unchanged": true,
     "p0_through_p6_unchanged": true
   },
-  "implementation_commit": "3a316ea807887a396b24892aabbaf05f06fafccf",
+  "implementation_commit": "a65b351f7126534f1ff3eac1b2ab432069d3dfa6",
   "merge_base": "7e6f4c4dc50b675afb60b6e160fe4f15312dd6c8",
   "milestone": "P7",
   "model_adapter": {
@@ -284,9 +252,9 @@
   },
   "provenance": {
     "gate": "p7_provenance_clean",
-    "implementation_tree_digest": "sha256:a7c8e65150c97981f992a4c996a5df82bad657e476a17781ea53afa8f357f1e1",
-    "new_implementation_count": 45,
-    "receipt_digest": "sha256:e2076e9b0e3fbb43c68b5074ead8a0e2bb733b201f2013204735321d965900da",
+    "implementation_tree_digest": "sha256:d911dfb00781557879956b13c1e71bd342d2999ef9f09b3422581245786ce256",
+    "new_implementation_count": 54,
+    "receipt_digest": "sha256:ab7d87328be75cb95ae0aea554447e9a0c0e23f45dc32b0b827e98bbc2b5df43",
     "schema_version": 1,
     "source_basis": "public_documents_and_accepted_p6_implementation",
     "transformed_migration_count": 0
@@ -296,7 +264,7 @@
     "expected_failures": 0,
     "failures": 0,
     "skipped": 0,
-    "tests_run": 272,
+    "tests_run": 277,
     "unexpected_successes": 0
   },
   "repository": {
@@ -306,11 +274,11 @@
     "base_commit": "7e6f4c4dc50b675afb60b6e160fe4f15312dd6c8",
     "branch": "codex/p7-optional-adapters",
     "gate": "p7_repository_clean",
-    "head_commit": "3a316ea807887a396b24892aabbaf05f06fafccf",
+    "head_commit": "a65b351f7126534f1ff3eac1b2ab432069d3dfa6",
     "historical_drift_count": 0,
     "merge_base": "7e6f4c4dc50b675afb60b6e160fe4f15312dd6c8",
     "migration_008": false,
-    "required_file_count": 35,
+    "required_file_count": 39,
     "residue_count": 0,
     "retained_p6_gate": "p6_repository_clean",
     "schema_version": 1,
@@ -332,7 +300,7 @@
     "status": "passed",
     "unexpected_successes": 0
   },
-  "tree_digest": "sha256:d163a004ba4d0e2c0aea8d7815ce32da6c9fa08e2512a1bc9452e323a5bd9bc1",
+  "tree_digest": "sha256:0df43ffd30f760841884f0705ec21e706a421c267a129b43049930e2619204d8",
   "unittest": {
     "errors": 0,
     "expected_failures": 0,
@@ -435,7 +403,6 @@
       "p6_scoped_auditor_projection_refusal",
       "p6_second_admin_digest_single_use",
       "p6_session_authority_revision",
-      "p7_ambiguous_no_blind_resend",
       "p7_channel_exact_binding_replay",
       "p7_channel_post_submit_ambiguity",
       "p7_credential_file_boundary",
@@ -445,13 +412,11 @@
       "p7_evidence_fail_closed",
       "p7_exact_approval_integration",
       "p7_explicit_opt_in_fail_closed",
-      "p7_failure_causal_restart",
       "p7_historical_immutability",
       "p7_model_authority_injection_refusal",
       "p7_model_authority_rebinding",
       "p7_model_malformed_oversize",
       "p7_model_transport_failures",
-      "p7_reconciliation_restart_unknown",
       "principal_separation",
       "restart_golden_path",
       "server_approval_time_authority",
@@ -682,15 +647,18 @@
       "tests.p7.test_channel_adapter.P7ChannelAdapterTests.test_all_finite_channel_and_reconciliation_results_are_mapped",
       "tests.p7.test_channel_adapter.P7ChannelAdapterTests.test_authority_binding_and_idempotency_rebinding_fail_before_network",
       "tests.p7.test_channel_adapter.P7ChannelAdapterTests.test_authority_fields_in_acknowledgement_are_refused",
-      "tests.p7.test_channel_adapter.P7ChannelAdapterTests.test_reconciliation_failure_and_fresh_restart_never_invent_absence",
+      "tests.p7.test_channel_adapter.P7ChannelAdapterTests.test_reconciliation_uses_durable_binding_after_fresh_restart",
       "tests.p7.test_channel_adapter.P7ChannelAdapterTests.test_status_malformed_oversize_and_redirect_failures_are_safe_and_finite",
       "tests.p7.test_channel_adapter.P7ChannelAdapterTests.test_success_carries_exact_binding_and_existing_idempotency_header",
       "tests.p7.test_channel_adapter.P7ChannelAdapterTests.test_timeout_and_disconnect_after_submission_are_ambiguous",
+      "tests.p7.test_channel_adapter.P7ChannelAdapterTests.test_total_deadline_stops_slow_drip_body",
       "tests.p7.test_channel_adapter.P7ChannelAdapterTests.test_untrusted_result_classification_is_not_persisted_or_returned",
       "tests.p7.test_configuration.P7ConfigurationTests.test_credential_must_be_regular_bounded_non_writable_file",
       "tests.p7.test_configuration.P7ConfigurationTests.test_default_selection_is_deterministic_and_network_free",
       "tests.p7.test_configuration.P7ConfigurationTests.test_explicit_loopback_selection_constructs_both_optional_adapters",
       "tests.p7.test_configuration.P7ConfigurationTests.test_https_is_required_outside_explicit_loopback_tests",
+      "tests.p7.test_configuration.P7ConfigurationTests.test_later_service_construction_failure_closes_sqlite",
+      "tests.p7.test_configuration.P7ConfigurationTests.test_malformed_credential_fails_before_state_or_service_construction",
       "tests.p7.test_configuration.P7ConfigurationTests.test_protocol_timeout_size_and_retry_bounds_are_fail_closed",
       "tests.p7.test_configuration.P7ConfigurationTests.test_unknown_modes_missing_fields_and_stray_network_settings_fail_closed",
       "tests.p7.test_configuration.P7ConfigurationTests.test_unused_adapter_settings_are_rejected_with_one_optional_adapter",
@@ -707,10 +675,12 @@
       "tests.p7.test_repository.P7RepositoryGateTests.test_historical_drift_and_migration_008_fail_closed",
       "tests.p7.test_repository.P7RepositoryGateTests.test_main_development_branch_and_normal_descendant_pass",
       "tests.p7.test_repository.P7RepositoryGateTests.test_wrong_ancestry_acceptance_drift_and_required_file_fail_closed",
-      "tests.p7.test_runtime_integration.P7RuntimeIntegrationTests.test_ambiguous_dispatch_is_not_resent_and_restart_stays_unknown",
       "tests.p7.test_runtime_integration.P7RuntimeIntegrationTests.test_default_reference_semantic_output_is_unchanged",
+      "tests.p7.test_runtime_integration.P7RuntimeIntegrationTests.test_one_model_failure_does_not_stop_other_bounded_work",
       "tests.p7.test_runtime_integration.P7RuntimeIntegrationTests.test_optional_model_exact_human_approval_and_channel_complete_existing_path",
-      "tests.p7.test_runtime_integration.P7RuntimeIntegrationTests.test_provider_failure_preserves_pending_causal_work_across_restart",
+      "tests.p7.test_runtime_integration.P7RuntimeIntegrationTests.test_provider_failure_commits_bounded_safe_causal_stop_across_restart",
+      "tests.p7.test_runtime_integration.P7RuntimeIntegrationTests.test_restart_reconciles_unknown_then_absent_before_bounded_retry",
+      "tests.p7.test_runtime_integration.P7RuntimeIntegrationTests.test_submitted_503_is_never_blindly_resent",
       "tests.persistence.test_sqlite_semantics.SQLiteSemanticsTests.test_every_store_connection_enables_wal_foreign_keys_and_busy_handling",
       "tests.persistence.test_sqlite_semantics.SQLiteSemanticsTests.test_migration_failure_rolls_back_without_partial_schema_or_metadata",
       "tests.persistence.test_sqlite_semantics.SQLiteSemanticsTests.test_migration_order_checksum_tampering_and_future_schema_fail_closed",
@@ -735,7 +705,7 @@
       "tests.runtime.test_p3_runtime.RuntimeSemanticsTests.test_wake_cycle_bounds_preserve_pending_work_and_agenda_takeover_fences_stale_owner",
       "tests.runtime.test_timer_runtime.TimerRuntimeTests.test_durable_timer_due_replay_restart_fencing_causation_and_namespace_isolation"
     ],
-    "tests_run": 272,
+    "tests_run": 277,
     "unexpected_successes": 0
   },
   "verified_gates": [
