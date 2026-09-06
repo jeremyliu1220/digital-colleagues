@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import json
 import shutil
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
 
+from scripts.check_p4_compose_runtime import ComposeRuntimeError
+from scripts.check_p8_compose_runtime import _operation_json
 from scripts.check_p8_repository import RepositoryError, check_repository
 from scripts.collect_p8_evidence import (
     EvidenceError,
@@ -27,6 +30,15 @@ def _clone(directory: Path) -> Path:
 
 
 class P8RepositoryTests(unittest.TestCase):
+    def test_compose_operation_json_accepts_stderr_and_rejects_missing_results(self) -> None:
+        expected = {"schema_version": 1, "status": "restored"}
+        self.assertEqual(
+            _operation_json("", "compose progress\n" + json.dumps(expected) + "\n"),
+            expected,
+        )
+        with self.assertRaisesRegex(ComposeRuntimeError, "no JSON object"):
+            _operation_json("compose progress\n", "warning\n")
+
     def test_studio_evidence_requires_positive_machine_readable_counts(self) -> None:
         valid = {
             "command": "corepack npm test -- --reporter=json --outputFile=<temporary>",

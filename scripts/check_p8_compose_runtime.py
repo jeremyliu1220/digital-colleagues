@@ -111,6 +111,18 @@ def _operations_command(
     return completed.stdout, completed.stderr
 
 
+def _operation_json(stdout: str, stderr: str) -> dict[str, Any]:
+    for stream in (stdout, stderr):
+        for line in reversed(stream.splitlines()):
+            try:
+                value = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(value, dict):
+                return value
+    raise ComposeRuntimeError("operation command returned no JSON object")
+
+
 def _write_override(path: Path, canaries: tuple[str, str, str]) -> None:
     credential, private_payload, local_marker = canaries
     path.write_text(
@@ -440,7 +452,7 @@ def _first_release_transition(
         ):
             raise ComposeRuntimeError("accepted P7 pre-upgrade backup did not verify")
         p7_database.unlink()
-        install_stdout, _ = _operations_command(
+        install_stdout, install_stderr = _operations_command(
             docker,
             transition_project,
             source,
@@ -458,7 +470,7 @@ def _first_release_transition(
             ],
             running=False,
         )
-        installed = json.loads(install_stdout)
+        installed = _operation_json(install_stdout, install_stderr)
         if (
             installed.get("status") != "restored"
             or installed.get("restored_source_version") != "0.0.0"
@@ -541,7 +553,7 @@ def _first_release_transition(
             root=source,
             environment=environment,
         )
-        restore_stdout, _ = _operations_command(
+        restore_stdout, restore_stderr = _operations_command(
             docker,
             transition_project,
             source,
@@ -565,8 +577,8 @@ def _first_release_transition(
             ],
             running=False,
         )
-        restored = json.loads(restore_stdout)
-        rollback_stdout, _ = _operations_command(
+        restored = _operation_json(restore_stdout, restore_stderr)
+        rollback_stdout, rollback_stderr = _operations_command(
             docker,
             transition_project,
             source,
@@ -585,7 +597,7 @@ def _first_release_transition(
         if (
             restored.get("restored_source_version") != "0.0.0"
             or restored.get("replaced_source_version") != "0.1.0"
-            or json.loads(rollback_stdout).get("source_version") != "0.1.0"
+            or _operation_json(rollback_stdout, rollback_stderr).get("source_version") != "0.1.0"
         ):
             raise ComposeRuntimeError("cross-version rollback binding was invalid")
 
@@ -1107,8 +1119,8 @@ def check_compose_runtime(root: Path) -> dict[str, object]:
             )
             operation_output.extend((verified_stdout, verified_stderr))
             if (
-                json.loads(stdout)["status"] != "created"
-                or json.loads(verified_stdout)["status"] != "verified"
+                _operation_json(stdout, stderr)["status"] != "created"
+                or _operation_json(verified_stdout, verified_stderr)["status"] != "verified"
             ):
                 raise ComposeRuntimeError("online backup did not verify")
 
@@ -1160,7 +1172,10 @@ def check_compose_runtime(root: Path) -> dict[str, object]:
                 running=False,
             )
             operation_output.extend((restore_stdout, restore_stderr))
-            if json.loads(restore_stdout).get("rollback_backup_created") is not True:
+            if (
+                _operation_json(restore_stdout, restore_stderr).get("rollback_backup_created")
+                is not True
+            ):
                 raise ComposeRuntimeError("restore lacked a verified rollback backup")
             rollback_stdout, rollback_stderr = _operations_command(
                 docker,
@@ -1179,7 +1194,7 @@ def check_compose_runtime(root: Path) -> dict[str, object]:
                 running=False,
             )
             operation_output.extend((rollback_stdout, rollback_stderr))
-            if json.loads(rollback_stdout).get("status") != "verified":
+            if _operation_json(rollback_stdout, rollback_stderr).get("status") != "verified":
                 raise ComposeRuntimeError("rollback backup did not verify")
             _compose(
                 docker,
@@ -1247,7 +1262,7 @@ def check_compose_runtime(root: Path) -> dict[str, object]:
                 running=True,
             )
             operation_output.extend((diagnostic_stdout, diagnostic_stderr))
-            if json.loads(diagnostic_stdout)["status"] != "created":
+            if _operation_json(diagnostic_stdout, diagnostic_stderr)["status"] != "created":
                 raise ComposeRuntimeError("diagnostics bundle was not created")
             rollback = operator / "pre-restore-rollback.tar.gz"
             _scan_bytes(

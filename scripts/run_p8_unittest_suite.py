@@ -31,6 +31,7 @@ P8_BOUNDARIES = {
     "tests.p8.test_release.P8ReleaseTests.test_source_archive_policy_excludes_evidence_and_private_residue": "p8_source_archive_allowlist",
     "tests.p8.test_release.P8ReleaseTests.test_release_builder_refuses_dirty_tree_before_emitting_candidate": "p8_dirty_release_refusal",
     "tests.p8.test_repository.P8RepositoryTests.test_acceptance_historical_migration_and_residue_drift_fail_closed": "p8_history_residue_refusal",
+    "tests.p8.test_repository.P8RepositoryTests.test_compose_operation_json_accepts_stderr_and_rejects_missing_results": "p8_compose_operation_result_parsing",
     "tests.p8.test_repository.P8RepositoryTests.test_p8_aggregate_executes_all_prior_current_tree_regressions": "p8_prior_current_tree_regressions",
     "tests.p8.test_repository.P8RepositoryTests.test_studio_evidence_requires_positive_machine_readable_counts": "p8_studio_test_evidence",
     "tests.p8.test_repository.P8RepositoryTests.test_evidence_writer_refuses_dirty_or_incomplete_results": "p8_evidence_fail_closed",
