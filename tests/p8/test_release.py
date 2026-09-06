@@ -132,8 +132,8 @@ class P8ReleaseTests(unittest.TestCase):
                 ("production", "It is not production-ready", "P8 is production-ready"),
                 (
                     "live-provider",
-                    "Human evaluation, live-provider evidence",
-                    "P8 is live-provider accepted; Human evaluation and live-provider evidence",
+                    "live-provider",
+                    "P8 is live-provider accepted; live-provider",
                 ),
             )
             for label, old, new in cases:
