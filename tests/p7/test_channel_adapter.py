@@ -104,15 +104,27 @@ class P7ChannelAdapterTests(unittest.TestCase):
                     )
                 ).apply(channel_effect())
                 self.assertEqual(outcome.kind, ChannelOutcomeKind.AMBIGUOUS)
+                self.assertEqual(len(stub.state.requests), 1)
 
     def test_status_malformed_oversize_and_redirect_failures_are_safe_and_finite(self) -> None:
         cases = (
             (StubBehavior(status=401, raw_body=b"private"), ChannelOutcomeKind.PERMANENT_FAILURE),
             (StubBehavior(status=403, raw_body=b"private"), ChannelOutcomeKind.PERMANENT_FAILURE),
             (StubBehavior(status=429, raw_body=b"private"), ChannelOutcomeKind.AMBIGUOUS),
+            (StubBehavior(status=500, raw_body=b"private"), ChannelOutcomeKind.AMBIGUOUS),
             (StubBehavior(status=503, raw_body=b"private"), ChannelOutcomeKind.AMBIGUOUS),
-            (StubBehavior(status=302), ChannelOutcomeKind.PERMANENT_FAILURE),
+            (StubBehavior(status=302), ChannelOutcomeKind.AMBIGUOUS),
+            (StubBehavior(status=307), ChannelOutcomeKind.AMBIGUOUS),
+            (StubBehavior(status=308), ChannelOutcomeKind.AMBIGUOUS),
+            (StubBehavior(status=408, raw_body=b"private"), ChannelOutcomeKind.AMBIGUOUS),
             (StubBehavior(raw_body=b"{"), ChannelOutcomeKind.AMBIGUOUS),
+            (
+                StubBehavior(
+                    document=channel_response("succeeded"),
+                    content_type="text/plain",
+                ),
+                ChannelOutcomeKind.AMBIGUOUS,
+            ),
             (
                 StubBehavior(raw_body=b"{" + (b"x" * 400) + b"}"),
                 ChannelOutcomeKind.AMBIGUOUS,
@@ -130,6 +142,7 @@ class P7ChannelAdapterTests(unittest.TestCase):
                     settings(stub.endpoint, credential, maximum_response_bytes=256)
                 ).apply(channel_effect())
                 self.assertEqual(outcome.kind, expected)
+                self.assertEqual(len(stub.state.requests), 1)
                 self.assertNotIn("private", str(outcome.safe_projection))
 
     def test_authority_binding_and_idempotency_rebinding_fail_before_network(self) -> None:
@@ -228,6 +241,7 @@ class P7ChannelAdapterTests(unittest.TestCase):
             ).apply(channel_effect())
             elapsed = time.monotonic() - started
             self.assertEqual(outcome.kind, ChannelOutcomeKind.AMBIGUOUS)
+            self.assertEqual(len(stub.state.requests), 1)
             self.assertGreaterEqual(elapsed, 0.08)
             self.assertLess(elapsed, 0.17)
 

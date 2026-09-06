@@ -25,6 +25,18 @@ def check_channel_adapter(root: Path) -> dict[str, object]:
         "test_restart_reconciles_unknown_then_absent_before_bounded_retry",
         "tests.p7.test_runtime_integration.P7RuntimeIntegrationTests."
         "test_submitted_503_is_never_blindly_resent",
+        "tests.p7.test_runtime_integration.P7RuntimeIntegrationTests."
+        "test_all_uncertain_post_submit_failures_remain_ambiguous_without_retry",
+        "tests.p7.test_runtime_integration.P7RuntimeIntegrationTests."
+        "test_headless_worker_recovers_ambiguous_only_namespace_across_restart",
+        "tests.p7.test_runtime_integration.P7RuntimeIntegrationTests."
+        "test_still_unknown_reconciliation_uses_durable_backoff_and_stops_at_budget",
+        "tests.p7.test_runtime_integration.P7RuntimeIntegrationTests."
+        "test_reconciliation_lease_29_seconds_succeeds_and_31_seconds_fails_closed",
+        "tests.p7.test_runtime_integration.P7RuntimeIntegrationTests."
+        "test_expired_reconciliation_takeover_fences_old_owner_and_recovers",
+        "tests.p7.test_runtime_integration.P7RuntimeIntegrationTests."
+        "test_authority_change_during_reconciliation_cannot_create_retry",
         "tests.runtime.test_outbox_binding",
     )
     return {
@@ -42,8 +54,12 @@ def check_channel_adapter(root: Path) -> dict[str, object]:
         "reconciliation": ["confirmed_absent", "confirmed_applied", "still_unknown"],
         "post_submit_timeout": "ambiguous",
         "submitted_429_or_5xx": "ambiguous",
+        "submitted_redirect_408_or_generic_4xx": "ambiguous",
         "unproven_retryable_wire_result": "ambiguous",
         "restart_binding_source": "durable_exact_effect",
+        "restart_recovery_driver": "headless_worker",
+        "reconciliation_backoff": "durable_exponential_bounded",
+        "reconciliation_lease_finalization": "atomic",
         "blind_resend": False,
         "idempotency_rebinding_refused": True,
         "raw_provider_body_persisted": False,

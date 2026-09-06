@@ -34,7 +34,153 @@ from scripts.check_p4_compose_runtime import (  # noqa: E402
 from scripts.check_p6_compose_runtime import check_compose_runtime as check_p6_runtime  # noqa: E402
 
 RUNTIME_SERVICES = ("p7-stub", "p7-api", "p7-worker", "p7-studio")
-SERVICES = (*RUNTIME_SERVICES, "p7-ingress")
+SERVICES = (*RUNTIME_SERVICES, "p7-egress-guard", "p7-ingress")
+
+
+def _default_route_count(route_table: str) -> int:
+    routes = 0
+    for line in route_table.splitlines()[1:]:
+        fields = line.split()
+        if len(fields) >= 8 and fields[1] == "00000000" and fields[7] == "00000000":
+            routes += 1
+    return routes
+
+
+def _service_route_report(
+    docker: str,
+    project: str,
+    files: list[str],
+    *,
+    root: Path,
+    environment: dict[str, str],
+) -> dict[str, dict[str, object]]:
+    report: dict[str, dict[str, object]] = {}
+    for service in SERVICES:
+        route = _compose(
+            docker,
+            project,
+            [*files, "exec", "-T", service, "cat", "/proc/net/route"],
+            root=root,
+            environment=environment,
+        ).stdout
+        default_routes = _default_route_count(route)
+        if default_routes:
+            raise ComposeRuntimeError(f"{service} has an external default route")
+        container_id = _ids(
+            docker,
+            project,
+            files,
+            root=root,
+            environment=environment,
+            services=(service,),
+        )[0]
+        inspection = _run(
+            [
+                docker,
+                "inspect",
+                "--format",
+                "{{json .NetworkSettings.Networks}}",
+                container_id,
+            ],
+            root=root,
+            environment=environment,
+        ).stdout
+        try:
+            attachments = json.loads(inspection)
+        except json.JSONDecodeError:
+            raise ComposeRuntimeError("P7 container network inspection was invalid") from None
+        if not isinstance(attachments, dict):
+            raise ComposeRuntimeError("P7 container network attachments were invalid")
+        non_internal: list[str] = []
+        attachment_labels: list[str] = []
+        for network_name in attachments:
+            network_label = next(
+                (
+                    label
+                    for label in ("p7-isolated", "p7-published")
+                    if str(network_name).endswith("_" + label)
+                ),
+                None,
+            )
+            if network_label is None:
+                raise ComposeRuntimeError("P7 container has an unexpected network attachment")
+            attachment_labels.append(network_label)
+            internal = _run(
+                [
+                    docker,
+                    "network",
+                    "inspect",
+                    "--format",
+                    "{{json .Internal}}",
+                    str(network_name),
+                ],
+                root=root,
+                environment=environment,
+            ).stdout.strip()
+            if internal != "true":
+                non_internal.append(network_label)
+        if non_internal and service != "p7-egress-guard":
+            raise ComposeRuntimeError(f"{service} attached to a non-internal network")
+        report[service] = {
+            "default_routes": default_routes,
+            "network_attachments": sorted(attachment_labels),
+            "non_internal_attachments": sorted(non_internal),
+            "route_status": "no_external_default_route",
+        }
+    if not report["p7-stub"]["network_attachments"]:
+        raise ComposeRuntimeError("P7 isolated runtime network attachment was not observable")
+    guard_external = report["p7-egress-guard"]["non_internal_attachments"]
+    if not isinstance(guard_external, list) or len(guard_external) != 1:
+        raise ComposeRuntimeError("P7 publisher route guard attachment is incomplete")
+    guard_status = _compose(
+        docker,
+        project,
+        [*files, "exec", "-T", "p7-egress-guard", "cat", "/proc/1/status"],
+        root=root,
+        environment=environment,
+    ).stdout
+    status_fields = {
+        line.split(":", 1)[0]: line.split(":", 1)[1].strip()
+        for line in guard_status.splitlines()
+        if ":" in line
+    }
+    uid_values = status_fields.get("Uid", "").split()
+    if (
+        len(uid_values) != 4
+        or uid_values[1] != "10001"
+        or status_fields.get("CapEff") != "0000000000000000"
+    ):
+        raise ComposeRuntimeError("P7 publisher guard retained privilege after route removal")
+    report["p7-egress-guard"]["runtime_uid"] = 10001
+    report["p7-egress-guard"]["effective_capabilities"] = 0
+    return report
+
+
+def _one_shot_route_count(
+    docker: str,
+    project: str,
+    files: list[str],
+    *,
+    root: Path,
+    environment: dict[str, str],
+    service: str,
+) -> int:
+    probe = (
+        "from pathlib import Path; lines=Path('/proc/net/route').read_text().splitlines()[1:]; "
+        "print(sum(len(f)>=8 and f[1]=='00000000' and f[7]=='00000000' "
+        "for f in (line.split() for line in lines)))"
+    )
+    completed = _compose(
+        docker,
+        project,
+        [*files, "run", "--rm", "--no-deps", "-T", service, "python", "-c", probe],
+        root=root,
+        environment=environment,
+    )
+    try:
+        return int(completed.stdout.strip())
+    except ValueError:
+        raise ComposeRuntimeError("P7 one-shot route inspection was invalid") from None
 
 
 def _ids(
@@ -204,6 +350,35 @@ def check_compose_runtime(root: Path) -> dict[str, object]:
                 environment=environment,
                 services=SERVICES,
             )
+            service_routes = _service_route_report(
+                docker,
+                project,
+                files,
+                root=root,
+                environment=environment,
+            )
+            operator_default_routes = _one_shot_route_count(
+                docker,
+                project,
+                files,
+                root=root,
+                environment=environment,
+                service="p7-operator",
+            )
+            if operator_default_routes:
+                raise ComposeRuntimeError("p7-operator has an external default route")
+            service_routes["p7-operator"] = {
+                "default_routes": operator_default_routes,
+                "network_attachments": ["shared:p7-stub"],
+                "non_internal_attachments": [],
+                "route_status": "no_external_default_route",
+            }
+            service_routes["p7-adapter-gate"] = {
+                "default_routes": gate_result.get("default_routes"),
+                "network_attachments": [],
+                "non_internal_attachments": [],
+                "route_status": "network_mode_none",
+            }
             _compose(
                 docker,
                 project,
@@ -335,13 +510,6 @@ def check_compose_runtime(root: Path) -> dict[str, object]:
             if _state_counts(state) != (1, 1, 1):
                 raise ComposeRuntimeError("ambiguous dispatch created an unexpected retry")
 
-            _compose(
-                docker,
-                project,
-                [*files, "up", "--detach", "p7-worker"],
-                root=root,
-                environment=environment,
-            )
             before_recreate = _ids(
                 docker,
                 project,
@@ -350,6 +518,14 @@ def check_compose_runtime(root: Path) -> dict[str, object]:
                 environment=environment,
                 services=("p7-api", "p7-worker"),
             )
+            _compose(
+                docker,
+                project,
+                [*files, "stop", "p7-api", "p7-worker"],
+                root=root,
+                environment=environment,
+            )
+            _enqueue(plain, control, "still_unknown")
             _compose(
                 docker,
                 project,
@@ -368,38 +544,21 @@ def check_compose_runtime(root: Path) -> dict[str, object]:
             )
             if set(before_recreate) & set(after_recreate):
                 raise ComposeRuntimeError("P7 API/worker checkpoint did not recreate containers")
-            recovered = _request(opener, api + "/auth/session")
-            csrf = cast(str, recovered["csrf_token"])
-            headers = {"Origin": origin, "X-CSRF-Token": csrf}
-
-            _enqueue(plain, control, "still_unknown")
-            unknown = _request(
-                opener,
-                api + "/runtime/process",
-                method="POST",
-                headers=headers,
-                payload={"idempotency_key": "p7-compose-reconcile-unknown"},
+            unknown_stub = _wait_json(
+                plain,
+                control + "/state",
+                predicate=lambda value: value.get("counts", {}).get("channel_reconciliation") == 1,
             )
-            if (
-                unknown.get("reconciled") is not True
-                or unknown.get("reconciliation_outcome") != "ambiguous"
-                or unknown.get("dispatched") is not False
-            ):
+            unknown_requests = unknown_stub.get("requests")
+            if not isinstance(unknown_requests, list) or len(unknown_requests) != 3:
                 raise ComposeRuntimeError(
-                    "restart reconciliation did not remain explicitly unknown"
+                    "restarted worker did not perform exactly one unknown reconciliation"
                 )
             state = _request(opener, api + "/studio/state")
             if _state_counts(state) != (1, 1, 1):
                 raise ComposeRuntimeError("still-unknown reconciliation resent the effect")
 
             _enqueue(plain, control, "confirmed_absent", "succeeded")
-            _request(
-                opener,
-                api + "/runtime/process",
-                method="POST",
-                headers=headers,
-                payload={"idempotency_key": "p7-compose-reconcile-absent"},
-            )
             final_state = _wait_json(
                 opener,
                 api + "/studio/state",
@@ -443,29 +602,16 @@ def check_compose_runtime(root: Path) -> dict[str, object]:
                     "restart reconciliation lost the durable exact-effect binding"
                 )
 
-            egress = _compose(
+            final_service_routes = _service_route_report(
                 docker,
                 project,
-                [
-                    *files,
-                    "exec",
-                    "-T",
-                    "p7-api",
-                    "python",
-                    "-c",
-                    (
-                        "import socket,sys; s=socket.socket(); s.settimeout(0.5); "
-                        "r=s.connect_ex(('198.51.100.1',80)); s.close(); sys.exit(r == 0)"
-                    ),
-                ],
+                files,
                 root=root,
                 environment=environment,
-                check=False,
             )
-            if egress.returncode != 0:
-                raise ComposeRuntimeError(
-                    "isolated P7 topology unexpectedly reached external egress"
-                )
+            for service, route_result in final_service_routes.items():
+                if route_result != service_routes[service]:
+                    raise ComposeRuntimeError(f"{service} route changed during worker recovery")
             logs = _compose(
                 docker,
                 project,
@@ -539,9 +685,12 @@ def check_compose_runtime(root: Path) -> dict[str, object]:
                 "fresh_service_recreate_count": len(after_recreate),
                 "provider_request_sequence": expected_sequence,
                 "restart_reconciliation": "still_unknown_then_confirmed_absent",
+                "recovery_driver": "recreated_headless_worker",
+                "runtime_process_calls_after_restart": 0,
                 "bounded_effect_attempts": attempts,
                 "credentials_absent_from_service_logs": True,
                 "unexpected_external_egress": 0,
+                "service_routes": service_routes,
                 "normal_stop": True,
                 "auxiliary_container_gate": gate_result.get("gate"),
                 "evidence_class": "synthetic_offline",

@@ -12,6 +12,8 @@ from unittest.mock import patch
 
 from scripts import check_p7_repository as repository_gate
 from scripts import collect_p7_evidence as evidence_gate
+from scripts.check_p7_compose import ComposeError, _assert_isolated_topology, _service_block
+from scripts.check_p7_compose_runtime import _default_route_count
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -124,6 +126,37 @@ class P7RepositoryGateTests(unittest.TestCase):
         self.assertTrue(current["trusted_p7_ancestor"])
         self.assertEqual(current["merge_base"], repository_gate.BASE_COMMIT)
 
+    def test_compose_topology_fails_closed_on_external_ingress_network_or_host_bind(self) -> None:
+        document = (ROOT / "compose.p7.yaml").read_text(encoding="utf-8")
+        _assert_isolated_topology(document)
+        ingress = _service_block(document, "p7-ingress")
+        changed_ingress = ingress.replace(
+            "    network_mode: service:p7-egress-guard\n",
+            "    networks:\n      - p7-isolated\n      - p7-published\n",
+            1,
+        )
+        external_ingress = document.replace(ingress, changed_ingress, 1).replace(
+            "  p7-isolated:\n    internal: true\n",
+            "  p7-isolated:\n    internal: true\n  p7-published:\n",
+            1,
+        )
+        with self.assertRaises(ComposeError):
+            _assert_isolated_topology(external_ingress)
+        external_bind = document.replace(
+            '"127.0.0.1:${DC_P7_API_PORT:',
+            '"0.0.0.0:${DC_P7_API_PORT:',
+            1,
+        )
+        with self.assertRaises(ComposeError):
+            _assert_isolated_topology(external_bind)
+
+    def test_runtime_route_parser_fails_closed_on_any_default_route(self) -> None:
+        header = "Iface Destination Gateway Flags RefCnt Use Metric Mask MTU Window IRTT\n"
+        isolated = header + "eth0 000011AC 00000000 0001 0 0 0 0000FFFF 0 0 0\n"
+        external = isolated + "eth0 00000000 010011AC 0003 0 0 0 00000000 0 0 0\n"
+        self.assertEqual(_default_route_count(isolated), 0)
+        self.assertEqual(_default_route_count(external), 1)
+
     def test_evidence_writer_requires_exact_branch_gates_claims_and_zero_cleanup(self) -> None:
         with tempfile.TemporaryDirectory(prefix="p7-evidence-gate-") as name:
             root = Path(name)
@@ -170,6 +203,8 @@ class P7RepositoryGateTests(unittest.TestCase):
                     "compose_runtime": {
                         "status": "passed",
                         "unexpected_external_egress": 0,
+                        "recovery_driver": "recreated_headless_worker",
+                        "runtime_process_calls_after_restart": 0,
                         "live_provider_evidence": "not_evaluated",
                         "human_acceptance_evidence": "not_evaluated",
                         "fresh_service_recreate_count": 2,
@@ -179,6 +214,19 @@ class P7RepositoryGateTests(unittest.TestCase):
                             "p7-worker",
                             "p7-studio",
                         ],
+                        "service_routes": {
+                            service: {"default_routes": 0}
+                            for service in (
+                                "p7-adapter-gate",
+                                "p7-api",
+                                "p7-egress-guard",
+                                "p7-ingress",
+                                "p7-operator",
+                                "p7-stub",
+                                "p7-studio",
+                                "p7-worker",
+                            )
+                        },
                         "cleanup": cleanup,
                     },
                     "abuse": {

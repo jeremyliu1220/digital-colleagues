@@ -144,6 +144,27 @@ services:
         condition: service_started
       p7-stub:
         condition: service_healthy
+      p7-egress-guard:
+        condition: service_healthy
+    network_mode: service:p7-egress-guard
+    read_only: true
+    tmpfs:
+      - /tmp
+    restart: "no"
+
+  p7-egress-guard:
+    profiles:
+      - optional-adapters
+    build:
+      context: .
+      dockerfile: Dockerfile.p7
+    command:
+      - python
+      - -B
+      - scripts/p7_compose_network_guard.py
+    depends_on:
+      p7-stub:
+        condition: service_healthy
     networks:
       - p7-isolated
       - p7-published
@@ -151,9 +172,27 @@ services:
       - "127.0.0.1:${DC_P7_API_PORT:?set a temporary API port}:18000"
       - "127.0.0.1:${DC_P7_STUDIO_PORT:?set a temporary Studio port}:18080"
       - "127.0.0.1:${DC_P7_STUB_PORT:?set a temporary stub control port}:18091"
+    user: "0:0"
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_ADMIN
+      - SETGID
+      - SETUID
+    security_opt:
+      - no-new-privileges:true
     read_only: true
     tmpfs:
       - /tmp
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import pathlib,sys; lines=pathlib.Path('/proc/net/route').read_text().splitlines()[1:]; sys.exit(any(len(f)>=8 and f[1]=='00000000' and f[7]=='00000000' for f in (line.split() for line in lines)))
+      interval: 1s
+      timeout: 3s
+      retries: 30
     restart: "no"
 
   p7-operator:

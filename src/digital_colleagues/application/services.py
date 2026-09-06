@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from digital_colleagues.application.contracts import (
     ApprovalRequest,
@@ -471,6 +471,7 @@ class DispatchService:
         owner_id: str,
         mandate_id: str,
         lease_duration: timedelta = timedelta(seconds=30),
+        reconciliation_backoff: timedelta = timedelta(0),
         checkpoint: CheckpointPort | None = None,
         policy_authorizer: DispatchAuthorizationPort | None = None,
     ) -> None:
@@ -484,6 +485,9 @@ class DispatchService:
         self._owner_id = owner_id
         self._mandate_id = mandate_id
         self._lease_duration = lease_duration
+        if reconciliation_backoff < timedelta(0) or reconciliation_backoff > timedelta(seconds=30):
+            raise ValidationError("reconciliation backoff must be between zero and 30 seconds")
+        self._reconciliation_backoff = reconciliation_backoff
         self._checkpoint = checkpoint or _NoopCheckpoint()
         self._policy_authorizer = policy_authorizer
 
@@ -513,6 +517,11 @@ class DispatchService:
         if bundle.attempt.attempt_number > bundle.maximum_attempts:
             raise PermissionDeniedError("effect attempt limit was exceeded")
         return bundle
+
+    @staticmethod
+    def _require_live_claim(claim: OutboxClaim, evaluated_at: datetime) -> None:
+        if claim.lease_until < evaluated_at:
+            raise ConflictError("outbox claim lease expired during provider I/O")
 
     def dispatch_once(self, namespace: Namespace) -> DispatchResult:
         now = self._clock.now()
@@ -578,11 +587,15 @@ class DispatchService:
         )
         if claim is None:
             return DispatchResult(False, None, None)
+        self._require_live_claim(claim, self._clock.now())
         bundle = self._validate_exact_effect(namespace, claim)
+        self._require_live_claim(claim, self._clock.now())
         outcome = self._channel.reconcile(
             bundle.effect_idempotency_key,
             bundle.proposal.proposal_digest,
         )
+        returned_at = self._clock.now()
+        self._require_live_claim(claim, returned_at)
         next_attempt_id = None
         if outcome.kind is ReconciliationKind.CONFIRMED_ABSENT:
             # Provider reconciliation is I/O. Re-read every durable authority and
@@ -592,14 +605,17 @@ class DispatchService:
                 next_attempt_id = self._identifiers.derive(
                     "attempt", claim.proposal_id, str(claim.attempt_number + 1)
                 )
+        finalized_at = self._clock.now()
+        self._require_live_claim(claim, finalized_at)
         result_id = self._identifiers.derive("result", claim.effect_attempt_id, outcome.kind.value)
         result = self._store.reconcile_ambiguous(
             claim,
             outcome=outcome,
             action_result_id=result_id,
             result_actor=self._result_actor,
-            occurred_at=self._clock.now(),
+            occurred_at=finalized_at,
             next_attempt_id=next_attempt_id,
+            next_reconciliation_at=finalized_at + self._reconciliation_backoff,
         )
         mapped = (
             ChannelOutcomeKind.SUCCEEDED

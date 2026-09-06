@@ -532,7 +532,8 @@ class SQLiteP4Store(SQLiteRuntimeStore):
                 return principal
         raise NotFoundError("required durable principal kind was not found")
 
-    def pending_namespaces(self) -> tuple[Namespace, ...]:
+    def pending_namespaces(self, evaluated_at: datetime | None = None) -> tuple[Namespace, ...]:
+        now = datetime_to_z(evaluated_at or self._clock.now())
         rows = self._connection.execute(
             """
             SELECT tenant_id, namespace_scope, namespace_scope_id FROM triggers
@@ -542,9 +543,16 @@ class SQLiteP4Store(SQLiteRuntimeStore):
             WHERE state = 'pending'
             UNION
             SELECT tenant_id, namespace_scope, namespace_scope_id FROM outbox
-            WHERE state IN ('pending', 'retry')
+            WHERE state IN ('pending', 'retry') AND next_attempt_at <= ?
+            UNION
+            SELECT tenant_id, namespace_scope, namespace_scope_id FROM outbox
+            WHERE state IN ('ambiguous', 'ambiguous_claimed')
+              AND next_attempt_at <= ?
+              AND (lease_until IS NULL OR lease_until < ?)
+              AND (last_outcome IS NULL OR last_outcome NOT LIKE 'still_unknown_stopped:%')
             ORDER BY tenant_id, namespace_scope, namespace_scope_id
-            """
+            """,
+            (now, now, now),
         ).fetchall()
         return tuple(
             Namespace(

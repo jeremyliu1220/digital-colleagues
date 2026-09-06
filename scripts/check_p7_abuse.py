@@ -32,6 +32,9 @@ ABUSE_CASES = (
     "fabricated_reconciliation_absence",
     "stale_mandate_policy_rbac_dispatch",
     "attempt_lease_and_fencing_evasion",
+    "ambiguous_only_namespace_starvation",
+    "reconciliation_busy_loop",
+    "reconciliation_lease_expiry",
     "unexpected_external_egress",
 )
 
@@ -56,6 +59,20 @@ def check_abuse(root: Path) -> dict[str, object]:
         "test_provider_failure_commits_bounded_safe_causal_stop_across_restart",
         "tests.p7.test_runtime_integration.P7RuntimeIntegrationTests."
         "test_one_model_failure_does_not_stop_other_bounded_work",
+        "tests.p7.test_runtime_integration.P7RuntimeIntegrationTests."
+        "test_all_uncertain_post_submit_failures_remain_ambiguous_without_retry",
+        "tests.p7.test_runtime_integration.P7RuntimeIntegrationTests."
+        "test_headless_worker_recovers_ambiguous_only_namespace_across_restart",
+        "tests.p7.test_runtime_integration.P7RuntimeIntegrationTests."
+        "test_still_unknown_reconciliation_uses_durable_backoff_and_stops_at_budget",
+        "tests.p7.test_runtime_integration.P7RuntimeIntegrationTests."
+        "test_reconciliation_lease_29_seconds_succeeds_and_31_seconds_fails_closed",
+        "tests.p7.test_runtime_integration.P7RuntimeIntegrationTests."
+        "test_expired_reconciliation_takeover_fences_old_owner_and_recovers",
+        "tests.p7.test_runtime_integration.P7RuntimeIntegrationTests."
+        "test_authority_change_during_reconciliation_cannot_create_retry",
+        "tests.p7.test_runtime_integration.P7RuntimeIntegrationTests."
+        "test_stale_reconciliation_claim_does_not_stop_other_worker_namespace",
         "tests.p6.test_effect_audit.P6EffectAuditTests."
         "test_effect_dispatch_revalidates_current_membership_and_expiry",
         "tests.runtime.test_outbox_binding",

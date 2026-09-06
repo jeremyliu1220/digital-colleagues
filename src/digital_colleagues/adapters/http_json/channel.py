@@ -111,11 +111,7 @@ def _projection(kind: str, classification: str) -> FrozenJsonObject:
 
 
 def _failure_outcome(failure: AdapterFailure) -> ChannelOutcome:
-    if failure.after_submit and failure.category not in {
-        AdapterFailureCategory.UNAUTHORIZED,
-        AdapterFailureCategory.REDIRECT_REFUSED,
-        AdapterFailureCategory.HTTP_FAILURE,
-    }:
+    if failure.after_submit and failure.category is not AdapterFailureCategory.UNAUTHORIZED:
         kind = ChannelOutcomeKind.AMBIGUOUS
     elif failure.category in {
         AdapterFailureCategory.CONNECT_FAILURE,

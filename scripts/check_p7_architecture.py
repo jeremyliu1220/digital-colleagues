@@ -43,6 +43,7 @@ STABLE_CONTRACTS = {
 }
 CORRECTIVE_APPLICATION_FILES = {
     "src/digital_colleagues/application/errors.py",
+    "src/digital_colleagues/application/p4_ports.py",
     "src/digital_colleagues/application/p4_services.py",
     "src/digital_colleagues/application/ports.py",
     "src/digital_colleagues/application/services.py",

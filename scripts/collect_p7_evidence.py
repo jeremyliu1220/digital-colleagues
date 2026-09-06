@@ -176,9 +176,31 @@ def write_p7_evidence(
     runtime = results.get("compose_runtime", {})
     cleanup = runtime.get("cleanup") if isinstance(runtime, dict) else None
     optional_topology = runtime.get("optional_topology") if isinstance(runtime, dict) else None
+    service_routes = runtime.get("service_routes") if isinstance(runtime, dict) else None
+    required_route_services = {
+        "p7-adapter-gate",
+        "p7-api",
+        "p7-egress-guard",
+        "p7-ingress",
+        "p7-operator",
+        "p7-stub",
+        "p7-studio",
+        "p7-worker",
+    }
+    routes_clean = (
+        isinstance(service_routes, dict)
+        and set(service_routes) == required_route_services
+        and all(
+            isinstance(value, dict) and value.get("default_routes") == 0
+            for value in service_routes.values()
+        )
+    )
     if (
         runtime.get("status") != "passed"
         or runtime.get("unexpected_external_egress") != 0
+        or runtime.get("recovery_driver") != "recreated_headless_worker"
+        or runtime.get("runtime_process_calls_after_restart") != 0
+        or not routes_clean
         or runtime.get("live_provider_evidence") != "not_evaluated"
         or runtime.get("human_acceptance_evidence") != "not_evaluated"
         or runtime.get("fresh_service_recreate_count") != 2

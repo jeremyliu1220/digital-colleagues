@@ -220,6 +220,7 @@ class OutboxPort(Protocol):
         result_actor: Principal,
         occurred_at: datetime,
         next_attempt_id: str | None,
+        next_reconciliation_at: datetime | None = None,
     ) -> ActionResult | None: ...
 
 

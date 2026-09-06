@@ -9,6 +9,7 @@ import time
 from collections.abc import Mapping
 from pathlib import Path
 
+from digital_colleagues.application.errors import ConflictError, PermissionDeniedError
 from digital_colleagues.local.runtime import build_local_runtime
 
 
@@ -16,12 +17,17 @@ def run_once(state_directory: Path, *, adapter_environment: Mapping[str, str] | 
     runtime = build_local_runtime(state_directory, adapter_environment=adapter_environment)
     try:
         processed = 0
-        for namespace in runtime.store.pending_namespaces():
+        for namespace in runtime.store.pending_namespaces(runtime.clock.now()):
             if namespace.scope_id is None:
                 continue
-            context = runtime.controller.service_context(namespace)
-            runtime.controller.process_once(context)
-            processed += 1
+            try:
+                context = runtime.controller.service_context(namespace)
+                runtime.controller.process_once(context)
+                processed += 1
+            except (ConflictError, PermissionDeniedError):
+                # A stale lease/fence or changed authority fails this namespace
+                # closed without terminating the long-running worker.
+                continue
         return processed
     finally:
         runtime.close()

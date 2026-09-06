@@ -11,7 +11,7 @@ import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import replace
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import TypeVar, cast
 
@@ -70,6 +70,9 @@ from digital_colleagues.governance.approvals import (
 )
 
 RecordT = TypeVar("RecordT")
+
+_RECONCILIATION_MAX_BACKOFF = timedelta(seconds=30)
+_RECONCILIATION_MAX_CALLS = 8
 
 _RECORD_IDENTITIES: dict[type[object], tuple[str, str, bool]] = {
     Principal: ("principal", "principal_id", False),
@@ -138,6 +141,7 @@ class SQLiteRuntimeStore:
         if type(busy_timeout_ms) is not int or busy_timeout_ms < 1:
             raise ValueError("busy timeout must be a positive integer")
         self._database_path = database_path
+        self._clock = clock
         self._closed = False
         self._lock = threading.RLock()
         connection: sqlite3.Connection | None = None
@@ -1528,8 +1532,14 @@ class SQLiteRuntimeStore:
         lease_until: datetime,
         source_states: tuple[str, ...],
         target_state: str,
+        exclude_stopped_reconciliation: bool = False,
     ) -> OutboxClaim | None:
         placeholders = ",".join("?" for _ in source_states)
+        reconciliation_filter = (
+            "AND (last_outcome IS NULL OR last_outcome NOT LIKE 'still_unknown_stopped:%')"
+            if exclude_stopped_reconciliation
+            else ""
+        )
         with self._transaction() as connection:
             row = connection.execute(
                 f"""
@@ -1539,6 +1549,7 @@ class SQLiteRuntimeStore:
                   AND next_attempt_at <= ?
                   AND (lease_until IS NULL OR lease_until < ?)
                   AND attempt_number <= maximum_attempts
+                  {reconciliation_filter}
                 ORDER BY next_attempt_at, outbox_id
                 LIMIT 1
                 """,
@@ -1618,6 +1629,7 @@ class SQLiteRuntimeStore:
             lease_until=lease_until,
             source_states=("ambiguous", "ambiguous_claimed"),
             target_state="ambiguous_claimed",
+            exclude_stopped_reconciliation=True,
         )
 
     def _require_outbox_claim(
@@ -1626,6 +1638,7 @@ class SQLiteRuntimeStore:
         claim: OutboxClaim,
         *,
         states: tuple[str, ...],
+        evaluated_at: datetime | None = None,
     ) -> sqlite3.Row:
         row = connection.execute(
             """
@@ -1639,6 +1652,7 @@ class SQLiteRuntimeStore:
             row is None
             or row["state"] not in states
             or row["lease_owner"] != claim.lease_owner
+            or row["lease_until"] != datetime_to_z(claim.lease_until)
             or row["fencing_token"] != claim.fencing_token
             or row["proposal_id"] != claim.proposal_id
             or row["approval_decision_id"] != claim.approval_decision_id
@@ -1647,6 +1661,8 @@ class SQLiteRuntimeStore:
             or row["attempt_number"] != claim.attempt_number
         ):
             raise ConflictError("stale or drifted outbox claim binding")
+        if evaluated_at is not None and claim.lease_until < evaluated_at:
+            raise ConflictError("outbox claim lease expired before finalization")
         return cast(sqlite3.Row, row)
 
     def load_dispatch_bundle(self, claim: OutboxClaim, *, mandate_id: str) -> DispatchBundle:
@@ -1985,6 +2001,22 @@ class SQLiteRuntimeStore:
             )
             return 1
 
+    @staticmethod
+    def _reconciliation_count(last_outcome: object) -> int:
+        if not isinstance(last_outcome, str):
+            return 0
+        prefix, separator, raw_count = last_outcome.rpartition(":")
+        if separator != ":" or prefix not in {
+            "still_unknown_wait",
+            "still_unknown_stopped",
+        }:
+            return 0
+        try:
+            count = int(raw_count)
+        except ValueError:
+            return 0
+        return count if count > 0 else 0
+
     def reconcile_ambiguous(
         self,
         claim: OutboxClaim,
@@ -1994,9 +2026,15 @@ class SQLiteRuntimeStore:
         result_actor: Principal,
         occurred_at: datetime,
         next_attempt_id: str | None,
+        next_reconciliation_at: datetime | None = None,
     ) -> ActionResult | None:
         with self._transaction() as connection:
-            row = self._require_outbox_claim(connection, claim, states=("ambiguous_claimed",))
+            row = self._require_outbox_claim(
+                connection,
+                claim,
+                states=("ambiguous_claimed",),
+                evaluated_at=occurred_at,
+            )
             attempt = self._get_record(
                 connection,
                 claim.namespace,
@@ -2007,16 +2045,42 @@ class SQLiteRuntimeStore:
             if attempt.state is not EffectAttemptState.AMBIGUOUS:
                 raise ConflictError("reconciliation requires an ambiguous attempt")
             if outcome.kind is ReconciliationKind.STILL_UNKNOWN:
+                previous_count = self._reconciliation_count(row["last_outcome"])
+                reconciliation_count = previous_count + 1
+                reconciliation_budget = min(
+                    row["maximum_attempts"],
+                    _RECONCILIATION_MAX_CALLS,
+                )
+                stopped = reconciliation_count >= reconciliation_budget
+                base_delay = (
+                    timedelta(0)
+                    if next_reconciliation_at is None
+                    else next_reconciliation_at - occurred_at
+                )
+                if base_delay < timedelta(0) or base_delay > _RECONCILIATION_MAX_BACKOFF:
+                    raise ConflictError("reconciliation backoff is outside its durable bound")
+                delay_seconds = min(
+                    base_delay.total_seconds() * (2 ** (reconciliation_count - 1)),
+                    _RECONCILIATION_MAX_BACKOFF.total_seconds(),
+                )
+                next_reconciliation_at = occurred_at + timedelta(seconds=delay_seconds)
+                last_outcome = (
+                    f"still_unknown_stopped:{reconciliation_count}"
+                    if stopped
+                    else f"still_unknown_wait:{reconciliation_count}"
+                )
                 connection.execute(
                     """
                     UPDATE outbox
                     SET state = 'ambiguous', lease_owner = NULL, lease_until = NULL,
-                        last_outcome = ?, updated_at = ?, revision = revision + 1
+                        next_attempt_at = ?, last_outcome = ?, updated_at = ?,
+                        revision = revision + 1
                     WHERE tenant_id = ? AND namespace_scope = ? AND namespace_scope_id = ?
                       AND outbox_id = ? AND lease_owner = ? AND fencing_token = ?
                     """,
                     (
-                        outcome.kind.value,
+                        datetime_to_z(next_reconciliation_at),
+                        last_outcome,
                         datetime_to_z(occurred_at),
                         *_ns(claim.namespace),
                         claim.outbox_id,

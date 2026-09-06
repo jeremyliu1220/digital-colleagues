@@ -871,6 +871,7 @@ class P4RuntimeController:
             result_actor=context.service_principal,
             owner_id="worker:p4-dispatch",
             mandate_id=context.mandate_id,
+            reconciliation_backoff=timedelta(seconds=2),
             policy_authorizer=self._dispatch_authorizer,
         )
         reconciled = dispatcher.reconcile_once(namespace)

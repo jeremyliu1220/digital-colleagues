@@ -9,7 +9,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 COPY requirements/p4.lock /app/requirements/p4.lock
-RUN python -m pip install --no-cache-dir -r /app/requirements/p4.lock
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends iproute2 \
+    && rm -rf /var/lib/apt/lists/* \
+    && python -m pip install --no-cache-dir -r /app/requirements/p4.lock
 
 COPY migrations /app/migrations
 COPY src /app/src
