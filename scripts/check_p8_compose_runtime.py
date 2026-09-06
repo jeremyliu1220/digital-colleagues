@@ -596,7 +596,13 @@ def check_compose_runtime(root: Path) -> dict[str, object]:
                 raise ComposeRuntimeError("restored Studio durable state drifted")
             if after_p5 != before_p5:
                 raise ComposeRuntimeError("restored P5 durable state drifted")
-            if after_governance != before_governance:
+            before_governance_durable = {
+                key: value for key, value in before_governance.items() if key != "generated_at"
+            }
+            after_governance_durable = {
+                key: value for key, value in after_governance.items() if key != "generated_at"
+            }
+            if after_governance_durable != before_governance_durable:
                 raise ComposeRuntimeError("restored governance durable state drifted")
             if after_audit != before_audit:
                 raise ComposeRuntimeError("restored causal audit state drifted")
