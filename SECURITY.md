@@ -4,9 +4,11 @@
 
 ## Supported status
 
-Digital Colleagues is pre-release research software. P1 is a repository scaffold with no
-runtime. No version is production-supported, and no security, compliance, availability,
-or enterprise-isolation claim is made.
+Digital Colleagues is pre-release research software. P7 is the independently accepted
+local reference baseline; P8 release and operational readiness is under development from
+`df47f8d075f7c0660ab5ed6035f8acfa3d3da4dc`. No version is production-supported or
+formally released, and no production security/privacy, compliance, availability,
+enterprise-IAM, encryption-at-rest, or tenancy-isolation claim is made.
 
 ## Reporting a vulnerability
 
@@ -26,4 +28,6 @@ best-effort goal until a later release defines supported versions and service le
 
 The current threat model is in `docs/security/threat-model.md`. Loopback binding, local
 tokens, deterministic adapters, or a clean boundary scan are not substitutes for security
-review. Live receipts and personal acceptance data remain outside the public repository.
+review. Local state, backups, rollback backups, and diagnostic bundles are unencrypted
+operator-private data and must remain outside the public repository. Live receipts and
+personal acceptance data remain outside the public repository.

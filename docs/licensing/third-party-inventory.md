@@ -1,72 +1,100 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 
-# Third-Party Dependency and Notice Inventory
+# Third-Party Dependency and Release Inventory
 
-## P3 distribution boundary
+## P8 release-candidate boundary
 
-P3 copies or vendors no third-party source, binary, container image, font, icon, or media
-asset. Package managers install the exact P3 lock only into OS temporary directories. The
-generated Studio bundle and API-test environments are verification output, are deleted,
-and are not published. P3 adds FastAPI and Pydantic as direct runtime dependencies and
-HTTPX as an in-process test dependency. It changes neither the Studio lockfile nor its
-reviewed dependency set.
+P8 reviews the actual unpublished `0.1.0` local reference candidate rather than only the
+P3 source tree. The six candidate files are a normalized public source archive, the
+project-authored Python wheel, a built Studio archive, deterministic machine-readable
+supply-chain inventory, release manifest, and checksums. P8 does not publish packages,
+images, archives, tags, or releases.
 
-This inventory records declared metadata review; it is not legal advice or a substitute
-for the release-level transitive and artifact review required by P8.
+The machine source of truth is `release/supply-chain-inputs.json` plus
+`requirements/p8.lock`, `studio/package-lock.json`, Dockerfiles, and CI. The generated
+`digital-colleagues-sbom-0.1.0.json` contains one deterministically sorted record per
+Python/npm dependency, build backend, OCI base, GitHub Action, and release/operator tool.
+Each applicable record carries version, immutable content/reference, declared license,
+artifact inclusion, and attribution treatment. `make p8-supply-chain` fails on drift,
+missing metadata, mutable critical references, or unresolved treatment.
 
-## Python direct packages
+This is a review of declared upstream metadata and distribution treatment, not legal
+advice, a source-code legal audit, a vulnerability assessment, or a conclusion about every
+package or base-image obligation in a future distribution.
 
-| Package | Version | Role | Declared license | P3 treatment |
-| --- | --- | --- | --- | --- |
-| Hatchling | 1.32.0 | PEP 517 build backend | MIT | Downloaded for builds; not vendored |
-| FastAPI | 0.141.1 | Typed HTTP mapping edge | MIT | Runtime package-manager dependency; not vendored |
-| Pydantic | 2.13.5 | HTTP request/response shape mapping | MIT | Runtime package-manager dependency; confined to API edge |
-| HTTPX | 0.28.1 | In-process FastAPI test client transport | BSD-3-Clause | Development dependency; no live-provider traffic |
-| Ruff | 0.16.4 | Development lint and format | MIT | Optional development dependency |
-| mypy | 2.3.1 | Development type checking | MIT | Optional development dependency |
+## Python graph and build backend
 
-`requirements/p3.lock` resolves 20 exact Python packages: MIT (13), BSD-3-Clause (4),
-MPL-2.0 (2), and PSF-2.0 (1). The MPL packages are Certifi and Pathspec; the PSF package is
-Typing Extensions. This is a metadata and source-tree boundary review, not a release bundle
-or transitive source-text legal conclusion. P3 vendors none of these packages.
+`requirements/p8.lock` contains 27 exact packages and permits only recorded wheel SHA-256
+values for the supported P8 gate environments. It covers direct runtime FastAPI and
+Pydantic, runtime Uvicorn, direct development HTTPX/mypy/Ruff, the Hatchling 1.32.0 build
+backend, and every resolved transitive. License metadata counts are:
 
-## Studio direct packages
+| Declared license | Packages |
+| --- | ---: |
+| MIT | 16 |
+| BSD-3-Clause | 6 |
+| MPL-2.0 | 2 |
+| Apache-2.0 | 1 |
+| Apache-2.0 OR BSD-2-Clause | 1 |
+| PSF-2.0 | 1 |
 
-| Package | Version | Role | Declared license | P1 treatment |
-| --- | --- | --- | --- | --- |
-| React | 19.2.8 | Static Studio shell | MIT | Package-manager dependency |
-| React DOM | 19.2.8 | Browser rendering | MIT | Package-manager dependency |
-| TypeScript | 6.0.3 | Type checking | Apache-2.0 | Development dependency |
-| Vite | 8.2.2 | Development and build tool | MIT | Development dependency |
-| Vite React plugin | 6.1.0 | Vite React transform | MIT | Development dependency |
-| Vitest | 4.1.11 | Studio tests | MIT | Development dependency |
-| ESLint | 10.9.1 | Studio lint | MIT | Development dependency |
-| ESLint JavaScript config | 10.0.1 | Base lint policy | MIT | Development dependency |
-| typescript-eslint | 8.68.0 | Typed lint policy | MIT | Development dependency |
-| React Hooks lint plugin | 7.1.1 | React lint policy | MIT | Development dependency |
-| React Refresh lint plugin | 0.5.5 | Vite lint policy | MIT | Development dependency |
-| globals | 17.11.0 | ESLint environment data | MIT | Development dependency |
-| Prettier | 3.9.6 | Studio formatting | MIT | Development dependency |
-| React type declarations | 19.2.18 | Type checking | MIT | Development dependency |
-| React DOM type declarations | 19.2.5 | Type checking | MIT | Development dependency |
+The Python wheel contains Digital Colleagues package code and its project licensing
+metadata; it does not vendor these package-manager dependencies. The source archive carries
+the lock/inventory metadata, not installed dependency code. Local operational images
+install the hash-checked graph, but P8 does not distribute or publish those images.
 
-`studio/package-lock.json` contains 202 resolved package entries beyond the root package.
-All carry declared license metadata: Apache-2.0 (16), BSD-2-Clause (6), BSD-3-Clause (2),
-BlueOak-1.0.0 (1), CC-BY-4.0 (1), ISC (11), MIT (153), and MPL-2.0 (12). This automated
-metadata census found no missing license field; it is not a source-text or release-bundle
-legal conclusion.
+## Studio graph and bundled output
 
-## CI actions and operator tools
+`studio/package-lock.json` lockfile version 3 contains 202 package entries beyond the root.
+Every entry has an exact version, npm SHA-512 integrity value, and declared license:
 
-The CI workflow pins Actions Checkout v6, Setup Python v6, and Setup Node v6 to immutable
-commit identifiers. Their repositories declare MIT licenses; the actions are fetched by
-the CI operator and are not vendored in this tree. Python, Node.js, npm, Git, and Make are
-external operator tools.
+| Declared license | Packages |
+| --- | ---: |
+| MIT | 153 |
+| Apache-2.0 | 16 |
+| MPL-2.0 | 12 |
+| ISC | 11 |
+| BSD-2-Clause | 6 |
+| BSD-3-Clause | 2 |
+| BlueOak-1.0.0 | 1 |
+| CC-BY-4.0 | 1 |
 
-## NOTICE decision
+Only React 19.2.8, React DOM 19.2.8, and Scheduler 0.27.0 are production graph entries
+bundled into the built Studio output; all three declare MIT. The release builder reads each
+installed package's `LICENSE` and adds the exact text to
+`THIRD_PARTY_LICENSES.txt` inside the Studio archive. Missing, special, or undecodable
+license files fail the release Gate. The other 199 entries are build/development inputs and
+are not copied as package trees into the candidate.
 
-The P3 direct-package review found no external attribution that must be copied into this
-project-authored source tree's NOTICE because dependency material is neither copied nor
-vendored. The decision and its distribution limit are recorded in
-`docs/licensing/notice-review.md`. Any copied material, generated distributable bundle,
-container, optional adapter, or release archive triggers a fresh review.
+## OCI bases, CI Actions, and release tools
+
+Operational Dockerfiles pin manifest-list digests for:
+
+| Base reference | Immutable manifest-list digest | Use |
+| --- | --- | --- |
+| `python:3.13-slim` | `sha256:9d2e5553305c7c7b0097999bb17187c69b921ccd6bc9d40e4bb5ebe652c00285` | API, worker, operator, gates |
+| `node:24-alpine` | `sha256:e67514e5d0f6c46656005e1b693b2ec9d52e80b641307de684d4a015ba7a4eaf` | Studio build stage |
+| `nginx:1.29-alpine` | `sha256:5616878291a2eed594aee8db4dade5878cf7edcb475e59193904b198d9b830de` | Studio runtime stage |
+
+These image references and their upstream-project license labels appear in the inventory;
+the labels are not a full census of every OS package in an image. P8 exercises the images
+locally and does not publish them. Raw image byte reproducibility is not claimed.
+
+CI uses Actions Checkout v6, Setup Python v6, and Setup Node v6 at exact 40-character
+commits, all declaring MIT. P8 does not vendor the Actions. The release inventory also
+records external Python, Node 24.15.0, integrity-pinned npm 11.12.1/Corepack, Git, Make,
+Docker, and Compose operator boundaries. Hatchling itself is Python hash-locked.
+
+## NOTICE and stop decision
+
+The root Apache-2.0 `LICENSE` is unchanged. The root `NOTICE` remains the project
+identification/collective copyright notice; it is not used as a substitute for dependency
+license texts. The only dependency bytes intentionally distributed in a P8 candidate are
+the built Studio production graph, whose installed license texts are placed inside that
+archive. Python dependencies, CI Actions, build-only npm packages, and OCI images are not
+published by P8.
+
+The P8 supply-chain Gate records zero unresolved declared-license and attribution-treatment
+entries for this exact candidate boundary. A later package repository, image push, hosted
+bundle, copied asset, font, named-provider adapter, or changed dependency/base must trigger
+a fresh review; this record cannot be promoted to a general legal conclusion.

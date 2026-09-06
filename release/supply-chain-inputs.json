@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "python": [
+    {"name": "annotated-doc", "version": "0.0.5", "license": "MIT", "role": "transitive_runtime"},
+    {"name": "annotated-types", "version": "0.8.0", "license": "MIT", "role": "transitive_runtime"},
+    {"name": "anyio", "version": "4.14.2", "license": "MIT", "role": "transitive_runtime"},
+    {"name": "ast_serialize", "version": "0.8.0", "license": "MIT", "role": "transitive_development"},
+    {"name": "certifi", "version": "2026.7.22", "license": "MPL-2.0", "role": "transitive_development"},
+    {"name": "click", "version": "8.3.1", "license": "BSD-3-Clause", "role": "transitive_runtime"},
+    {"name": "fastapi", "version": "0.141.1", "license": "MIT", "role": "direct_runtime"},
+    {"name": "h11", "version": "0.16.0", "license": "MIT", "role": "transitive_runtime"},
+    {"name": "hatchling", "version": "1.32.0", "license": "MIT", "role": "direct_build"},
+    {"name": "httpcore", "version": "1.0.9", "license": "BSD-3-Clause", "role": "transitive_development"},
+    {"name": "httpx", "version": "0.28.1", "license": "BSD-3-Clause", "role": "direct_development"},
+    {"name": "idna", "version": "3.19", "license": "BSD-3-Clause", "role": "transitive_development"},
+    {"name": "librt", "version": "0.15.0", "license": "MIT", "role": "transitive_development"},
+    {"name": "mypy", "version": "2.3.1", "license": "MIT", "role": "direct_development"},
+    {"name": "mypy_extensions", "version": "1.1.0", "license": "MIT", "role": "transitive_development"},
+    {"name": "packaging", "version": "26.3", "license": "Apache-2.0 OR BSD-2-Clause", "role": "transitive_build"},
+    {"name": "pathspec", "version": "1.1.1", "license": "MPL-2.0", "role": "transitive_build_development"},
+    {"name": "pluggy", "version": "1.6.0", "license": "MIT", "role": "transitive_build"},
+    {"name": "pydantic", "version": "2.13.5", "license": "MIT", "role": "direct_runtime"},
+    {"name": "pydantic_core", "version": "2.46.5", "license": "MIT", "role": "transitive_runtime"},
+    {"name": "ruff", "version": "0.16.4", "license": "MIT", "role": "direct_development"},
+    {"name": "starlette", "version": "1.6.0", "license": "BSD-3-Clause", "role": "transitive_runtime"},
+    {"name": "tomlkit", "version": "0.15.1", "license": "MIT", "role": "transitive_build"},
+    {"name": "trove-classifiers", "version": "2026.6.1.19", "license": "Apache-2.0", "role": "transitive_build"},
+    {"name": "typing-inspection", "version": "0.4.4", "license": "MIT", "role": "transitive_runtime"},
+    {"name": "typing_extensions", "version": "4.16.0", "license": "PSF-2.0", "role": "transitive_runtime_development"},
+    {"name": "uvicorn", "version": "0.41.0", "license": "BSD-3-Clause", "role": "direct_runtime"}
+  ],
+  "docker_bases": [
+    {"name": "docker.io/library/nginx", "version": "1.29-alpine", "digest": "sha256:5616878291a2eed594aee8db4dade5878cf7edcb475e59193904b198d9b830de", "license": "BSD-2-Clause", "role": "studio_runtime"},
+    {"name": "docker.io/library/node", "version": "24-alpine", "digest": "sha256:e67514e5d0f6c46656005e1b693b2ec9d52e80b641307de684d4a015ba7a4eaf", "license": "MIT", "role": "studio_build"},
+    {"name": "docker.io/library/python", "version": "3.13-slim", "digest": "sha256:9d2e5553305c7c7b0097999bb17187c69b921ccd6bc9d40e4bb5ebe652c00285", "license": "PSF-2.0", "role": "api_worker_runtime"}
+  ],
+  "github_actions": [
+    {"name": "actions/checkout", "version": "v6", "commit": "d23441a48e516b6c34aea4fa41551a30e30af803", "license": "MIT"},
+    {"name": "actions/setup-node", "version": "v6", "commit": "249970729cb0ef3589644e2896645e5dc5ba9c38", "license": "MIT"},
+    {"name": "actions/setup-python", "version": "v6", "commit": "ece7cb06caefa5fff74198d8649806c4678c61a1", "license": "MIT"}
+  ],
+  "operator_tools": [
+    {"name": "docker", "version": "29", "immutable_reference": "operator_prerequisite_major_29", "license": "Apache-2.0"},
+    {"name": "docker-compose", "version": "v5", "immutable_reference": "operator_prerequisite_major_5", "license": "Apache-2.0"},
+    {"name": "git", "version": "2", "immutable_reference": "operator_prerequisite_major_2", "license": "GPL-2.0-only"},
+    {"name": "make", "version": "4", "immutable_reference": "operator_prerequisite_major_4", "license": "GPL-3.0-or-later"},
+    {"name": "node", "version": "24.15.0", "immutable_reference": "node_runtime_version_24_15_0", "license": "MIT"},
+    {"name": "npm", "version": "11.12.1", "immutable_reference": "sha512-zcoUuF1kezGSAo0CqtvoLXX3mkRqzuqYdL6Y5tdo8g69NVV3CkjQ6ZBhBgB4d7vGkPcV6TcvLi3GRKPDFX+xTA==", "license": "Artistic-2.0"},
+    {"name": "python", "version": "3.12+", "immutable_reference": "requires_python_gte_3_12", "license": "PSF-2.0"}
+  ]
+}

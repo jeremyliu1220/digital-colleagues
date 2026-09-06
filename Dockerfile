@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
-FROM python:3.13-slim AS runtime
+FROM python:3.13-slim@sha256:9d2e5553305c7c7b0097999bb17187c69b921ccd6bc9d40e4bb5ebe652c00285 AS runtime
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -8,8 +8,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-COPY requirements/p4.lock /app/requirements/p4.lock
-RUN python -m pip install --no-cache-dir -r /app/requirements/p4.lock
+COPY requirements/p8.lock /app/requirements/p8.lock
+RUN python -m pip install --no-cache-dir --require-hashes -r /app/requirements/p8.lock
 
 COPY migrations /app/migrations
 COPY src /app/src

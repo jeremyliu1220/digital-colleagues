@@ -1,0 +1,338 @@
+{
+  "milestone": "P8",
+  "new_implementations": [
+    {
+      "classification": "new_implementation",
+      "destination": ".github/workflows/ci.yml",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": ".nvmrc",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "Dockerfile",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "Dockerfile.p7",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "Makefile",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "README.md",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "SECURITY.md",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "docs/architecture/target-architecture.md",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "docs/development.md",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "docs/licensing/notice-review.md",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "docs/licensing/third-party-inventory.md",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "docs/p8/acceptance.md",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "docs/p8/operations.md",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "docs/p8/release-checklist.md",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "docs/p8/release-golden-path.md",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "docs/product/capability-matrix.md",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "docs/roadmap.md",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "docs/security/privacy-boundary.md",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "docs/security/threat-model.md",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "pyproject.toml",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "release/source-archive-policy.json",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "release/supply-chain-inputs.json",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "requirements/p8.lock",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "scripts/build_p8_release.py",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "scripts/check_p8_backup_restore.py",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "scripts/check_p8_compose_runtime.py",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "scripts/check_p8_diagnostics.py",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "scripts/check_p8_golden_path.py",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "scripts/check_p8_operations.py",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "scripts/check_p8_provenance.py",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "scripts/check_p8_release.py",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "scripts/check_p8_repository.py",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "scripts/check_p8_reproducibility.py",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "scripts/check_p8_supply_chain.py",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "scripts/collect_p8_evidence.py",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "scripts/p8_gate_support.py",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "scripts/p8_release_support.py",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "scripts/run_p8_toolchain.py",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "scripts/run_p8_unittest_suite.py",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "src/digital_colleagues/__init__.py",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "src/digital_colleagues/operations/__init__.py",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "src/digital_colleagues/operations/__main__.py",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "src/digital_colleagues/operations/backup_restore.py",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "src/digital_colleagues/operations/diagnostics.py",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "src/digital_colleagues/operations/metadata.py",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "studio/Dockerfile",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "studio/Dockerfile.p7",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "studio/package-lock.json",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "studio/package.json",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "tests/p8/__init__.py",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "tests/p8/fixtures.py",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "tests/p8/test_backup_restore.py",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "tests/p8/test_diagnostics.py",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "tests/p8/test_release.py",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    },
+    {
+      "classification": "new_implementation",
+      "destination": "tests/p8/test_repository.py",
+      "gate_result": "not_a_source_migration",
+      "implementation_basis": "public_documents_and_accepted_p7_implementation"
+    }
+  ],
+  "schema_version": 1,
+  "source_basis": "public_documents_and_accepted_p7_implementation",
+  "transformed_entries": []
+}

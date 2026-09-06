@@ -8,11 +8,13 @@ Digital Colleagues is an open-source, local-first control plane and reference st
 making an AI coworker's identity, delegated authority, responsibilities, finite work,
 approvals, effects, persistence, and audit causality explicit and testable.
 
-> **Project status — P6 accepted; P7 optional adapters are in development.** P6 is merged
-> in `main` at the fixed P7 base `7e6f4c4dc50b675afb60b6e160fe4f15312dd6c8`.
-> P7 has a fixed acceptance contract but has not passed its Gate. Named-provider
-> compatibility, live delivery, production security, distributed operation, measured human
-> improvement, and a proven five-minute limit are not claimed.
+> **Project status — P7 accepted; P8 release readiness is in development.** P7 passed
+> independent acceptance and was fast-forward merged to `main` at the fixed P8 base
+> `df47f8d075f7c0660ab5ed6035f8acfa3d3da4dc`. P8 has a fixed acceptance contract but
+> has not passed independent acceptance. No tag, GitHub Release, package, image, or formal
+> release exists. Named-provider compatibility, live delivery, production readiness or
+> security, distributed operation, measured human improvement, and an unmeasured
+> five-minute limit are not claimed.
 
 ## What makes a digital colleague different?
 
@@ -35,7 +37,7 @@ The target is a local deterministic reference implementation—not enterprise IA
 production tenancy isolation, high availability, compliance certification, or a hosted
 service.
 
-## Accepted P6 baseline and P7 contract
+## Accepted P7 baseline and P8 contract
 
 P5 retained the accepted P4 local Compose and Studio path and added an inert, revisioned
 Profile/Mandate/policy draft. A local Admin reviews explicit defaults and a classified
@@ -44,28 +46,31 @@ working-hours, trigger, proactivity, notification/interruption, wake-budget, sto
 escalation, stale-draft, and stale-proposal behavior. See the
 [P5 operator guide](docs/p5/golden-path.md). P6 adds accepted local multi-user governance,
 two-person authority changes, recovery, approval revalidation, and bounded audit export.
-P7 fixes the provider-neutral optional-adapter requirements in its
-[acceptance contract](docs/p7/acceptance.md), [ADR 0006](docs/adr/0006-optional-provider-and-channel-adapters.md),
-and [adapter Golden Path](docs/p7/adapter-golden-path.md). These P7 documents are a
-development contract, not evidence that P7 has passed or any named provider works.
+P7 adds accepted, explicitly optional provider-neutral HTTP JSON adapters behind the same
+ports while retaining deterministic/reference defaults. Its public evidence is only an
+offline loopback contract and proves no named-provider compatibility or real delivery. P8
+starts from that fixed baseline and defines release/operations convergence in its
+[acceptance contract](docs/p8/acceptance.md), [operator guide](docs/p8/operations.md),
+[release checklist](docs/p8/release-checklist.md), and
+[release Golden Path](docs/p8/release-golden-path.md).
 
-## P7 development verification
+## P8 development verification
 
-Prerequisites are Python 3.12+, Node.js 22.12+, npm, and Make.
+Prerequisites are Python 3.12+, Node.js 24.15.0, npm 11.12.1 through Corepack, Git, Make,
+and Docker Engine/Compose for the required actual operational Gate.
 
 ```bash
 make check
 make studio-dev
 ```
 
-`make check` currently resolves the exact lock in an OS temporary workspace, then runs
-Python and Studio lint, type checks, tests and build plus the public-boundary and all
-retained P0–P6 gates. P7 implementation will extend it with the model/channel contract,
-configuration, abuse, static Compose, and loopback Golden Path gates. All test databases,
-package environments, stubs, and temporary credentials remain outside the repository. The
-separate `make p7-compose-runtime` target requires Docker and must perform the actual
-isolated optional-adapter start/recreate/ambiguity/reconciliation/stop/cleanup Gate before
-P7 evidence can be written.
+`make check` resolves the hash-checked Python lock in an OS temporary workspace, runs Python
+and Studio lint/type/test/build, the public boundary, accepted historical regressions, and
+the current P8 repository, operations, backup/restore, diagnostics, supply-chain,
+reproducibility, release, and Golden Path gates. Private databases, package environments,
+candidate artifacts, backups, diagnostics, credentials, and build trees remain outside the
+repository. `make p8-compose-runtime` and `make p8-golden` require an actual Docker runtime;
+`not_evaluated` blocks P8 evidence.
 
 Useful focused commands:
 
@@ -118,6 +123,16 @@ make p7-abuse
 make p7-compose
 make p7-compose-runtime
 make p7-golden
+make p8-repository
+make p8-provenance
+make p8-operations
+make p8-backup-restore
+make p8-diagnostics
+make p8-supply-chain
+make p8-reproducibility
+make p8-release
+make p8-compose-runtime
+make p8-golden
 make p3-provenance
 make p3-architecture
 make p3-migrations
@@ -125,11 +140,12 @@ make p3-persistence
 make p3-runtime
 make p3-golden
 make bootstrap
-make evidence-p7
+make evidence-p8
 ```
 
 No public Gate requires provider credentials or live data. P7 uses only temporary synthetic
-loopback credentials. Do not put live credentials or data in this tree.
+loopback credentials, while P8 default operations contact no provider. Do not put live
+credentials, databases, backups, diagnostics, or data in this tree.
 See [local development](docs/development.md) for exact commands and troubleshooting. The
 accepted P0–P4 evidence remains historical and must not be rebuilt from the P5 tree.
 
@@ -150,18 +166,21 @@ tests/p4/                authentication, metrics, Studio API, and recovery fixtu
 tests/p5/                revisioned builder, typed policy, migration, and recovery fixtures
 tests/p6/                local RBAC, recovery, change approval, export, and abuse fixtures
 tests/p7/                offline optional-adapter contracts, configuration, and abuse fixtures
+tests/p8/                release, backup/restore, diagnostics, inventory, and operations fixtures
 tests/persistence/       SQLite migration, namespace, transaction, and fencing tests
 tests/runtime/           Agenda, authorization, outbox, ambiguity, and crash tests
 tests/api/               in-process typed FastAPI mapping tests
 scripts/                 sanitized boundary and evidence tools
+release/                 deterministic source-archive and supply-chain input policy
 docs/                    product, architecture, policy, and milestones
 provenance/              fixed-revision source and scanner manifests
 artifacts/               machine-readable milestone summaries
 ```
 
-The private parent research repository remains read-only. P0-P6 history, acceptance,
-artifacts, evidence, migrations 001-007, and provenance receipts remain unchanged. P7 starts
-from the accepted public P6 baseline and may migrate no parent working-tree content.
+The private parent research repository remains read-only. P0-P7 history, acceptance,
+artifacts, evidence, migrations 001-007, fingerprints, and provenance receipts remain
+unchanged. P8 starts from the accepted public P7 baseline and migrates no parent
+working-tree content.
 
 ## Contributing and security
 

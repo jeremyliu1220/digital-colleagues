@@ -82,6 +82,14 @@ compatibility, and high availability remain gaps.
 | Retry duplicates an uncertain effect | Post-submit timeout/disconnect is ambiguous; no blind retry; reconcile before retry |
 | Provider rebinds idempotency | Existing effect key binds canonical effect digest; conflicts fail closed |
 | External egress during public tests | Explicit IP-literal loopback allowlist plus negative socket/endpoint tests |
+| WAL-inconsistent backup | SQLite online backup API plus snapshot integrity and applied-migration validation |
+| Malicious or corrupted backup | Exact archive members, bounded reads, no generic extraction, digest/integrity/schema/manifest validation |
+| Restore overwrites valid state | Default-new destination; explicit offline replacement; verified rollback backup; atomic install |
+| Restored stale authority or sessions | Documented mandatory session rotation and membership/approval/authority revalidation |
+| Diagnostic disclosure | Versioned field allowlist, finite errors, irreversible causal digests, and secret/path/private canaries |
+| Mutable release dependency | Python hashes, npm integrity, OCI manifest digests, Action commits, inventory drift gate |
+| Release archive includes private residue | Git-object allowlist plus database/backup/log/cache/path/private-data scans |
+| Reproducibility overclaim | Byte comparison only for six declared artifacts; OCI claim limited to immutable inputs/content/runtime |
 
 ## Authentication requirements
 
@@ -105,5 +113,12 @@ evidence pass.
 - An operator who enables an adapter chooses an external disclosure boundary; P7 reduces
   fields and validates responses but cannot control a remote service.
 - One SQLite writer and one-host Compose topology do not provide availability guarantees.
+- Local backups and diagnostic bundles are unencrypted private files whose storage,
+  transfer, retention, snapshots, and secure deletion remain operator responsibilities.
+- Restoring a valid old backup can intentionally restore revoked or expired historical
+  security state; P8 requires rotation/revalidation but cannot determine current real-world
+  authority.
+- Declared dependency license metadata and local inventory checks are not legal advice or
+  a complete third-party security assessment.
 
 These are explicit limitations, not deferred claims.

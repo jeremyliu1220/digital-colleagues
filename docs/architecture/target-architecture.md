@@ -286,3 +286,35 @@ Records include namespace, stable identifiers, relevant revisions, timestamps fr
 injected clock, actor principal, correlation and causation identifiers, and schema version.
 Sensitive payloads are represented by safe projections or digests, not copied blindly into
 diagnostics.
+
+## P8 release and operations topology
+
+P8 adds an operator edge without changing core, governance, application ports, SQLite
+schema, or adapter authority. The candidate is version `0.1.0` and consists of a normalized
+source archive, Python wheel, built Studio archive with bundled dependency license texts,
+deterministic supply-chain inventory, release manifest, and checksums. OCI images are
+actual operational test output, not release artifacts or byte-reproducibility claims.
+
+```text
+clean accepted source commit
+    +-- normalized source archive --> default deterministic Compose
+    +-- Python wheel
+    +-- built Studio + dependency license texts
+    `-- inventory + release manifest + checksums
+
+live WAL state -- SQLite online backup API --> private versioned backup
+verified private backup -- stopped writers + atomic replacement --> restored state
+state metadata -- strict allowlist + irreversible causal digests --> private diagnostics
+```
+
+Backup and restore validate the existing migration manifest and applied migration records;
+P8 adds no migration 008. Replacement requires an explicit offline assertion and first
+creates a verified rollback backup. Restore changes bytes, not authority rules: after
+returning sessions, membership, approvals, authority, and audit to the backup instant, the
+operator must rotate/revalidate them through existing P6 controls.
+
+The release builder uses two OS temporary workspaces and normalizes time, ordering,
+ownership, modes, locale, timezone, gzip, tar, and wheel inputs. Runtime/build Python
+packages are exact and hash-checked, npm packages use exact integrity records, Docker base
+images use manifest digests, and CI Actions use commit IDs. This is local release-candidate
+evidence, not production software-supply-chain assurance or a publication.

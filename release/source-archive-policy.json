@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "allowed_root_files": [
+    ".dockerignore",
+    ".editorconfig",
+    ".gitignore",
+    ".nvmrc",
+    ".python-version",
+    "AGENTS.md",
+    "CODE_OF_CONDUCT.md",
+    "CONTRIBUTING.md",
+    "Dockerfile",
+    "Dockerfile.p7",
+    "Dockerfile.p7.dockerignore",
+    "GOVERNANCE.md",
+    "LICENSE",
+    "Makefile",
+    "NOTICE",
+    "README.md",
+    "SECURITY.md",
+    "SUPPORT.md",
+    "compose.p7.yaml",
+    "compose.yaml",
+    "pyproject.toml"
+  ],
+  "allowed_root_directories": [
+    ".github",
+    "docs",
+    "migrations",
+    "provenance",
+    "release",
+    "requirements",
+    "scripts",
+    "src",
+    "studio",
+    "tests"
+  ],
+  "excluded_root_directories": [
+    "artifacts"
+  ],
+  "forbidden_components": [
+    ".git",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".venv",
+    "__pycache__",
+    "artifacts",
+    "build",
+    "dist",
+    "node_modules"
+  ],
+  "forbidden_suffixes": [
+    ".backup",
+    ".db",
+    ".log",
+    ".pyc",
+    ".sqlite",
+    ".sqlite-shm",
+    ".sqlite-wal"
+  ]
+}

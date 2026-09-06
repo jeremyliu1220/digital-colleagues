@@ -7,4 +7,4 @@ P2 exposes immutable core primitives only. Runtime orchestration remains deferre
 
 __all__ = ["__version__"]
 
-__version__ = "0.0.0"
+__version__ = "0.1.0"

@@ -5,16 +5,17 @@
 ## Prerequisites
 
 - Python 3.12 or newer (`PYTHON=python3.13` may be passed to Make)
-- Node.js 22.12 or newer
-- npm 11 or a compatible npm that honors the committed lockfile
+- Node.js 24.15.0
+- Corepack with npm 11.12.1 from Studio's integrity-pinned `packageManager`
 - Git and Make
-- Docker Engine with Compose v2 only for an actual container Golden Path
+- Docker Engine and Compose v2-compatible CLI for required P8 runtime gates
 
 No provider account, live credential, parent checkout, or checked-in database is needed.
 The default path uses deterministic intelligence, a synthetic reference channel, and OS
-temporary SQLite files. P7 adapter contract tests use only a controlled loopback stub and
-temporary opaque credentials. Without Docker, static checks still run, but required actual
-P7 container evidence is `not_evaluated` and P7 completion is blocked.
+temporary SQLite files. P7 adapter regression tests use only a controlled loopback stub and
+temporary opaque credentials. P8 release tests use temporary candidate, backup, restore,
+diagnostic, container, network, and volume boundaries. Without actual Docker/Compose
+execution the runtime result is `not_evaluated`, and P8 evidence/completion is blocked.
 
 ## Isolated tool workspace
 
@@ -22,119 +23,119 @@ P7 container evidence is `not_evaluated` and P7 completion is blocked.
 make bootstrap
 ```
 
-The command installs `requirements/p4.lock` into a temporary virtual environment, copies
-Studio to a temporary directory, runs environment checks, and deletes both. It creates no
-repository `.venv`, `node_modules`, cache, database, coverage, or build output. Direct
-runtime and development dependencies are exactly pinned in `pyproject.toml`; the lock also
-pins resolved transitives.
+The command installs `requirements/p8.lock` with `pip --require-hashes` into a temporary
+virtual environment, copies Studio to a temporary directory, runs environment checks, and
+deletes both. It creates no repository `.venv`, `node_modules`, cache, database, coverage,
+candidate, backup, diagnostics, or build output. Python runtime, development, and Hatchling
+build packages are exact and hash-checked. Studio packages are exact and carry npm
+integrity values.
 
-The current schema applies migrations 001–007. Migration 007 adds P6 local governance
-state; migrations 001–006 remain byte-immutable. P7 adapters are stateless and add no
-migration 008.
-Never edit an applied migration; add the next numbered file and checksum instead.
-
-## P7 credential and network boundary
-
-The normal composition root accepts only allowlisted default modes. Optional
-`http_json_v1` modes require an explicit startup configuration, protocol version, fixed
-HTTPS endpoint, and operator-created read-only credential file. Test-only HTTP also
-requires explicit permission and an IP-literal loopback host. Do not pass credentials on a
-command line, commit them, or place them in a URL or environment variable. Browser and
-Studio inputs cannot configure adapters.
-
-Public P7 gates make no external call. They create an isolated loopback stub and temporary
-credential files, then delete them. Live-provider acceptance is separate, explicitly
-authorized, non-public work and is not part of `make check` or P7 evidence.
+The current schema applies immutable migrations 001-007. P7 adapters are stateless and P8
+adds no migration 008. Never edit an applied migration. A future schema change belongs to a
+separately gated milestone and must add a numbered, checksummed migration.
 
 ## Verification
 
 ```bash
 make check
+make p8-compose-runtime
+make p8-golden
 ```
 
-The aggregate gate runs the equivalent of:
+`make check` runs the P8 toolchain aggregate in disposable workspaces:
+
+- Ruff lint/format and strict mypy for Python;
+- full Python unittest with zero skips/failures/errors and required P0-P8 identities;
+- Studio ESLint, Prettier, TypeScript, Vitest, and Vite build;
+- zero-exception public-boundary scan;
+- applicable P0-P7 regressions against accepted history without running a historical
+  evidence writer;
+- P8 repository/provenance, operations, backup/restore, diagnostics, supply-chain,
+  reproducibility, release, Compose runtime, and Golden Path gates; and
+- Git whitespace, residue, immutable-input, claim-boundary, and cleanup checks.
+
+Focused P8 targets are:
 
 ```bash
-ruff check src scripts tests
-ruff format --check src scripts tests
-mypy src scripts tests
-python -B scripts/run_p5_unittest_suite.py --start-directory tests --top-level-directory .
-npm --prefix studio run lint
-npm --prefix studio run format:check
-npm --prefix studio run typecheck
-npm --prefix studio test
-npm --prefix studio run build
-python -B scripts/check_public_boundary.py .
-python -B scripts/check_p3_repository.py .
-python -B scripts/check_p3_provenance.py .
-python -B scripts/check_p3_architecture.py .
-PYTHONPATH=src python -B scripts/check_p3_migrations.py .
-PYTHONPATH=src python -B scripts/check_p3_persistence.py
-PYTHONPATH=src python -B scripts/check_p3_runtime_contracts.py .
-PYTHONPATH=src python -B scripts/check_p3_golden_path.py
-python -B scripts/check_p4_repository.py .
-python -B scripts/check_p4_provenance.py .
-python -B scripts/check_p4_architecture.py .
-PYTHONPATH=src python -B scripts/check_p4_migrations.py .
-PYTHONPATH=src python -B scripts/check_p4_authentication.py .
-python -B scripts/check_p4_studio.py .
-python -B scripts/check_p4_compose.py .
-python -B scripts/check_p4_compose_runtime.py .
-PYTHONPATH=src python -B scripts/check_p4_golden_path.py
-python -B scripts/check_p5_repository.py .
-python -B scripts/check_p5_provenance.py .
-python -B scripts/check_p5_architecture.py .
-PYTHONPATH=src python -B scripts/check_p5_migrations.py .
-python -B scripts/check_p5_builder.py .
-python -B scripts/check_p5_policy.py .
-python -B scripts/check_p5_studio.py .
-python -B scripts/check_p5_compose.py .
-PYTHONPATH=src python -B scripts/check_p5_golden_path.py
+make p8-repository
+make p8-provenance
+make p8-operations
+make p8-backup-restore
+make p8-diagnostics
+make p8-supply-chain
+make p8-reproducibility
+make p8-release
+make p8-compose-runtime
+make p8-golden
 ```
 
-Focused Make targets include `boundary`, every retained P4 target, `p5-repository`,
-`p5-provenance`, `p5-architecture`, `p5-migrations`, `p5-builder`, `p5-policy`, `p5-studio`,
-`p5-compose`, `p5-compose-runtime`, and `p5-golden`, plus every P6 target documented in
-`make help`. P7 adds `p7-repository`, `p7-provenance`, `p7-architecture`,
-`p7-model-adapter`, `p7-channel-adapter`, `p7-configuration`, `p7-abuse`, `p7-compose`,
-`p7-compose-runtime`, and `p7-golden`. Static/config validation and the Docker-required
-actual runtime Gate remain separate. Earlier targets remain available as regression gates.
-The literal full unittest command can bootstrap its API-test dependencies into an OS
-temporary environment when FastAPI is not installed in the invoking interpreter; no test
-is skipped.
+All earlier focused targets remain available. A P8 aggregate may evaluate an accepted
+historical commit in a temporary checkout where current version, image pins, or provenance
+would otherwise contradict an earlier milestone's fixed tree. This preserves original
+historical semantics; it does not weaken or rebuild the old Gate.
 
-## Evidence milestone
+## Release-candidate build
 
-After P7 implementation, tests, docs, provenance, and gates are committed with a clean
-tree, run:
+After the acceptance and implementation commits exist and the tree is clean:
 
 ```bash
-make evidence-p7
+python3 -B scripts/build_p8_release.py --output /operator/private/rc
 ```
 
-The collector reruns retained P0–P6 gates plus the complete zero-exception P7 suite. It
-requires the authorized P7 branch and accepted P6 base, records the real tested
-implementation commit, synthetic/offline evidence class, successful actual Compose runtime
-and cleanup, and atomically writes `artifacts/p7/summary.json`. Its public-tree digest
-excludes only that summary to avoid self-hashing. Commit it separately, then rerun focused
-P7 gates, `make check`, the public-boundary scan, and actual runtime. Historical evidence
-commands P0–P6 are forbidden.
+The builder requires the exact fixed ancestry and version `0.1.0`. It uses normalized
+metadata and produces only the six artifacts fixed in the
+[P8 acceptance contract](p8/acceptance.md). It builds twice under
+`make p8-reproducibility`; every declared artifact digest must match. Candidate output is
+local and unpublished. OCI images are runtime test output, not byte-reproducible release
+artifacts; their base digests and build inputs are nevertheless fixed and checked.
 
-Required P3 test identities include complete outbox field binding, server-controlled approval
-time, boundary/alias bypass rejection, version-2 Timer upgrade and Timer restart semantics,
-and application-layer deterministic no-op behavior. A missing identity, skip, or nonzero test
-outcome prevents evidence replacement.
+## Backup, restore, and diagnostics
+
+Use the exact private operator flows in [P8 local operations](p8/operations.md). Online
+backup is WAL-consistent; restore validates format/digest/schema/migrations before atomic
+replacement; diagnostics emits one bounded allowlisted member. All state, backups,
+rollback backups, diagnostic bundles, credentials, and extracted candidates belong outside
+the repository with private permissions.
+
+## P7 credential and network boundary
+
+Optional `http_json_v1` modes require explicit startup configuration, protocol, fixed HTTPS
+endpoint, and an operator-created read-only credential file. Test-only HTTP requires an IP
+loopback literal and explicit permission. Do not pass credentials on a command line, commit
+them, place them in a URL/environment value, or include them in diagnostics. Browser,
+Studio, and provider content cannot configure adapters. Default P8 release operations keep
+deterministic intelligence and the reference channel and make zero provider calls.
+
+## P8 evidence milestone
+
+Only with a clean implementation commit after every direct/aggregate gate and actual
+Docker cleanup passes, run:
+
+```bash
+make evidence-p8
+```
+
+The collector reruns the complete zero-exception P8 suite, records the real implementation
+commit, candidate digests, double-build result, synthetic/offline evidence class, actual
+Compose restore path and zero cleanup, then atomically writes only
+`artifacts/p8/summary.json`. Its tree digest excludes exactly that summary. Commit the
+summary alone and rerun the full final gates. P0-P7 evidence commands are forbidden.
+
+The resulting status may say only **P8 development complete, awaiting independent
+acceptance**. It is not a tag, publication, formal release, or production-readiness claim.
+Human evaluation, live-provider acceptance, production properties, post-v0.1 capabilities,
+and an unmeasured five-minute target remain excluded or `not_evaluated`.
 
 ## Authenticated Studio and HTTP boundaries
 
-The accepted P4-P6 Golden Path is exercised through the authenticated FastAPI mapping, application
-services, and bounded worker facade. A server-side session derives
-`RequestPrincipalContext`; request bodies cannot submit tenant, namespace, principal kind,
-role, or session authority. See [the operator guide](p4/golden-path.md) for the one-time
-token retrieval and isolated Compose workflow. P6 adds accepted enrollment, recovery,
-versioned RBAC, two-person change approval, and bounded audit export. P7 adapters do not
-alter these boundaries.
+The accepted P4-P7 Golden Path uses authenticated FastAPI mappings, application services,
+and a bounded worker. A server-side session derives `RequestPrincipalContext`; request
+bodies cannot submit tenant, namespace, principal kind, role, membership, or session
+authority. P6 adds accepted enrollment/recovery, versioned RBAC, two-person authority
+change, approval revalidation, and bounded audit export. P7 optional adapters do not alter
+those rules, and P8 restore requires revalidation because it returns authority and sessions
+to the backup instant.
 
-Every check removes its temporary environment. If a contributor independently creates a
-runtime database, `.venv`, `node_modules`, cache, coverage, log, or build directory inside
-the repository, remove it before running the repository and public-boundary gates.
+If a contributor independently creates a database, virtual environment, `node_modules`,
+cache, coverage, candidate, backup, diagnostics, log, or build directory in the repository,
+remove it before repository, release, and public-boundary gates.

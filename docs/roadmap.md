@@ -6,15 +6,15 @@ Each milestone stops at its gate. A later milestone must not begin automatically
 
 Current checkpoint:
 
-- P6 has passed independent acceptance and was fast-forward merged into `main`.
-- The accepted P6 `main` baseline is
-  `7e6f4c4dc50b675afb60b6e160fe4f15312dd6c8`.
-- Historical P0–P6 acceptance, artifacts, evidence, receipts, and migrations remain
+- P7 has passed independent acceptance and was fast-forward merged into `main`.
+- The accepted P7 `main` baseline and fixed P8 base is
+  `df47f8d075f7c0660ab5ed6035f8acfa3d3da4dc`.
+- Historical P0–P7 acceptance, artifacts, evidence, receipts, and migrations remain
   unchanged.
-- P7 optional-adapter development starts from that fixed base. Its acceptance contract is
-  fixed; its implementation has not passed the P7 Gate and must not be described as
-  complete, accepted, live-provider compatible, or production-ready.
-- P8 has not started.
+- P8 release-readiness development starts from that fixed base on
+  `codex/p8-release-readiness`. Its acceptance contract is fixed; implementation has not
+  passed the P8 Gate or independent acceptance and must not be described as accepted,
+  published, production-ready, or a formal release.
 
 Rebaseline boundary:
 
@@ -142,12 +142,12 @@ for P7.
 
 Exit: reference behavior stays deterministic and optional adapter contracts pass.
 
-Current development status: the P7 acceptance contract, ADR 0006, and adapter Golden Path
-are fixed from the accepted P6 base. P7 will add provider-neutral HTTP JSON model and
-channel adapters with strict startup opt-in, safe credentials, loopback-only public tests,
-ambiguity/reconciliation, and no migration 008. Product implementation and evidence must
-pass the documented Gates before P7 may be described as development complete. P8 remains
-unstarted.
+Accepted result: P7 is accepted and merged. It adds stateless provider-neutral HTTP JSON
+model and channel adapters behind unchanged ports, strict startup opt-in, safe credential
+files, bounded transport, ambiguity/reconciliation, loopback-only synthetic/offline
+evidence, and no migration 008. Deterministic intelligence and the reference channel remain
+the defaults. Acceptance establishes no named-provider compatibility, real delivery,
+production reliability/privacy/security, pilot readiness, or production readiness.
 
 ## P8 — Release and operational readiness
 
@@ -161,6 +161,14 @@ Exit: v0.1 may be labeled a local reference release. Enterprise IAM, HA, distrib
 operation, production tenancy, compliance, real-provider pilot claims, Semantic Memory,
 Skill Learning, shared knowledge, multi-person collaboration, and Self-initiated autonomy
 remain separate.
+
+Current development status: P8 has a fixed acceptance contract from the accepted P7 base.
+It will build an unpublished `0.1.0` local reference candidate, add WAL-consistent private
+backup and fail-closed restore, allowlisted diagnostics, a deterministic supply-chain
+inventory, double-build comparison, public release checks, and an actual default Compose
+operations path. Until implementation, evidence, and independent acceptance pass, no P8
+completion, formal release, tag, publication, five-minute result, human result, live-
+provider result, or production property is claimed.
 
 ## Post-v0.1 outlook
 

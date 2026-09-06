@@ -168,3 +168,32 @@ classifications, and digests. Provider/account/workspace/channel/conversation/me
 live payloads, live receipts, real endpoints, and personal acceptance results remain
 forbidden from the public tree. Live acceptance requires separate authorization and
 non-public storage and cannot replace the P7 synthetic contract Gate.
+
+## P8 private operations and release boundary
+
+P8 release-candidate artifacts are built only from committed allowlisted Git objects. They
+exclude milestone evidence artifacts, databases, WAL/SHM files, backups, diagnostics, logs,
+caches, dependency trees, build residue, local paths, credentials, personal data, private
+payloads, and live-provider material. The deterministic release manifest contains public
+commit and file/input digests only. The supply-chain inventory contains package names,
+versions, integrity/digest references, declared licenses, inclusion flags, and attribution
+treatment; it contains no installed path or environment value.
+
+Backups and rollback backups are never public evidence. They contain a complete private
+SQLite snapshot and can therefore contain identity, authority, work, session/credential
+digests, approvals, effects, and causal history. The backup manifest is path-free but does
+not make the database public. Operator files are mode `0600`; retention, protected transfer,
+encryption, snapshots, and secure deletion remain outside the v0.1 implementation.
+
+Diagnostics contains exactly one allowlisted JSON member with public release identity,
+verified migration/health classifications, coarse non-sensitive runtime versions, and
+purpose-framed digests of bounded safe causal identifiers. It contains no state/backup
+bytes, free-form logs/audit, environment values, endpoints, URLs, local paths/user names,
+credentials or digests, cookies, CSRF, request/response bodies, private payload, live
+receipt, or personal data. Runtime canaries test stdout, stderr, bundle, release archives,
+and service logs.
+
+P8 evidence is synthetic/offline and records only safe results/digests and cleanup counts.
+Human evaluation, live-provider acceptance, and the unmeasured five-minute target remain
+`not_evaluated`. A clean Gate does not prove production privacy, security, compliance,
+software-supply-chain safety, or legal sufficiency.
