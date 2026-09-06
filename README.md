@@ -8,7 +8,7 @@ Digital Colleagues is an open-source, local-first control plane and reference st
 making an AI coworker's identity, delegated authority, responsibilities, finite work,
 approvals, effects, persistence, and audit causality explicit and testable.
 
-> **Project status — P7 accepted; P8 release readiness is in development.** P7 passed
+> **Project status — P7 accepted; P8 `0.1.0` release readiness is in development.** P7 passed
 > independent acceptance and was fast-forward merged to `main` at the fixed P8 base
 > `df47f8d075f7c0660ab5ed6035f8acfa3d3da4dc`. P8 has a fixed acceptance contract but
 > has not passed independent acceptance. No tag, GitHub Release, package, image, or formal

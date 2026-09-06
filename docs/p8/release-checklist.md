@@ -52,7 +52,7 @@ formal release exists.
   restart reproduce the backup instant.
 - [ ] Diagnostics canaries are absent from stdout, stderr, bundle/archive bytes, and
   container logs.
-- [ ] Cleanup reports zero containers, networks, volumes, credentials, backups,
+- [ ] `cleanup` reports zero containers, networks, volumes, credentials, backups,
   diagnostics, extracted trees, and build workspaces.
 
 ## Mechanical gates and claims

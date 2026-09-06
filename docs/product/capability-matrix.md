@@ -37,7 +37,7 @@ deferred capabilities are described only as a non-committing
 | Redacted support diagnostics | Yes | P8 contract fixed; implementation not yet gated | Allowlisted bounded local bundle; no raw logs, audit export, state, credentials, private payload, or path |
 | Reproducible release candidate | Yes | P8 contract fixed; implementation not yet gated | Six unpublished `0.1.0` artifacts compared byte-for-byte; OCI claim limited to immutable inputs/content/runtime |
 | Release supply-chain inventory | Yes | P8 contract fixed; implementation not yet gated | Python, npm, build, OCI base, Actions, and tool metadata; declared-license review is not legal advice |
-| Real model providers | Optional | Separate live acceptance not evaluated | Not required for deterministic reference path; generic HTTP contract is not named-provider compatibility |
+| Real model providers | Optional | Separate live acceptance `not_evaluated` | Not required for deterministic reference path; generic HTTP contract is not named-provider compatibility |
 | Live chat or email providers | Optional | Separate live acceptance not evaluated | No named channel is implemented or claimed; live acceptance remains non-public and separate |
 | PostgreSQL or distributed stores | No | Not implemented | Port seam only |
 | High availability | No | Not claimed | Not designed or claimed in v0.1 |

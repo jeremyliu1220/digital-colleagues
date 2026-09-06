@@ -5,10 +5,11 @@
 ## Supported status
 
 Digital Colleagues is pre-release research software. P7 is the independently accepted
-local reference baseline; P8 release and operational readiness is under development from
+local reference baseline; P8 `0.1.0` release and operational readiness is under development from
 `df47f8d075f7c0660ab5ed6035f8acfa3d3da4dc`. No version is production-supported or
 formally released, and no production security/privacy, compliance, availability,
 enterprise-IAM, encryption-at-rest, or tenancy-isolation claim is made.
+P8 remains subject to independent acceptance and separate version-management authority.
 
 ## Reporting a vulnerability
 
