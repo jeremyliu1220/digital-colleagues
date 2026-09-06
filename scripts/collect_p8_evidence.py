@@ -213,7 +213,7 @@ def write_p8_evidence(
         )
     ):
         raise EvidenceError("P8 Compose runtime or cleanup is incomplete")
-    golden = results.get("golden_path", {})
+    golden = results.get("golden", {})
     if (
         golden.get("status") != "passed"
         or golden.get("claim") != "v0_1_local_reference_release_candidate"
