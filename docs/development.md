@@ -46,7 +46,8 @@ make p8-compose-runtime
 make p8-golden
 ```
 
-`make check` runs the P8 toolchain aggregate in disposable workspaces:
+`make check` runs the P9 aggregate in disposable workspaces. It first executes the complete
+retained P8 toolchain, then the P9 governance gates. The retained P8 portion includes:
 
 - Ruff lint/format and strict mypy for Python;
 - full Python unittest with zero skips/failures/errors and required P0-P8 identities;
@@ -138,6 +139,42 @@ The resulting status may say only **P8 development complete, awaiting independen
 acceptance**. It is not a tag, publication, formal release, or production-readiness claim.
 Human evaluation, live-provider acceptance, production properties, post-v0.1 capabilities,
 and an unmeasured five-minute target remain excluded or `not_evaluated`.
+
+## P9 Productization Rebaseline development
+
+P9 adds documentation, fixed product/architecture/security decisions, governance gates,
+tests, provenance, and static/synthetic evidence only. The executable version remains the
+unpublished `0.1.0` local reference candidate. P9 does not edit runtime, Studio, Compose,
+Docker, dependencies, API/worker/adapters/operations, migrations, or version metadata, and
+does not start P10.
+
+Focused commands are:
+
+```bash
+make p9-repository
+make p9-provenance
+make p9-rebaseline
+make p9-test
+make p9-check
+```
+
+`make p9-check` runs the retained P8 toolchain through the existing hash-locked temporary
+Python and Studio workspaces, then the P9 repository, provenance, rebaseline, and P9 test
+gates. `make check` delegates to the same P9 aggregate. Neither invokes evidence P0-P8.
+
+Only after the fixed P9 acceptance contract and implementation are separate commits, the
+branch is exact, and all direct/aggregate gates pass with a clean tree may the developer
+run:
+
+```bash
+make evidence-p9
+```
+
+That command writes only `artifacts/p9/summary.json`, with `static` and
+`synthetic_offline` evidence. OpenAI live, Microsoft 365 live, and human evaluation remain
+`not_evaluated`. Commit the summary alone and rerun all final gates. The resulting claim is
+only **P9 development complete, awaiting independent acceptance**; do not merge, push, tag,
+publish, upload, create a Release, or begin P10.
 
 ## Authenticated Studio and HTTP boundaries
 

@@ -7,6 +7,8 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
+import stat
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -23,7 +25,47 @@ EXCLUDED = {RECEIPT, "artifacts/p8/summary.json"}
 FIELDS = {"destination", "classification", "implementation_basis", "gate_result"}
 BASIS = "public_documents_and_accepted_p7_implementation"
 ACCEPTED_P8_COMMIT = "0bb80ab187932fbad42fbf665b8310987609a1f5"
-POST_MERGE_ALLOWED_PATHS = frozenset(
+P9_ALLOWED_PATHS = frozenset(
+    {
+        "AGENTS.md",
+        "Makefile",
+        "README.md",
+        "SECURITY.md",
+        "artifacts/p9/summary.json",
+        "docs/adr/0007-declarative-agent-package-and-deployment-model.md",
+        "docs/adr/0008-external-identity-connections-and-automatic-authorization.md",
+        "docs/architecture/target-architecture.md",
+        "docs/development.md",
+        "docs/p9/acceptance.md",
+        "docs/p9/rebaseline-checklist.md",
+        "docs/product/capability-matrix.md",
+        "docs/product/post-v0.1-capability-outlook.md",
+        "docs/product/v0.2-external-dependency-register.md",
+        "docs/product/v0.2-public-pilot-capability-matrix.md",
+        "docs/product/v0.2-public-pilot-product-brief.md",
+        "docs/roadmap.md",
+        "docs/security/privacy-boundary.md",
+        "docs/security/threat-model.md",
+        "docs/security/v0.2-public-pilot-privacy-boundary.md",
+        "docs/security/v0.2-public-pilot-threat-model.md",
+        "provenance/p9-migration-receipt.json",
+        "scripts/check_p8_provenance.py",
+        "scripts/check_p8_repository.py",
+        "scripts/check_p9_provenance.py",
+        "scripts/check_p9_rebaseline.py",
+        "scripts/check_p9_repository.py",
+        "scripts/collect_p9_evidence.py",
+        "scripts/run_p9_toolchain.py",
+        "tests/p8/test_repository.py",
+        "tests/p9/__init__.py",
+        "tests/p9/fixtures.py",
+        "tests/p9/test_evidence_gate.py",
+        "tests/p9/test_rebaseline.py",
+        "tests/p9/test_repository.py",
+    }
+)
+P9_IMPLEMENTATION_PATHS = P9_ALLOWED_PATHS - {"artifacts/p9/summary.json"}
+P8_CHECKPOINT_PATHS = frozenset(
     {
         "README.md",
         "SECURITY.md",
@@ -37,6 +79,8 @@ POST_MERGE_ALLOWED_PATHS = frozenset(
         "tests/p8/test_repository.py",
     }
 )
+POST_MERGE_ALLOWED_PATHS = P8_CHECKPOINT_PATHS | P9_ALLOWED_PATHS
+POST_MERGE_IMPLEMENTATION_PATHS = P8_CHECKPOINT_PATHS | P9_IMPLEMENTATION_PATHS
 
 
 class ProvenanceError(RuntimeError):
@@ -195,13 +239,37 @@ def _descendant_paths(changes: tuple[ProvenanceGitChange, ...]) -> set[str]:
     return {path for change in changes for path in change.paths}
 
 
+def _unsafe_tree_type_count(root: Path) -> int:
+    count = 0
+    for directory, names, files in os.walk(root, topdown=True, followlinks=False):
+        base = Path(directory)
+        relative_dir = base.relative_to(root)
+        if ".git" in relative_dir.parts:
+            names[:] = []
+            continue
+        names[:] = [name for name in names if name != ".git"]
+        for name in (*names, *files):
+            mode = (base / name).lstat().st_mode
+            if stat.S_ISLNK(mode) or not (stat.S_ISREG(mode) or stat.S_ISDIR(mode)):
+                count += 1
+    return count
+
+
 def _check_descendant_boundary(root: Path) -> dict[str, int | str]:
     committed = _descendant_diff(root, ACCEPTED_P8_COMMIT, "HEAD")
+    if any(change.status[:1] in {"R", "C", "T", "D"} for change in committed):
+        raise ProvenanceError(
+            "P8 post-merge commit contains a forbidden rename, copy, type change, or deletion"
+        )
     committed_paths = _descendant_paths(committed)
     if committed_paths - POST_MERGE_ALLOWED_PATHS:
         raise ProvenanceError("P8 post-merge commit changed a path outside the allowlist")
-    if committed_paths != POST_MERGE_ALLOWED_PATHS:
-        raise ProvenanceError("P8 post-merge checkpoint delta is incomplete")
+    if committed_paths == POST_MERGE_ALLOWED_PATHS:
+        phase = "final_evidence"
+    elif committed_paths == POST_MERGE_IMPLEMENTATION_PATHS:
+        phase = "implementation"
+    else:
+        raise ProvenanceError("P8 post-merge/P9 descendant delta is incomplete")
 
     staged = _descendant_diff(root, "--cached", "HEAD")
     unstaged = _descendant_diff(root)
@@ -211,15 +279,22 @@ def _check_descendant_boundary(root: Path) -> dict[str, int | str]:
     working_paths = staged_paths | unstaged_paths | set(untracked)
     if working_paths - POST_MERGE_ALLOWED_PATHS:
         raise ProvenanceError("P8 working tree changed a path outside the allowlist")
+    if staged or unstaged or untracked:
+        raise ProvenanceError("P8 descendant requires a clean index and worktree")
+    unsafe_type_count = _unsafe_tree_type_count(root)
+    if unsafe_type_count:
+        raise ProvenanceError("P8 descendant contains a symlink or special file")
     return {
         "descendant_boundary_status": "passed",
+        "descendant_candidate_phase": phase,
         "post_merge_change_count": len(committed),
         "post_merge_path_count": len(committed_paths),
-        "post_merge_allowed_path_count": len(POST_MERGE_ALLOWED_PATHS),
+        "post_merge_allowed_path_count": len(committed_paths),
         "post_merge_unexpected_path_count": 0,
         "staged_change_path_count": len(staged_paths),
         "unstaged_change_path_count": len(unstaged_paths),
         "untracked_path_count": len(untracked),
+        "unsafe_tree_type_count": unsafe_type_count,
     }
 
 

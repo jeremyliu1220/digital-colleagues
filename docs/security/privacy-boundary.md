@@ -203,3 +203,12 @@ P8 rollback backup, and temporary source tree inside the private runtime boundar
 deletes them after verification. Public evidence records only fixed public source
 identities, finite classifications, versions, schema numbers, and zero-cleanup results; it
 does not record the database digest or session values.
+
+## v0.2 planning continuation
+
+The [v0.2 Public Pilot privacy boundary](v0.2-public-pilot-privacy-boundary.md) defines
+future FileVault/encrypted-volume, `0700`/`0600`, read-only credential mount, provider
+minimization, SourceReference/SourceCursor, bounded temporary-body processing, redaction,
+discard timing, crash cleanup, and private live-evidence requirements. P9 implements none
+of them. Existing P0-P8 privacy and evidence statements remain historical and unchanged;
+planned controls are not accepted effectiveness evidence.

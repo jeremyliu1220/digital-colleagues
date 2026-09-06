@@ -18,6 +18,12 @@ approvals, effects, persistence, and audit causality explicit and testable.
 > evidence, and the unmeasured five-minute target remain `not_evaluated`. Post-v0.1 S1–S4
 > and Self-initiated autonomy have not started and do not start automatically.
 
+> **P9 planning status.** Productization Rebaseline development is authorized under the
+> fixed [P9 acceptance contract](docs/p9/acceptance.md). It adds documentation,
+> governance gates, tests, provenance, and static/synthetic evidence only. The target is a
+> future **v0.2 Public Pilot**, not production-ready 1.0; no v0.2 runtime capability is
+> implemented or accepted, and P10-P15 have not started.
+
 ## What makes a digital colleague different?
 
 An assistant answers a request. A task agent completes a bounded goal. A digital colleague
@@ -67,12 +73,14 @@ make check
 make studio-dev
 ```
 
-`make check` resolves the hash-checked Python lock in an OS temporary workspace, runs Python
-and Studio lint/type/test/build, the public boundary, accepted historical regressions, and
-the current P8 repository, operations, backup/restore, diagnostics, supply-chain,
-reproducibility, release, and Golden Path gates. Private databases, package environments,
-candidate artifacts, backups, diagnostics, credentials, and build trees remain outside the
-repository. `make p8-compose-runtime` and `make p8-golden` require an actual Docker runtime;
+`make check` resolves the hash-checked Python lock in OS temporary workspaces, first runs
+the complete retained P8 toolchain, then runs the P9 repository, provenance, rebaseline,
+and negative/abuse tests. The retained run still covers Python and Studio
+lint/type/test/build, the public boundary, historical regressions, and P8 repository,
+operations, backup/restore, diagnostics, supply-chain, reproducibility, release, Compose,
+and Golden Path gates. Private databases, package environments, candidate artifacts,
+backups, diagnostics, credentials, and build trees remain outside the repository.
+`make p8-compose-runtime` and `make p8-golden` require an actual Docker runtime;
 `not_evaluated` blocks P8 evidence.
 
 Useful focused commands:
@@ -136,6 +144,11 @@ make p8-reproducibility
 make p8-release
 make p8-compose-runtime
 make p8-golden
+make p9-repository
+make p9-provenance
+make p9-rebaseline
+make p9-test
+make p9-check
 make p3-provenance
 make p3-architecture
 make p3-migrations
@@ -143,7 +156,7 @@ make p3-persistence
 make p3-runtime
 make p3-golden
 make bootstrap
-make evidence-p8
+make evidence-p9
 ```
 
 No public Gate requires provider credentials or live data. P7 uses only temporary synthetic
@@ -170,6 +183,7 @@ tests/p5/                revisioned builder, typed policy, migration, and recove
 tests/p6/                local RBAC, recovery, change approval, export, and abuse fixtures
 tests/p7/                offline optional-adapter contracts, configuration, and abuse fixtures
 tests/p8/                release, backup/restore, diagnostics, inventory, and operations fixtures
+tests/p9/                productization rebaseline governance, negative, and evidence fixtures
 tests/persistence/       SQLite migration, namespace, transaction, and fencing tests
 tests/runtime/           Agenda, authorization, outbox, ambiguity, and crash tests
 tests/api/               in-process typed FastAPI mapping tests
@@ -184,6 +198,33 @@ The private parent research repository remains read-only. P0-P8 history, accepta
 artifacts, evidence, migrations 001-007, fingerprints, and provenance receipts remain
 unchanged. P8 started from the accepted public P7 baseline and migrated no parent
 working-tree content.
+
+## v0.2 Public Pilot planning boundary
+
+P9 defines the future product objects and ordered P9-P15 delivery contract in the
+[v0.2 product brief](docs/product/v0.2-public-pilot-product-brief.md),
+[v0.2 capability matrix](docs/product/v0.2-public-pilot-capability-matrix.md),
+[external dependency register](docs/product/v0.2-external-dependency-register.md), and
+[Roadmap](docs/roadmap.md).
+
+AgentPackage is a non-executable, versioned, digest-bound declaration that requests but
+never grants capabilities; it is not an S4 Skill. ColleagueDeployment is an isolated
+namespaced instance, not shared knowledge or Agent collaboration. ExternalConnection
+authenticates but grants nothing; an Admin-created ConnectorGrant binds exact resources and
+actions to the current Mandate and Policy. AutomaticEffectAuthorization is a durable
+low-risk policy record separate from HumanApprovalDecision. External source content is
+temporary context, not Semantic Memory.
+
+The planned first providers are OpenAI `gpt-5.5` through Responses API with Structured
+Outputs and `store:false`, and delegated Microsoft 365 device-code connections for
+Outlook, Teams, Planner, and selected read-only SharePoint. P9 makes no provider call.
+OpenAI live, Microsoft 365 live, and human evaluation remain `not_evaluated`; mock, stub,
+or loopback evidence cannot establish live or named-provider compatibility.
+
+Current P6/P7-branded Studio/API metadata and `/p5`/`/p6` route names remain unchanged in
+P9. P10 owns user-facing product metadata and translation-key foundations; existing routes
+remain compatibility surfaces until a separate deprecation contract. New v0.2 public APIs
+will use stable product vocabulary under `/api/v1`.
 
 ## Contributing and security
 

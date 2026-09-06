@@ -16,6 +16,13 @@ target remain `not_evaluated`. Post-v0.1 S1–S4 and Self-initiated autonomy hav
 and do not start automatically. P0–P8 accepted artifacts, evidence, acceptance contracts,
 receipts, and migrations remain historical and unchanged.
 
+P9 Productization Rebaseline is documentation/governance work for a future v0.2 Public
+Pilot. It implements no package runtime, model/provider call, OAuth, connector, automatic
+effect, Semantic Memory, Agent collaboration, or executable Skill. See the
+[v0.2 threat model](docs/security/v0.2-public-pilot-threat-model.md) and
+[v0.2 privacy boundary](docs/security/v0.2-public-pilot-privacy-boundary.md). Their planned
+controls are not evidence of live-provider security or production readiness.
+
 ## Reporting a vulnerability
 
 Use the repository host's **private vulnerability reporting** feature when it is available.
@@ -37,3 +44,11 @@ tokens, deterministic adapters, or a clean boundary scan are not substitutes for
 review. Local state, backups, rollback backups, and diagnostic bundles are unencrypted
 operator-private data and must remain outside the public repository. Live receipts and
 personal acceptance data remain outside the public repository.
+
+For future live pilot work, Mac credentials require a FileVault check, secret directories
+mode `0700`, credential files mode `0600`, and read-only service mounts. Keys/tokens are
+forbidden from environment variables, SQLite, audit, backup, diagnostics, logs, errors,
+command arguments, and public evidence. Always-on Linux requires an operator-provided
+encrypted volume; without proven storage encryption, live readiness remains
+`not_evaluated` or live mode is blocked. Do not submit credentials or live identifiers in
+an issue, conversation, fixture, or repository file.

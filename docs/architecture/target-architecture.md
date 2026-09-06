@@ -325,3 +325,117 @@ ownership, modes, locale, timezone, gzip, tar, and wheel inputs. Runtime/build P
 packages are exact and hash-checked, npm packages use exact integrity records, Docker base
 images use manifest digests, and CI Actions use commit IDs. This is local release-candidate
 evidence, not production software-supply-chain assurance or a publication.
+
+## P9 v0.2 Public Pilot planning boundary
+
+P9 changes no runtime, Studio, Compose, adapter, operation, API, worker, schema, migration,
+dependency, or version. It defines the planned P10-P15 architecture while the executable
+baseline remains the unpublished `0.1.0` local reference candidate. The v0.2 plan is a
+Public Pilot, not production-ready 1.0, HA, enterprise IAM, production tenancy, compliance,
+production security, or production readiness.
+
+The planned product composition extends the existing pure-core/application/ports direction:
+
+```text
+Admin Studio / future stable /api/v1 mappings
+       |
+Package and deployment application services ----> package provenance/trust ports
+       |                                           `-- inert declarative artifacts
+Existing governance and runtime services --------> model and connector ports
+       |                                           +-- OpenAI semantic gateway
+Pure core contracts                               `-- Microsoft 365 connectors
+       |
+Existing and future stores behind ports
+```
+
+AgentPackage is a non-executable, versioned, digest-bound declaration containing
+schema-valid metadata, localized display text/prompts, bounded workflow declarations, and
+requested capabilities. ColleagueDeployment is a separately namespaced instance created
+from one exact package version/digest with its own Profile, Mandate, Policy, lifecycle,
+connections, grants, work, budgets, effects, and audit. Package material is untrusted and
+can request but never grant or activate authority. It is not an S4 Skill.
+
+ExternalConnection authenticates one managed provider/application/account relationship but
+grants no resource or action. ConnectorGrant is Admin-created, revisioned, and exact to a
+resource/action within the current Mandate and Policy. SourceReference and SourceCursor
+retain a safe locator/version/digest/cursor rather than full external bodies or Semantic
+Memory. Multiple deployments remain isolated; they do not imply S3 shared knowledge,
+delegation, messaging, collaboration, or shared memory.
+
+AutomaticEffectAuthorization is a new planned durable non-human authorization path for an
+effect proven to satisfy the exact low-risk policy, Mandate, Policy, ConnectorGrant,
+source/data version, connection state, and budget. It is separate in schema, authoring,
+consumption, and audit from HumanApprovalDecision. MODEL and SERVICE never author a human
+decision.
+
+### Planned package data flow
+
+```text
+Package source
+-> bounded download/local selection
+-> digest
+-> provenance/attestation verification
+-> archive/content safety validation
+-> requested-capability inspection
+-> Admin trust decision
+-> inert installed package
+-> reviewed deployment draft
+-> exact Mandate/Policy/ConnectorGrant binding
+-> confirmed ColleagueDeployment
+```
+
+Package sources are official built-in, local development, or GitHub Release artifacts with
+valid GitHub artifact attestation. Attestation binds digest to source/build identity but is
+not a safety result. Updates create new drafts; rollback selects an accepted still-trusted
+exact version. Unknown schema/capability, executable content, digest mismatch, stale/revoked
+trust, or ambiguous permission fails closed.
+
+### Planned external-event data flow
+
+```text
+External event
+-> ExternalConnection authentication
+-> ConnectorGrant resource check
+-> bounded source fetch
+-> temporary source context
+-> SourceReference/cursor/digest/safe projection
+-> existing Event/Agenda/Wake/Decision path
+-> exact EffectProposal
+-> automatic-policy evaluation or Human approval
+-> dispatch-time revalidation
+-> effect attempt/result/reconciliation
+-> causal audit
+```
+
+OpenAI is planned behind a P12 gateway using `gpt-5.5`, Responses API, Structured Outputs,
+and explicit `store:false`. It receives no tools, credentials, or execution authority and
+returns only a bounded semantic decision; the server reconstructs authoritative fields.
+
+Microsoft 365 is planned behind P13 connectors with one delegated work/school account per
+Agent, device-code public-client authentication, project multi-tenant and BYO single-tenant
+App modes, explicit consent/configuration state, Outlook per-folder delta, Teams allowlisted
+dated polling, Planner ETag/`If-Match`, and SharePoint selected read-only access. Bodies are
+temporary context, not durable memory.
+
+Every unknown, missing, stale, revoked, cross-namespace, cross-Agent, digest/schema
+mismatch, unbound resource, ambiguous authority, or budget overflow fails closed.
+
+### Interface transition inventory
+
+P9 inventories and does not edit these compatibility surfaces:
+
+- `studio/src/App.tsx` contains P6 local-governance/control-plane and under-verification
+  copy. P10 owns product copy and translation keys.
+- `src/digital_colleagues/local/runtime.py` sets a P7 FastAPI title and `0.0.0-p7` version.
+  P10 owns product metadata.
+- `src/digital_colleagues/api/app.py` and `p4_app.py` retain P3/P4 milestone metadata. P10
+  owns product-facing correction.
+- Existing `/p5` and `/p6` names are compatibility routes, not future product vocabulary.
+  They remain until a separate deprecation contract. New v0.2 public APIs use stable terms
+  under `/api/v1`; P11+ schemas/APIs do not expose milestone names.
+
+P11 preserves v0.1 data by converting the single colleague to a legacy/manual deployment
+without rebuilding authority. Migration 008 can first be considered in P11 only if an
+additive schema need exists. Package upgrade is a new draft, connection revocation
+invalidates grants and pending effects, and database rollback uses verified backup with
+matching code rather than destructive down migration.

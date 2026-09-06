@@ -1,6 +1,6 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 
-# P0-P8 Roadmap
+# P0-P15 Roadmap
 
 Each milestone stops at its gate. A later milestone must not begin automatically.
 
@@ -19,6 +19,9 @@ Current checkpoint:
   `not_evaluated`.
 - Post-v0.1 S1–S4 and Self-initiated autonomy have not started and do not start
   automatically.
+- P9 Productization Rebaseline is authorized on its fixed development branch. It is
+  documentation/governance work only and does not change the P8 executable baseline or
+  authorize P10.
 
 Rebaseline boundary:
 
@@ -176,6 +179,134 @@ v0.1 local reference release candidate, not production readiness, production sec
 high availability, enterprise IAM, real-provider readiness, compliance, or any other
 excluded capability. Human evaluation, live-provider evidence, and the unmeasured
 five-minute target remain `not_evaluated`.
+
+## P9-P15 v0.2 Public Pilot sequence
+
+The following phases are non-mergeable and non-skippable. Every phase must complete this
+sequence before the next phase can be planned or started:
+
+```text
+development complete
+-> independent acceptance
+-> scoped correction when required
+-> final acceptance
+-> fast-forward merge
+-> main verification
+-> only then plan the next phase
+```
+
+Passing one phase never authorizes the next. v0.2 targets a Public Pilot, not production-
+ready 1.0. The plan does not claim HA, enterprise IAM, production tenancy/security,
+large-scale multi-tenancy, compliance certification, or production readiness.
+
+## P9 — Productization Rebaseline
+
+Create only v0.2 product/architecture/security documents, ADRs, the fixed acceptance
+contract, governance gates, tests, provenance, and `static`/`synthetic_offline` evidence.
+Define AgentPackage, ColleagueDeployment, ExternalConnection, ConnectorGrant,
+AutomaticEffectAuthorization, SourceReference/SourceCursor, language, compatibility,
+provider, privacy, and live-evidence boundaries. Inventory existing milestone-shaped
+Studio/API metadata without editing runtime files.
+
+Exit: P9 direct and aggregate gates pass from the exact base; P0-P8 history and migrations
+001-007 remain byte-identical; migration 008 is absent; product/runtime change count is
+zero; evidence claims only `p9_productization_rebaseline_candidate`; status is development
+complete awaiting independent acceptance. P9 acceptance does not authorize P10.
+
+## P10 — Mac Quickstart and Distribution
+
+Add prebuilt, signed, attested multi-architecture GHCR images; `dc`
+doctor/quickstart/up/down/status/backup/restore/update/uninstall; Application Support
+layout; FileVault and secret boundaries; `zh-TW`/`en-US` translation-key foundation;
+product metadata; and a deterministic measured five-minute Mac quickstart.
+
+P10 owns removal of user-visible milestone branding and FastAPI product metadata. Existing
+`/p5` and `/p6` routes remain compatibility surfaces. New v0.2 public APIs use stable
+product vocabulary under `/api/v1` and require a separate alias/deprecation/removal
+contract. P10 adds no AgentPackage lifecycle, OpenAI gateway, or Microsoft 365 connector.
+
+Exit: signed/attested distribution and deterministic quickstart gates pass with secret and
+compatibility boundaries; no P11+ capability is present.
+
+## P11 — Agent Package and Multi-Agent Lifecycle
+
+Add the declarative non-executable `dc-agent/v1` schema; package
+inspect/validate/install/upgrade/rollback/trust/revoke; GitHub artifact attestation and
+explicit trust review; Catalog; deployment registry; no more than ten active Agents;
+bounded declarative workflows; and migration of the single v0.1 colleague to a
+legacy/manual ColleagueDeployment without authority loss.
+
+An AgentPackage requests capabilities only and is not an S4 Skill. Updates create new
+drafts and never auto-apply. Stale/revoked versions are refused. Migration 008 may first be
+added here only if an additive schema need exists; migrations 001-007 remain immutable.
+New schemas and APIs use stable product terms, not milestone names.
+
+Exit: package safety/provenance/trust/update/rollback, legacy preservation, and ten-Agent
+namespace/isolation gates pass. Multiple deployments do not establish S3 collaboration.
+
+## P12 — OpenAI Model Gateway
+
+Implement the OpenAI `gpt-5.5` Responses API gateway with Structured Outputs,
+`store:false`, bounded input/output and usage/cost, connection lifecycle, prompt layering,
+refusal/incomplete/schema-error handling, prompt-injection refusal, and model provenance.
+Expose no function/hosted tools, MCP, browser/computer use, shell, connector credentials,
+or execution authority. The server reconstructs every authoritative field.
+
+Official OpenAI docs and actual project access are rechecked before development and every
+live acceptance. An unavailable/incompatible model requires a Change Decision. No silent
+substitution is allowed. Without actual project access, live acceptance is
+`not_evaluated`. P12 executes no connector or external effect.
+
+Exit: static/synthetic gateway contracts pass; private live compatibility passes only when
+actual project access is available and separately stored.
+
+## P13 — Microsoft 365 Connector Foundation
+
+Implement one dedicated delegated Microsoft 365 work/school identity per Agent; verified
+project multi-tenant and BYO single-tenant public-client App modes; device-code flow;
+user-consent/Admin-pre-consent/selected-resource lifecycle; Outlook per-folder delta;
+Teams allowlisted bounded-date polling with message ID/etag dedupe and no public
+webhook/relay; Planner read/write with ETag/`If-Match`; SharePoint selected-site/folder
+read-only; and ExternalConnection/ConnectorGrant lifecycle.
+
+Test Graph 401/403/429/5xx, refresh/revoke, throttling, ambiguity, retry,
+reconciliation, restart cursor, cross-Agent/tenant denial, and bounded temporary source
+context. Connector content is not S1 Semantic Memory. Without real tenants, named-provider
+compatibility remains `not_evaluated`; mock/stub/loopback cannot substitute.
+
+Exit: connector authority, cursor, minimization, and synthetic/loopback gates pass; private
+live compatibility is reported only from real authorized tenants.
+
+## P14 — Built-in Project Tracker
+
+Add the bilingual official `project-tracker` AgentPackage plus setup, deploy, health,
+timeline, usage, and audit UI. Implement the exact effect outcomes
+`auto_within_boundary`, `require_approval`, and `deny`, with durable
+AutomaticEffectAuthorization separate from HumanApprovalDecision. The built-in does not
+request `delete_task`; third-party deletion requests are separately prominent.
+
+Prevent self-reply, Agent-to-Agent loops, duplicate messages/effects, replay, and
+notification flooding. P14 adds no Semantic Memory, shared knowledge, Agent collaboration,
+or executable Skill runtime.
+
+Exit: end-to-end synthetic/loopback tracker, effect-policy, failure, restart, and audit
+gates pass without live-provider overclaim.
+
+## P15 — Always-on and Public Pilot Release
+
+Add Mac local and Linux/Mac mini always-on profiles, SSH-tunneled Studio, a ten-Agent
+72-hour soak, live OpenAI/Microsoft 365 acceptance, human evaluation, and release
+artifacts/SBOM/checksums/attestations.
+
+Minimum private live prerequisites are two Microsoft 365 test tenants, ten dedicated Agent
+test accounts, one usable OpenAI test project, one verified project multi-tenant Entra
+public-client App, one BYO single-tenant App, delegated user-consent and Admin-consent test
+capability, real Outlook/Teams/Planner/SharePoint test data, and private live-acceptance
+storage outside the public tree. A mock, stub, or loopback cannot satisfy this live gate.
+
+Exit: all static, synthetic, live-private, human-evaluation, security/privacy, soak,
+distribution, and rollback requirements pass. Tag, push, publish, upload, or Release
+creation still requires final live acceptance and separate explicit user authorization.
 
 ## Post-v0.1 outlook
 

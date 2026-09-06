@@ -5,6 +5,12 @@
 Status: non-committing outlook. These stages are not v0.1 requirements, release promises, or
 authorization to begin implementation.
 
+The separately gated [v0.2 Public Pilot plan](v0.2-public-pilot-product-brief.md) does not
+start or satisfy S1-S4. AgentPackage is a non-executable declaration and is not S4 Skill;
+temporary external source context is not S1 Semantic Memory; and multiple isolated
+ColleagueDeployments are not S3 shared knowledge or Agent collaboration. These distinctions
+remain authoritative throughout P9-P15.
+
 ## Boundary and sequencing
 
 The accepted v0.1 direction remains governance, persistent finite work, exact-effect human

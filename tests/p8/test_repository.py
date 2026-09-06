@@ -16,6 +16,7 @@ from scripts.check_p8_provenance import ProvenanceError, check_provenance
 from scripts.check_p8_repository import (
     ACCEPTED_P8_COMMIT,
     ACCEPTED_P8_IMMUTABLE_PATHS,
+    P9_ALLOWED_PATHS,
     RepositoryError,
     check_repository,
 )
@@ -28,7 +29,7 @@ from scripts.p8_release_support import ACCEPTANCE_COMMIT, BASE_COMMIT
 from scripts.run_p8_toolchain import PRIOR_CURRENT_TREE
 from tests.p8.fixtures import ROOT
 
-EXPECTED_POST_MERGE_PATHS = {
+EXPECTED_P8_CHECKPOINT_PATHS = {
     "README.md",
     "SECURITY.md",
     "docs/p8/release-checklist.md",
@@ -40,6 +41,22 @@ EXPECTED_POST_MERGE_PATHS = {
     "tests/p8/test_release.py",
     "tests/p8/test_repository.py",
 }
+P9_BASE_COMMIT = "b093a4fa54bf30cef838c72222d1ae63c4eab9d9"
+EXPECTED_POST_MERGE_PATHS = EXPECTED_P8_CHECKPOINT_PATHS | P9_ALLOWED_PATHS
+EXPECTED_IMPLEMENTATION_PATHS = EXPECTED_POST_MERGE_PATHS - {"artifacts/p9/summary.json"}
+
+
+def _expected_real_paths() -> set[str]:
+    changed = set(
+        subprocess.check_output(
+            ["git", "diff", "--name-only", ACCEPTED_P8_COMMIT, "HEAD", "--"],
+            cwd=ROOT,
+            text=True,
+        ).splitlines()
+    )
+    if "artifacts/p9/summary.json" in changed:
+        return EXPECTED_POST_MERGE_PATHS
+    return EXPECTED_IMPLEMENTATION_PATHS
 
 
 def _clone(directory: Path) -> Path:
@@ -150,6 +167,7 @@ class P8RepositoryTests(unittest.TestCase):
 
     def test_real_tree_has_fixed_base_acceptance_history_and_required_files(self) -> None:
         result = check_repository(ROOT)
+        expected = _expected_real_paths()
         self.assertEqual(result["gate"], "p8_repository_clean")
         self.assertEqual(result["base_commit"], BASE_COMMIT)
         self.assertEqual(result["merge_base"], BASE_COMMIT)
@@ -163,12 +181,12 @@ class P8RepositoryTests(unittest.TestCase):
         self.assertEqual(result["residue_count"], 0)
         self.assertFalse(result["migration_008"])
         self.assertEqual(result["descendant_boundary_status"], "passed")
-        self.assertEqual(result["post_merge_change_count"], 10)
-        self.assertEqual(result["post_merge_path_count"], 10)
-        self.assertEqual(result["post_merge_allowed_path_count"], 10)
+        self.assertEqual(result["post_merge_change_count"], len(expected))
+        self.assertEqual(result["post_merge_path_count"], len(expected))
+        self.assertEqual(result["post_merge_allowed_path_count"], len(expected))
         self.assertEqual(result["post_merge_unexpected_path_count"], 0)
 
-    def test_real_hotfix_committed_delta_is_exactly_the_reviewed_ten_paths(self) -> None:
+    def test_real_descendant_delta_is_exactly_checkpoint_plus_p9_paths(self) -> None:
         changed = set(
             subprocess.check_output(
                 ["git", "diff", "--name-only", ACCEPTED_P8_COMMIT, "HEAD", "--"],
@@ -176,13 +194,39 @@ class P8RepositoryTests(unittest.TestCase):
                 text=True,
             ).splitlines()
         )
-        self.assertEqual(changed, EXPECTED_POST_MERGE_PATHS)
+        expected = _expected_real_paths()
+        self.assertEqual(changed, expected)
         repository = check_repository(ROOT)
         provenance = check_provenance(ROOT)
         for result in (repository, provenance):
             self.assertEqual(result["descendant_boundary_status"], "passed")
-            self.assertEqual(result["post_merge_path_count"], len(EXPECTED_POST_MERGE_PATHS))
+            self.assertEqual(result["post_merge_path_count"], len(expected))
             self.assertEqual(result["post_merge_unexpected_path_count"], 0)
+
+    def test_partial_p9_descendant_delta_fails_both_retained_gates(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="digital-colleagues-p8-partial-p9-") as name:
+            root = _clone(Path(name))
+            subprocess.run(
+                ["git", "switch", "--quiet", "--detach", ACCEPTED_P8_COMMIT],
+                cwd=root,
+                check=True,
+            )
+            for relative in sorted(EXPECTED_P8_CHECKPOINT_PATHS):
+                content = subprocess.check_output(
+                    ["git", "show", f"{P9_BASE_COMMIT}:{relative}"], cwd=ROOT
+                )
+                target = root / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(content + b"\npartial checkpoint fixture\n")
+            acceptance = root / "docs/p9/acceptance.md"
+            acceptance.parent.mkdir(parents=True, exist_ok=True)
+            acceptance.write_text("partial P9 fixture\n", encoding="utf-8")
+            subprocess.run(["git", "add", "--all"], cwd=root, check=True)
+            _commit(root, "partial P9 descendant")
+            with self.assertRaisesRegex(RepositoryError, "incomplete"):
+                check_repository(root)
+            with self.assertRaisesRegex(ProvenanceError, "incomplete"):
+                check_provenance(root)
 
     def test_committed_out_of_scope_descendant_paths_fail_both_gates(self) -> None:
         paths = (
@@ -199,7 +243,7 @@ class P8RepositoryTests(unittest.TestCase):
             "docs/p7/acceptance.md",
             "artifacts/p7/summary.json",
             "provenance/p7-migration-receipt.json",
-            "docs/development.md",
+            "docs/product/v0.1-product-brief.md",
             "scripts/check_p8_operations.py",
             "tests/p8/test_backup_restore.py",
         )

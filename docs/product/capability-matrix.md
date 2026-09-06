@@ -20,6 +20,11 @@ compliance, or other excluded capability. Human evaluation, live-provider eviden
 the unmeasured five-minute target remain `not_evaluated`. Post-v0.1 S1–S4 and Self-initiated
 autonomy have not started and do not start automatically.
 
+P9 now defines a documentation-only path toward a future v0.2 Public Pilot. It does not
+change any implemented v0.1 status below. Planned v0.2 objects, phases, evidence, and claim
+limits are in the [v0.2 capability matrix](v0.2-public-pilot-capability-matrix.md) and
+[v0.2 product brief](v0.2-public-pilot-product-brief.md).
+
 | Capability | v0.1 target | Current status | Boundary |
 | --- | --- | --- | --- |
 | Colleague registry | Yes | P3 headless persistence | Local namespaced SQLite reference only |

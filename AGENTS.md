@@ -23,7 +23,7 @@ recorded in the project.
 
 ## Milestone discipline
 
-- Work only in P0 through P8 order.
+- Preserve the accepted P0 through P8 history, then work only in P9 through P15 order.
 - Do not begin the next milestone until the current milestone's documented gate passes.
 - An exit criterion requires a repeatable command and an evidence artifact.
 - A failed hypothesis stays in the record with its consequence.
@@ -34,6 +34,11 @@ recorded in the project.
 - P1 may create repository policy, packaging, Studio shell, development, and CI scaffold
   only. It must not add P2 core primitives, migrations, application services, adapters,
   APIs, workers, Compose topology, or migrated source content.
+- P9 is an authorized productization rebaseline containing only documents, ADRs, fixed
+  acceptance contracts, governance gates, tests, provenance, and static/synthetic evidence.
+  It adds no runtime capability and does not authorize P10.
+- P10 through P15 remain ordered, independently gated work defined in `docs/roadmap.md`.
+  Passing one phase never authorizes the next.
 
 ## Source repository boundary
 

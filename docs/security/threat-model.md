@@ -124,3 +124,11 @@ evidence pass.
   a complete third-party security assessment.
 
 These are explicit limitations, not deferred claims.
+
+## v0.2 planning continuation
+
+The [v0.2 Public Pilot threat model](v0.2-public-pilot-threat-model.md) adds future package,
+multi-Agent, OpenAI, Microsoft 365, connection/grant, temporary-source, and automatic-
+authorization requirements. P9 implements none of those capabilities. This v0.1 model and
+all accepted P0-P8 statements remain unchanged in meaning; the v0.2 model cannot be cited
+as evidence that a planned control exists or works.
