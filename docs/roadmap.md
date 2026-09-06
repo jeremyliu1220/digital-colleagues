@@ -6,15 +6,19 @@ Each milestone stops at its gate. A later milestone must not begin automatically
 
 Current checkpoint:
 
-- P7 has passed independent acceptance and was fast-forward merged into `main`.
-- The accepted P7 `main` baseline and fixed P8 base is
-  `df47f8d075f7c0660ab5ed6035f8acfa3d3da4dc`.
-- Historical P0–P7 acceptance, artifacts, evidence, receipts, and migrations remain
-  unchanged.
-- P8 release-readiness development started from that fixed base on
-  `codex/p8-release-readiness`. P8 development complete, awaiting independent
-  acceptance. It must not be described as accepted, published, production-ready, or a
-  formal release.
+- P8 passed independent acceptance and was fast-forward merged from
+  `codex/p8-release-readiness` to `main`.
+- The accepted P8 commit is `0bb80ab187932fbad42fbf665b8310987609a1f5`.
+- Historical P0–P8 artifacts, evidence, acceptance contracts, receipts, and migrations
+  remain unchanged.
+- The result is only a **v0.1 local reference release candidate** for version `0.1.0`: no
+  tag has been created, and nothing has been published, uploaded, or formally released.
+- It is not production-ready and establishes no production security, high availability,
+  enterprise IAM, real-provider readiness, compliance, or other excluded capability.
+- Human evaluation, live-provider evidence, and the unmeasured five-minute target remain
+  `not_evaluated`.
+- Post-v0.1 S1–S4 and Self-initiated autonomy have not started and do not start
+  automatically.
 
 Rebaseline boundary:
 
@@ -162,14 +166,16 @@ operation, production tenancy, compliance, real-provider pilot claims, Semantic 
 Skill Learning, shared knowledge, multi-person collaboration, and Self-initiated autonomy
 remain separate.
 
-Current development status: P8 has a fixed acceptance contract from the accepted P7 base.
-Development builds an unpublished `0.1.0` local reference candidate and implements
-WAL-consistent private backup, fail-closed restore, allowlisted diagnostics, deterministic
-supply-chain inventory, double-build comparison, public release checks, and actual default
-Compose operations. Independent acceptance returned findings; the original branch now
-contains the scoped corrections and regenerated evidence awaiting independent
-re-acceptance. P8 is not accepted, merged, tagged, published, or formally released, and no
-five-minute, human, live-provider, or production property is claimed.
+Accepted result: P8 is accepted and fast-forward merged to `main` at
+`0bb80ab187932fbad42fbf665b8310987609a1f5`. It builds an unpublished `0.1.0` local
+reference candidate and implements WAL-consistent private backup, fail-closed restore,
+allowlisted diagnostics, deterministic supply-chain inventory, double-build comparison,
+public release checks, and actual default Compose operations. No tag has been created, and
+nothing has been published, uploaded, or formally released. Acceptance establishes only a
+v0.1 local reference release candidate, not production readiness, production security,
+high availability, enterprise IAM, real-provider readiness, compliance, or any other
+excluded capability. Human evaluation, live-provider evidence, and the unmeasured
+five-minute target remain `not_evaluated`.
 
 ## Post-v0.1 outlook
 
@@ -178,3 +184,5 @@ orders separately gated exploration as S1 memory-loop closure, S2 memory autonom
 bounded goal-driven proactivity, S3 knowledge decentralization and multi-person
 collaboration, and S4 a governed Skill system. Self-initiated autonomy may be considered
 only after those stages; none of these capabilities is required for the v0.1 P4–P8 gates.
+S1–S4 and Self-initiated autonomy have not started, do not start automatically, and remain
+uncommitted work behind independent future Gates.

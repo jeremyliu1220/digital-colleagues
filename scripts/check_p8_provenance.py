@@ -15,6 +15,7 @@ from typing import Any
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from scripts.check_p8_repository import ACCEPTED_P8_COMMIT
 from scripts.p8_release_support import BASE_COMMIT
 
 RECEIPT = "provenance/p8-migration-receipt.json"
@@ -41,6 +42,45 @@ def _git(root: Path, *arguments: str) -> tuple[str, ...]:
     return tuple(line for line in completed.stdout.splitlines() if line)
 
 
+def _git_object(root: Path, revision_path: str) -> bytes:
+    completed = subprocess.run(
+        ["git", "show", revision_path],
+        cwd=root,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    if completed.returncode != 0:
+        raise ProvenanceError("an accepted P8 Git object is unavailable")
+    return completed.stdout
+
+
+def _require_commit(root: Path) -> None:
+    completed = subprocess.run(
+        ["git", "cat-file", "-e", f"{ACCEPTED_P8_COMMIT}^{{commit}}"],
+        cwd=root,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    if completed.returncode != 0:
+        raise ProvenanceError("the accepted P8 commit is unavailable")
+
+
+def _require_accepted_ancestor(root: Path) -> None:
+    completed = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", ACCEPTED_P8_COMMIT, "HEAD"],
+        cwd=root,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    if completed.returncode == 1:
+        raise ProvenanceError("the accepted P8 commit is not an ancestor of HEAD")
+    if completed.returncode != 0:
+        raise ProvenanceError("Git P8 ancestry inspection failed")
+
+
 def _safe_path(value: object) -> str:
     if not isinstance(value, str) or not value:
         raise ProvenanceError("receipt destination is invalid")
@@ -51,27 +91,31 @@ def _safe_path(value: object) -> str:
 
 
 def changed_files(root: Path) -> set[str]:
-    changed = set(_git(root, "diff", "--name-only", BASE_COMMIT, "--"))
-    changed.update(_git(root, "ls-files", "--others", "--exclude-standard"))
+    changed = set(_git(root, "diff", "--name-only", BASE_COMMIT, ACCEPTED_P8_COMMIT, "--"))
     return {path for path in changed if path not in EXCLUDED}
 
 
 def framed_digest(root: Path, paths: set[str]) -> str:
     aggregate = hashlib.sha256()
     for relative in sorted(paths):
-        document = root / relative
-        if not document.is_file():
-            raise ProvenanceError("a P8 implementation destination is missing")
-        for value in (relative.encode(), hashlib.sha256(document.read_bytes()).digest()):
+        content = _git_object(root, f"{ACCEPTED_P8_COMMIT}:{relative}")
+        for value in (relative.encode(), hashlib.sha256(content).digest()):
             aggregate.update(len(value).to_bytes(8, "big"))
             aggregate.update(value)
     return "sha256:" + aggregate.hexdigest()
 
 
 def check_provenance(root: Path) -> dict[str, object]:
+    root = root.resolve()
+    _require_commit(root)
+    _require_accepted_ancestor(root)
     path = root / RECEIPT
     try:
-        receipt: Any = json.loads(path.read_text(encoding="utf-8"))
+        current_receipt = path.read_bytes()
+        accepted_receipt = _git_object(root, f"{ACCEPTED_P8_COMMIT}:{RECEIPT}")
+        if current_receipt != accepted_receipt:
+            raise ProvenanceError("the accepted P8 receipt changed")
+        receipt: Any = json.loads(accepted_receipt.decode("utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         raise ProvenanceError("P8 receipt is unreadable") from exc
     if not isinstance(receipt, dict) or set(receipt) != {
@@ -109,10 +153,12 @@ def check_provenance(root: Path) -> dict[str, object]:
     return {
         "schema_version": 1,
         "gate": "p8_provenance_clean",
+        "accepted_p8_commit": ACCEPTED_P8_COMMIT,
+        "implementation_range": f"{BASE_COMMIT}..{ACCEPTED_P8_COMMIT}",
         "transformed_migration_count": 0,
         "new_implementation_count": len(destinations),
         "source_basis": BASIS,
-        "receipt_digest": "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest(),
+        "receipt_digest": "sha256:" + hashlib.sha256(accepted_receipt).hexdigest(),
         "implementation_tree_digest": framed_digest(root, actual),
     }
 

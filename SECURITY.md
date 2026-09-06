@@ -4,13 +4,17 @@
 
 ## Supported status
 
-Digital Colleagues is pre-release research software. P7 is the independently accepted
-local reference baseline at `df47f8d075f7c0660ab5ed6035f8acfa3d3da4dc`. **P8
-development complete, awaiting independent acceptance** for candidate version `0.1.0`.
-No version is production-supported or
-formally released, and no production security/privacy, compliance, availability,
-enterprise-IAM, encryption-at-rest, or tenancy-isolation claim is made.
-P8 remains subject to independent acceptance and separate version-management authority.
+Digital Colleagues is pre-release research software. **P8 passed independent acceptance
+and was fast-forward merged from `codex/p8-release-readiness` to `main`.** The accepted P8
+commit is `0bb80ab187932fbad42fbf665b8310987609a1f5`. The result is only a **v0.1 local
+reference release candidate** for version `0.1.0`: no tag has been created, and nothing
+has been published, uploaded, or formally released. It is not production-ready and
+establishes no production security, high availability, enterprise IAM, real-provider
+readiness, compliance, security certification, production hardening, or other excluded
+capability. Human evaluation, live-provider evidence, and the unmeasured five-minute
+target remain `not_evaluated`. Post-v0.1 S1–S4 and Self-initiated autonomy have not started
+and do not start automatically. P0–P8 accepted artifacts, evidence, acceptance contracts,
+receipts, and migrations remain historical and unchanged.
 
 ## Reporting a vulnerability
 

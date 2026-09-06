@@ -17,7 +17,16 @@ if __package__ in {None, ""}:
 from scripts.check_p7_repository import check_repository as check_p7_repository
 from scripts.p8_release_support import ACCEPTANCE_COMMIT, BASE_COMMIT
 
+# The evidence writer imports BRANCH and the fixed development-boundary commits. General
+# repository health is instead anchored to the independently accepted P8 main baseline and
+# never to the checkout branch name.
 BRANCH = "codex/p8-release-readiness"
+ACCEPTED_P8_COMMIT = "0bb80ab187932fbad42fbf665b8310987609a1f5"
+ACCEPTED_P8_IMMUTABLE_PATHS = (
+    "artifacts/p8/summary.json",
+    "docs/p8/acceptance.md",
+    "provenance/p8-migration-receipt.json",
+)
 ACCEPTANCE_DOCUMENT_PATHS = ("docs/p8/acceptance.md",)
 HISTORICAL_PATHS = (
     "artifacts/p0",
@@ -135,6 +144,37 @@ def _is_ancestor(root: Path, ancestor: str, descendant: str) -> bool:
     return completed.returncode == 0
 
 
+def _require_commit(root: Path, commit: str) -> None:
+    completed = subprocess.run(
+        ["git", "cat-file", "-e", f"{commit}^{{commit}}"],
+        cwd=root,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    if completed.returncode != 0:
+        raise RepositoryError("the accepted P8 commit is unavailable")
+
+
+def _require_paths_unchanged(
+    root: Path,
+    *,
+    commit: str,
+    paths: tuple[str, ...],
+    missing_message: str,
+    changed_message: str,
+) -> int:
+    for relative in paths:
+        document = root / relative
+        if not document.is_file():
+            raise RepositoryError(missing_message)
+        accepted = _git(root, "show", f"{commit}:{relative}", text=False)
+        assert isinstance(accepted, bytes)
+        if document.read_bytes() != accepted:
+            raise RepositoryError(changed_message)
+    return len(paths)
+
+
 def _residue(root: Path) -> tuple[str, ...]:
     found: list[str] = []
     for path in root.rglob("*"):
@@ -154,6 +194,9 @@ def check_repository(root: Path) -> dict[str, object]:
     assert isinstance(top, str)
     if Path(top.strip()).resolve() != root:
         raise RepositoryError("P8 repository root is not exact")
+    _require_commit(root, ACCEPTED_P8_COMMIT)
+    if not _is_ancestor(root, ACCEPTED_P8_COMMIT, "HEAD"):
+        raise RepositoryError("the accepted P8 commit is not an ancestor of HEAD")
     if not _is_ancestor(root, BASE_COMMIT, "HEAD") or not _is_ancestor(
         root, ACCEPTANCE_COMMIT, "HEAD"
     ):
@@ -168,11 +211,20 @@ def check_repository(root: Path) -> dict[str, object]:
     assert isinstance(branch, str) and isinstance(head, str) and isinstance(merge_base, str)
     if merge_base.strip() != BASE_COMMIT:
         raise RepositoryError("P8 fixed merge-base drifted")
-    for relative in ACCEPTANCE_DOCUMENT_PATHS:
-        accepted = _git(root, "show", f"{ACCEPTANCE_COMMIT}:{relative}", text=False)
-        assert isinstance(accepted, bytes)
-        if not (root / relative).is_file() or (root / relative).read_bytes() != accepted:
-            raise RepositoryError("the fixed P8 acceptance contract changed")
+    accepted_p8_immutable_count = _require_paths_unchanged(
+        root,
+        commit=ACCEPTED_P8_COMMIT,
+        paths=ACCEPTED_P8_IMMUTABLE_PATHS,
+        missing_message="an accepted P8 immutable file is missing",
+        changed_message="an accepted P8 immutable file changed",
+    )
+    _require_paths_unchanged(
+        root,
+        commit=ACCEPTANCE_COMMIT,
+        paths=ACCEPTANCE_DOCUMENT_PATHS,
+        missing_message="the fixed P8 acceptance contract is missing",
+        changed_message="the fixed P8 acceptance contract changed",
+    )
     historical = _git(root, "diff", "--name-only", BASE_COMMIT, "--", *HISTORICAL_PATHS)
     assert isinstance(historical, str)
     if historical.strip():
@@ -188,6 +240,9 @@ def check_repository(root: Path) -> dict[str, object]:
     return {
         "schema_version": 1,
         "gate": "p8_repository_clean",
+        "accepted_p8_commit": ACCEPTED_P8_COMMIT,
+        "accepted_p8_ancestor": True,
+        "accepted_p8_immutable_file_count": accepted_p8_immutable_count,
         "branch": branch.strip(),
         "head_commit": head.strip(),
         "base_commit": BASE_COMMIT,

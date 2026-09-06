@@ -8,13 +8,15 @@ Digital Colleagues is an open-source, local-first control plane and reference st
 making an AI coworker's identity, delegated authority, responsibilities, finite work,
 approvals, effects, persistence, and audit causality explicit and testable.
 
-> **Project status — P8 development complete, awaiting independent acceptance.** P7 passed
-> independent acceptance and was fast-forward merged to `main` at the fixed P8 base
-> `df47f8d075f7c0660ab5ed6035f8acfa3d3da4dc`. P8 `0.1.0` has passed its development
-> gates but has not passed independent acceptance. No tag, GitHub Release, package, image, or formal
-> release exists. Named-provider compatibility, live delivery, production readiness or
-> security, distributed operation, measured human improvement, and an unmeasured
-> five-minute limit are not claimed.
+> **Project status — P8 passed independent acceptance and was fast-forward merged from
+> `codex/p8-release-readiness` to `main`.** The accepted P8 commit is
+> `0bb80ab187932fbad42fbf665b8310987609a1f5`. The result is only a **v0.1 local
+> reference release candidate** for version `0.1.0`: no tag has been created, and nothing
+> has been published, uploaded, or formally released. It is not production-ready and
+> establishes no production security, high availability, enterprise IAM, real-provider
+> readiness, compliance, or other excluded capability. Human evaluation, live-provider
+> evidence, and the unmeasured five-minute target remain `not_evaluated`. Post-v0.1 S1–S4
+> and Self-initiated autonomy have not started and do not start automatically.
 
 ## What makes a digital colleague different?
 
@@ -37,7 +39,7 @@ The target is a local deterministic reference implementation—not enterprise IA
 production tenancy isolation, high availability, compliance certification, or a hosted
 service.
 
-## Accepted P7 baseline and P8 contract
+## Accepted P8 main baseline and historical contract
 
 P5 retained the accepted P4 local Compose and Studio path and added an inert, revisioned
 Profile/Mandate/policy draft. A local Admin reviews explicit defaults and a classified
@@ -49,12 +51,13 @@ two-person authority changes, recovery, approval revalidation, and bounded audit
 P7 adds accepted, explicitly optional provider-neutral HTTP JSON adapters behind the same
 ports while retaining deterministic/reference defaults. Its public evidence is only an
 offline loopback contract and proves no named-provider compatibility or real delivery. P8
-starts from that fixed baseline and defines release/operations convergence in its
-[acceptance contract](docs/p8/acceptance.md), [operator guide](docs/p8/operations.md),
-[release checklist](docs/p8/release-checklist.md), and
-[release Golden Path](docs/p8/release-golden-path.md).
+started from that fixed baseline and converged release/operations readiness under its
+fixed historical [acceptance contract](docs/p8/acceptance.md),
+[operator guide](docs/p8/operations.md), [release checklist](docs/p8/release-checklist.md),
+and [release Golden Path](docs/p8/release-golden-path.md). The accepted P0–P8 artifacts,
+evidence, acceptance contracts, receipts, and migrations remain historical and unchanged.
 
-## P8 development verification
+## P8 release-candidate verification
 
 Prerequisites are Python 3.12+, Node.js 24.15.0, npm 11.12.1 through Corepack, Git, Make,
 and Docker Engine/Compose for the required actual operational Gate.
@@ -147,7 +150,7 @@ No public Gate requires provider credentials or live data. P7 uses only temporar
 loopback credentials, while P8 default operations contact no provider. Do not put live
 credentials, databases, backups, diagnostics, or data in this tree.
 See [local development](docs/development.md) for exact commands and troubleshooting. The
-accepted P0–P4 evidence remains historical and must not be rebuilt from the P5 tree.
+accepted P0–P8 evidence remains historical and must not be rebuilt from this tree.
 
 ## Repository map
 
@@ -177,9 +180,9 @@ provenance/              fixed-revision source and scanner manifests
 artifacts/               machine-readable milestone summaries
 ```
 
-The private parent research repository remains read-only. P0-P7 history, acceptance,
+The private parent research repository remains read-only. P0-P8 history, acceptance,
 artifacts, evidence, migrations 001-007, fingerprints, and provenance receipts remain
-unchanged. P8 starts from the accepted public P7 baseline and migrates no parent
+unchanged. P8 started from the accepted public P7 baseline and migrated no parent
 working-tree content.
 
 ## Contributing and security

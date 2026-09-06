@@ -10,6 +10,10 @@ import unittest
 from pathlib import Path
 from typing import Any, cast
 
+from scripts.check_p8_release import (
+    PUBLIC_STATUS_PATHS,
+    _release_documents,
+)
 from scripts.check_p8_supply_chain import SupplyChainError, check_supply_chain
 from scripts.p8_release_support import (
     ARTIFACT_NAMES,
@@ -22,7 +26,122 @@ from scripts.p8_release_support import (
 from tests.p8.fixtures import ROOT
 
 
+def _public_status_fixture(directory: Path) -> Path:
+    root = directory / "repository"
+    subprocess.run(["git", "clone", "--quiet", "--shared", str(ROOT), str(root)], check=True)
+    for relative in PUBLIC_STATUS_PATHS:
+        shutil.copyfile(ROOT / relative, root / relative)
+    return root
+
+
+def _replace(root: Path, relative: str, old: str, new: str) -> None:
+    path = root / relative
+    document = path.read_text(encoding="utf-8")
+    if old not in document:
+        raise AssertionError(f"fixture text missing from {relative}: {old}")
+    path.write_text(document.replace(old, new, 1), encoding="utf-8")
+
+
 class P8ReleaseTests(unittest.TestCase):
+    def test_public_post_merge_status_passes_without_rejecting_historical_terms(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="digital-colleagues-p8-status-") as name:
+            root = _public_status_fixture(Path(name))
+            self.assertIn(
+                "development complete,\nawaiting independent acceptance",
+                (root / "docs/p8/acceptance.md").read_text(encoding="utf-8"),
+            )
+            self.assertIn(
+                '"status": "development_complete_awaiting_independent_acceptance"',
+                (root / "artifacts/p8/summary.json").read_text(encoding="utf-8"),
+            )
+            _release_documents(root)
+
+    def test_readme_pre_acceptance_status_fails_real_release_gate(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="digital-colleagues-p8-readme-stale-") as name:
+            root = _public_status_fixture(Path(name))
+            _replace(
+                root,
+                "README.md",
+                "P8 passed independent acceptance",
+                "P8 development complete, awaiting independent acceptance",
+            )
+            with self.assertRaises(ReleaseError):
+                _release_documents(root)
+
+    def test_roadmap_rejected_or_p7_checkpoint_status_fails_real_release_gate(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="digital-colleagues-p8-roadmap-stale-") as name:
+            temporary = Path(name)
+            for label, old, new in (
+                (
+                    "not-accepted",
+                    "P8 passed independent acceptance",
+                    "P8 is not accepted and P8 is not merged",
+                ),
+                (
+                    "p7-checkpoint",
+                    "Current checkpoint:\n\n- P8 passed independent acceptance",
+                    "Current checkpoint:\n\n- P7 has passed independent acceptance",
+                ),
+            ):
+                root = _public_status_fixture(temporary / label)
+                _replace(root, "docs/roadmap.md", old, new)
+                with self.assertRaises(ReleaseError, msg=label):
+                    _release_documents(root)
+
+    def test_capability_matrix_pre_acceptance_status_fails_real_release_gate(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="digital-colleagues-p8-matrix-stale-") as name:
+            root = _public_status_fixture(Path(name))
+            _replace(
+                root,
+                "docs/product/capability-matrix.md",
+                "| Upgrade, backup, restore, and release rollback | Yes | P8 accepted main baseline |",
+                "| Upgrade, backup, restore, and release rollback | Yes | "
+                "P8 development complete, awaiting independent acceptance |",
+            )
+            with self.assertRaises(ReleaseError):
+                _release_documents(root)
+
+    def test_release_checklist_development_branch_requirement_fails_real_gate(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="digital-colleagues-p8-checklist-stale-") as name:
+            root = _public_status_fixture(Path(name))
+            _replace(
+                root,
+                "docs/p8/release-checklist.md",
+                "Release work starts from a clean `main` containing accepted P8 commit",
+                "HEAD is on `codex/p8-release-readiness`, clean, and contains accepted P8 commit",
+            )
+            with self.assertRaises(ReleaseError):
+                _release_documents(root)
+
+    def test_missing_unpublished_limitation_fails_real_release_gate(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="digital-colleagues-p8-release-limit-") as name:
+            root = _public_status_fixture(Path(name))
+            _replace(root, "README.md", "no tag has been created", "a tag has been created")
+            with self.assertRaises(ReleaseError):
+                _release_documents(root)
+
+    def test_formal_release_production_and_live_provider_overclaims_fail_real_gate(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="digital-colleagues-p8-overclaim-") as name:
+            temporary = Path(name)
+            cases = (
+                (
+                    "formal-release",
+                    "no tag has been created",
+                    "P8 is formally released and a tag has been created",
+                ),
+                ("production", "It is not production-ready", "P8 is production-ready"),
+                (
+                    "live-provider",
+                    "Human evaluation, live-provider evidence",
+                    "P8 is live-provider accepted; Human evaluation and live-provider evidence",
+                ),
+            )
+            for label, old, new in cases:
+                root = _public_status_fixture(temporary / label)
+                _replace(root, "README.md", old, new)
+                with self.assertRaises(ReleaseError, msg=label):
+                    _release_documents(root)
+
     def test_supply_chain_is_complete_sorted_hash_pinned_and_notice_scoped(self) -> None:
         commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
         first = build_supply_chain_inventory(ROOT, commit)

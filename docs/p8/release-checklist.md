@@ -2,17 +2,26 @@
 
 # P8 Release Candidate Checklist
 
-This checklist creates an unpublished v0.1 local reference candidate. A checked list does
-not mean P8 is independently accepted or that a Git tag, GitHub Release, package, image, or
-formal release exists.
+P8 passed independent acceptance and was fast-forward merged from
+`codex/p8-release-readiness` to `main`. The accepted P8 commit is
+`0bb80ab187932fbad42fbf665b8310987609a1f5`. Historical P0–P8 artifacts, evidence,
+acceptance contracts, receipts, and migrations remain unchanged. The accepted result is
+only a **v0.1 local reference release candidate** for version `0.1.0`: no tag has been
+created, and nothing has been published, uploaded, or formally released. It is not
+production-ready and establishes no production security, high availability, enterprise
+IAM, real-provider readiness,
+compliance, or other excluded capability. Human evaluation, live-provider evidence, and
+the unmeasured five-minute target remain `not_evaluated`. Post-v0.1 S1–S4 and Self-initiated
+autonomy have not started and do not start automatically. This checklist remains unchecked
+because this checkpoint hotfix performs no tag, publication, upload, or formal release.
 
 ## Source and history
 
-- [ ] HEAD is on `codex/p8-release-readiness`, clean, and has merge-base
-  `df47f8d075f7c0660ab5ed6035f8acfa3d3da4dc`.
-- [ ] Acceptance commit `eeb13ca643d5b512faab93e2e762ef4558dab688` and the committed
-  implementation commit are ancestors.
-- [ ] P0-P7 acceptance, evidence, artifacts, receipts, fingerprints, and migrations
+- [ ] Release work starts from a clean `main` containing accepted P8 commit
+  `0bb80ab187932fbad42fbf665b8310987609a1f5`, or an explicitly authorized descendant.
+- [ ] The accepted P8 commit is an ancestor of HEAD; the fixed P8 development history remains
+  anchored at merge-base `df47f8d075f7c0660ab5ed6035f8acfa3d3da4dc`.
+- [ ] P0-P8 acceptance, evidence, artifacts, receipts, fingerprints, and migrations
   001-007 are unchanged; migration 008 is absent.
 - [ ] Public-boundary scan reports zero exceptions and release archives contain no private
   state, backup, diagnostic, credential, log, cache, dependency tree, or build residue.
@@ -66,9 +75,9 @@ formal release exists.
 - [ ] `git diff --check`, public boundary, every focused P8 target, full P8 unittest,
   `make check`, `make p8-compose-runtime`, and `make p8-golden` pass with zero failures,
   errors, skips, expected failures, or unexpected successes.
-- [ ] Only after a clean implementation commit and all actual runtime checks pass,
-  `make evidence-p8` writes the summary atomically and it is committed alone.
+- [ ] The accepted P8 evidence summary remains byte-unchanged and no historical evidence
+  writer is invoked.
 - [ ] Final checks pass after the evidence commit and the worktree is clean.
-- [ ] Status is only “P8 development complete, awaiting independent acceptance”; human
-  evaluation, live-provider acceptance, production properties, and an unmeasured
-  five-minute target remain `not_evaluated` or explicitly excluded.
+- [ ] P8 remains accepted and merged but not tagged, published, uploaded, or formally
+  released; human evaluation, live-provider evidence, production properties, and the
+  unmeasured five-minute target remain `not_evaluated` or explicitly excluded.
