@@ -313,6 +313,13 @@ creates a verified rollback backup. Restore changes bytes, not authority rules: 
 returning sessions, membership, approvals, authority, and audit to the backup instant, the
 operator must rotate/revalidate them through existing P6 controls.
 
+The first release has an explicit accepted-P7 transition boundary. P7 version `0.0.0`
+predates release manifests, so a P8-authored source descriptor binds its immutable commit,
+tree, timestamp, schema, and migration digest while recording the absent manifest. Actual
+runtime evidence creates state with exact P7 code before P8 starts, backs it up, boots P8,
+and restores it for verification with exact P7 code. The replaced P8 state receives its own
+P8-bound rollback backup; source identities are never silently conflated.
+
 The release builder uses two OS temporary workspaces and normalizes time, ordering,
 ownership, modes, locale, timezone, gzip, tar, and wheel inputs. Runtime/build Python
 packages are exact and hash-checked, npm packages use exact integrity records, Docker base

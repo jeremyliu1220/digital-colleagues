@@ -17,6 +17,8 @@ if __package__ in {None, ""}:
 from scripts.run_p7_unittest_suite import REQUIRED_TEST_BOUNDARIES as P7_BOUNDARIES
 
 P8_BOUNDARIES = {
+    "tests.p8.test_backup_restore.P8BackupRestoreTests.test_first_release_p7_source_binding_and_cross_version_rollback_are_exact": "p8_first_release_transition_binding",
+    "tests.p8.test_backup_restore.P8BackupRestoreTests.test_read_only_database_uri_encodes_reserved_path_characters_without_urllib": "p8_uri_encoding_without_network_namespace",
     "tests.p8.test_backup_restore.P8BackupRestoreTests.test_live_wal_backup_restore_preserves_identity_authority_work_and_causality": "p8_wal_backup_restore_state",
     "tests.p8.test_backup_restore.P8BackupRestoreTests.test_restore_rejects_existing_state_corruption_and_incompatible_manifest": "p8_restore_corruption_manifest_refusal",
     "tests.p8.test_backup_restore.P8BackupRestoreTests.test_archive_path_traversal_symlink_unknown_member_and_future_schema_fail_closed": "p8_archive_and_future_schema_refusal",
@@ -24,9 +26,13 @@ P8_BOUNDARIES = {
     "tests.p8.test_diagnostics.P8DiagnosticsTests.test_bundle_is_exact_allowlisted_bounded_and_canary_free": "p8_diagnostics_allowlist_redaction",
     "tests.p8.test_diagnostics.P8DiagnosticsTests.test_diagnostics_rejects_unbounded_ids_existing_output_and_path_errors_are_finite": "p8_diagnostics_finite_failure",
     "tests.p8.test_release.P8ReleaseTests.test_supply_chain_is_complete_sorted_hash_pinned_and_notice_scoped": "p8_supply_chain_complete",
+    "tests.p8.test_release.P8ReleaseTests.test_nested_npm_package_identities_are_exact_and_scoped_names_survive": "p8_nested_npm_identity",
+    "tests.p8.test_release.P8ReleaseTests.test_container_host_toolchain_and_os_dependency_drift_fail_closed": "p8_toolchain_and_os_dependency_drift_refusal",
     "tests.p8.test_release.P8ReleaseTests.test_source_archive_policy_excludes_evidence_and_private_residue": "p8_source_archive_allowlist",
     "tests.p8.test_release.P8ReleaseTests.test_release_builder_refuses_dirty_tree_before_emitting_candidate": "p8_dirty_release_refusal",
     "tests.p8.test_repository.P8RepositoryTests.test_acceptance_historical_migration_and_residue_drift_fail_closed": "p8_history_residue_refusal",
+    "tests.p8.test_repository.P8RepositoryTests.test_p8_aggregate_executes_all_prior_current_tree_regressions": "p8_prior_current_tree_regressions",
+    "tests.p8.test_repository.P8RepositoryTests.test_studio_evidence_requires_positive_machine_readable_counts": "p8_studio_test_evidence",
     "tests.p8.test_repository.P8RepositoryTests.test_evidence_writer_refuses_dirty_or_incomplete_results": "p8_evidence_fail_closed",
 }
 REQUIRED_TEST_BOUNDARIES = {**P7_BOUNDARIES, **P8_BOUNDARIES}

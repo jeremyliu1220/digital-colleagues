@@ -197,3 +197,9 @@ P8 evidence is synthetic/offline and records only safe results/digests and clean
 Human evaluation, live-provider acceptance, and the unmeasured five-minute target remain
 `not_evaluated`. A clean Gate does not prove production privacy, security, compliance,
 software-supply-chain safety, or legal sufficiency.
+
+The first-release transition keeps its P7 database, session material, source-bound backup,
+P8 rollback backup, and temporary source tree inside the private runtime boundary and
+deletes them after verification. Public evidence records only fixed public source
+identities, finite classifications, versions, schema numbers, and zero-cleanup results; it
+does not record the database digest or session values.

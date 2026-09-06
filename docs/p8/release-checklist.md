@@ -24,6 +24,8 @@ formal release exists.
   integrity and declared license metadata.
 - [ ] Docker base images use manifest-list digests; GitHub Actions use 40-character
   commits; no release-critical `latest` or mutable-only reference exists.
+- [ ] Host and both Studio container builds execute Node 24.15.0 and integrity-pinned npm
+  11.12.1 checks; no Dockerfile installs an uninventoried OS package.
 - [ ] Deterministically sorted SBOM covers Python, npm, Hatchling, OCI bases, Actions, and
   release/operator tools with inclusion and attribution treatment.
 - [ ] Built Studio archive contains license texts for React, React DOM, and Scheduler.
@@ -46,6 +48,8 @@ formal release exists.
   reference channel; optional P7 HTTP adapters remain explicit opt-in.
 - [ ] API/worker/Studio health and authenticated smoke flow succeed without an external
   provider call.
+- [ ] Exact accepted P7 `0.0.0` code creates durable state and a source-bound backup before
+  P8 starts; upgrade and rollback run mechanically without inventing a P7 release manifest.
 - [ ] Synthetic durable identity, authority, finite work, Event/Timer, wake, Agenda,
   proposal, HUMAN approval, result, membership, and causal audit state exists.
 - [ ] Live-WAL online backup verifies; post-backup state changes; stopped restore and fresh

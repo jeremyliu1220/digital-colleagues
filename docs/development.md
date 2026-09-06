@@ -28,7 +28,11 @@ virtual environment, copies Studio to a temporary directory, runs environment ch
 deletes both. It creates no repository `.venv`, `node_modules`, cache, database, coverage,
 candidate, backup, diagnostics, or build output. Python runtime, development, and Hatchling
 build packages are exact and hash-checked. Studio packages are exact and carry npm
-integrity values.
+integrity values. The Studio Docker build uses the exact `node:24.15.0-alpine` manifest
+digest, checks Node/npm inside the build stage, invokes npm only through Corepack, and
+generates matching bounded build-toolchain metadata in the served bundle. No Dockerfile
+performs a separate OS
+package-manager install.
 
 The current schema applies immutable migrations 001-007. P7 adapters are stateless and P8
 adds no migration 008. Never edit an applied migration. A future schema change belongs to a
@@ -48,8 +52,9 @@ make p8-golden
 - full Python unittest with zero skips/failures/errors and required P0-P8 identities;
 - Studio ESLint, Prettier, TypeScript, Vitest, and Vite build;
 - zero-exception public-boundary scan;
-- applicable P0-P7 regressions against accepted history without running a historical
-  evidence writer;
+- all 38 applicable P2-P7 current-tree architecture, migration, security, policy, Studio,
+  Compose, adapter, and Golden Path regressions, plus the fixed P7 historical evidence
+  identity, without running a historical evidence writer;
 - P8 repository/provenance, operations, backup/restore, diagnostics, supply-chain,
   reproducibility, release, Compose runtime, and Golden Path gates; and
 - Git whitespace, residue, immutable-input, claim-boundary, and cleanup checks.
@@ -96,6 +101,12 @@ backup is WAL-consistent; restore validates format/digest/schema/migrations befo
 replacement; diagnostics emits one bounded allowlisted member. All state, backups,
 rollback backups, diagnostic bundles, credentials, and extracted candidates belong outside
 the repository with private permissions.
+
+The first-release P7→P8 path is distinct from same-version P8 backup/restore. The runtime
+Gate materializes the exact accepted P7 Git tree, creates P7 durable state with P7 code,
+backs it up before P8 starts using the fixed non-release source descriptor, starts P8,
+checks durable governance state, then restores and starts matching P7 code. P7 did not have
+a release manifest; the descriptor records that fact instead of fabricating one.
 
 ## P7 credential and network boundary
 

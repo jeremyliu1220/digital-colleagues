@@ -39,6 +39,7 @@ def check_golden_path(root: Path) -> dict[str, object]:
         "double_build_byte_equal": True,
         "candidate_default_compose": "deterministic_reference",
         "health_authenticated_smoke": "passed",
+        "first_release_transition": runtime["first_release_transition"],
         "durable_fixture": runtime["durable_fixture"],
         "online_backup": runtime["online_backup"],
         "restore_restart_state_equal": runtime["fresh_restart_state_equal"],

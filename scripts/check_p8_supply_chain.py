@@ -15,10 +15,17 @@ from pathlib import Path
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from scripts.p8_release_support import BASE_COMMIT, ReleaseError, build_supply_chain_inventory
+from scripts.p8_release_support import (
+    BASE_COMMIT,
+    NODE_VERSION,
+    NPM_VERSION,
+    ReleaseError,
+    build_supply_chain_inventory,
+)
 
 FROM_PATTERN = re.compile(r"^FROM\s+([^\s]+)", re.MULTILINE)
 ACTION_PATTERN = re.compile(r"uses:\s*([^@\s]+)@([0-9a-f]{40})")
+PACKAGE_MANAGER_PATTERN = re.compile(r"^npm@([0-9]+(?:\.[0-9]+){2})\+sha224\.[0-9a-f]{56}$")
 
 
 class SupplyChainError(RuntimeError):
@@ -83,9 +90,44 @@ def check_supply_chain(root: Path) -> dict[str, object]:
         matches = FROM_PATTERN.findall(document)
         if not matches or any("@sha256:" not in value for value in matches):
             raise SupplyChainError("a Docker base is mutable or missing")
+        if re.search(r"\b(?:apt-get|apk|dnf|yum)\s+(?:install|add)\b", document):
+            raise SupplyChainError("a Dockerfile installs an uninventoried OS package")
         actual_bases.update(matches)
     if not actual_bases.issubset(expected_bases) or len(actual_bases) != 3:
         raise SupplyChainError("Docker base inventory drifted")
+    package = json.loads((root / "studio/package.json").read_text(encoding="utf-8"))
+    manager = package.get("packageManager")
+    manager_match = PACKAGE_MANAGER_PATTERN.fullmatch(manager) if isinstance(manager, str) else None
+    studio_dockerfiles = tuple(
+        (root / relative).read_text(encoding="utf-8")
+        for relative in ("studio/Dockerfile", "studio/Dockerfile.p7")
+    )
+    node_reference = next(
+        (item for item in inputs["docker_bases"] if item.get("name") == "docker.io/library/node"),
+        None,
+    )
+    operator_versions = {item.get("name"): item.get("version") for item in inputs["operator_tools"]}
+    if (
+        (root / ".nvmrc").read_text(encoding="utf-8").strip() != NODE_VERSION
+        or package.get("engines", {}).get("node") != f">={NODE_VERSION} <25"
+        or manager_match is None
+        or manager_match.group(1) != NPM_VERSION
+        or operator_versions.get("node") != NODE_VERSION
+        or operator_versions.get("npm") != NPM_VERSION
+        or not isinstance(node_reference, dict)
+        or node_reference.get("version") != f"{NODE_VERSION}-alpine"
+        or any(
+            f'test "$(node --version)" = "v{NODE_VERSION}"' not in document
+            or f'test "$(corepack npm --version)" = "{NPM_VERSION}"' not in document
+            or "corepack npm ci --ignore-scripts --no-audit" not in document
+            or "corepack npm run build" not in document
+            or (f'\'{{"node":"{NODE_VERSION}","npm":"{NPM_VERSION}","schema_version":1}}\'')
+            not in document
+            or re.search(r"(?m)^RUN npm\s", document) is not None
+            for document in studio_dockerfiles
+        )
+    ):
+        raise SupplyChainError("host, container, or declared Studio toolchain drifted")
     workflow = (root / ".github/workflows/ci.yml").read_text(encoding="utf-8")
     actions = set(ACTION_PATTERN.findall(workflow))
     expected_actions = {(item["name"], item["commit"]) for item in inputs["github_actions"]}
@@ -116,6 +158,12 @@ def check_supply_chain(root: Path) -> dict[str, object]:
         "studio_integrity_locked": True,
         "docker_bases_digest_pinned": True,
         "github_actions_commit_pinned": True,
+        "host_node_version": NODE_VERSION,
+        "host_npm_version": NPM_VERSION,
+        "container_node_version": NODE_VERSION,
+        "container_npm_version": NPM_VERSION,
+        "container_toolchain_build_asserted": True,
+        "uninventoried_os_packages": 0,
         "bundled_studio_license_text_count": len(bundled),
         "root_notice": "unchanged_reviewed_project_notice",
         "review_class": "declared_metadata_review_not_legal_advice",

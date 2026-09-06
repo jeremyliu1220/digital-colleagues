@@ -23,6 +23,8 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 VERSION = "0.1.0"
+NODE_VERSION = "24.15.0"
+NPM_VERSION = "11.12.1"
 BASE_COMMIT = "df47f8d075f7c0660ab5ed6035f8acfa3d3da4dc"
 ACCEPTANCE_COMMIT = "eeb13ca643d5b512faab93e2e762ef4558dab688"
 ARTIFACT_NAMES = (
@@ -283,7 +285,7 @@ def _production_node_packages(package_lock: dict[str, Any]) -> tuple[tuple[str, 
     for path, value in packages.items():
         if not path or not isinstance(value, dict) or value.get("dev") is True:
             continue
-        name = PurePosixPath(path).name
+        name = _npm_package_name(path)
         version = value.get("version")
         license_name = value.get("license")
         if not isinstance(version, str) or not isinstance(license_name, str):
@@ -317,13 +319,21 @@ def _build_studio(source: Path, output: Path, *, epoch: int, environment: dict[s
     npm_version = (
         _run(["corepack", "npm", "--version"], cwd=studio, environment=environment).decode().strip()
     )
-    if node_version != "v24.15.0" or npm_version != "11.12.1":
+    if node_version != f"v{NODE_VERSION}" or npm_version != NPM_VERSION:
         raise ReleaseError("npm_version_invalid")
-    _run(["corepack", "npm", "ci", "--ignore-scripts"], cwd=studio, environment=environment)
+    _run(
+        ["corepack", "npm", "ci", "--ignore-scripts", "--no-audit"],
+        cwd=studio,
+        environment=environment,
+    )
     _run(["corepack", "npm", "run", "build"], cwd=studio, environment=environment)
     dist = studio / "dist"
     if not dist.is_dir():
         raise ReleaseError("studio_build_missing")
+    _write_json(
+        dist / "build-toolchain.json",
+        {"schema_version": 1, "node": NODE_VERSION, "npm": NPM_VERSION},
+    )
     prefix = f"digital-colleagues-studio-{VERSION}/"
     entries: list[tuple[str, bytes, int]] = []
     for path in sorted(dist.rglob("*")):
@@ -360,6 +370,22 @@ def _parse_python_lock(path: Path) -> dict[tuple[str, str], tuple[str, ...]]:
             raise ReleaseError("python_lock_invalid")
         result[key] = hashes
     return result
+
+
+def _npm_package_name(path: str) -> str:
+    marker = "node_modules/"
+    if marker not in path:
+        raise ReleaseError("studio_lock_path_invalid")
+    candidate = path.rsplit(marker, 1)[1]
+    parts = candidate.split("/")
+    if (
+        not candidate
+        or any(not part or part in {".", ".."} for part in parts)
+        or (candidate.startswith("@") and len(parts) != 2)
+        or (not candidate.startswith("@") and len(parts) != 1)
+    ):
+        raise ReleaseError("studio_lock_path_invalid")
+    return candidate
 
 
 def build_supply_chain_inventory(root: Path, commit: str) -> dict[str, object]:
@@ -416,7 +442,7 @@ def build_supply_chain_inventory(root: Path, commit: str) -> dict[str, object]:
             continue
         if not isinstance(value, dict):
             raise ReleaseError("studio_lock_invalid")
-        name = path.removeprefix("node_modules/")
+        name = _npm_package_name(path)
         node_version = value.get("version")
         license_name = value.get("license")
         integrity = value.get("integrity")

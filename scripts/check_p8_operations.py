@@ -54,6 +54,8 @@ def check_operations(root: Path) -> dict[str, object]:
         "tests_run": tests,
         "document_count": len(REQUIRED_DOCUMENTS),
         "upgrade": "verify_backup_stop_start_health_smoke",
+        "first_release_transition": "accepted_p7_git_object_0.0.0_to_p8_candidate_0.1.0",
+        "p7_release_manifest": "not_available_before_first_release",
         "rollback": "restore_verified_pre_upgrade_backup_with_matching_code",
         "destructive_down_migration": False,
         "private_backup_boundary": True,

@@ -17,18 +17,17 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import NoReturn, cast
-from urllib.parse import quote
 
 from digital_colleagues.operations.metadata import (
     MetadataError,
     MigrationBinding,
     ReleaseBinding,
     load_migration_bindings,
-    load_release_binding,
+    load_source_binding,
     sha256_file,
 )
 
-BACKUP_FORMAT_VERSION = 1
+BACKUP_FORMAT_VERSION = 2
 BACKUP_MEMBERS = ("manifest.json", "state.sqlite")
 MAX_MANIFEST_BYTES = 64 * 1024
 MAX_DATABASE_BYTES = 1024 * 1024 * 1024
@@ -44,6 +43,9 @@ class BackupReport:
     status: str
     schema_version: int
     migration_count: int
+    source_version: str
+    source_commit: str
+    source_class: str
 
 
 @dataclass(frozen=True)
@@ -52,6 +54,9 @@ class RestoreReport:
     schema_version: int
     migration_count: int
     rollback_backup_created: bool
+    restored_source_version: str
+    restored_source_commit: str
+    replaced_source_version: str | None
 
 
 def _raise(category: str, cause: BaseException | None = None) -> NoReturn:
@@ -78,7 +83,7 @@ def _require_safe_parent(path: Path) -> None:
 
 
 def _open_read_only(path: Path) -> sqlite3.Connection:
-    uri = "file:" + quote(path.absolute().as_posix(), safe="/") + "?mode=ro"
+    uri = path.absolute().as_uri() + "?mode=ro"
     try:
         connection = sqlite3.connect(uri, uri=True, timeout=5)
         connection.execute("PRAGMA foreign_keys = ON")
@@ -117,10 +122,10 @@ def _database_migrations(
 
 
 def _bindings(
-    *, release_manifest: Path, migrations_directory: Path
+    *, source_binding: Path, migrations_directory: Path
 ) -> tuple[ReleaseBinding, tuple[MigrationBinding, ...]]:
     try:
-        release = load_release_binding(release_manifest)
+        release = load_source_binding(source_binding)
         digest, migrations = load_migration_bindings(migrations_directory)
     except MetadataError as exc:
         _raise(str(exc), exc)
@@ -185,14 +190,14 @@ def backup_database(
     database: Path,
     output: Path,
     *,
-    release_manifest: Path,
+    source_binding: Path,
     migrations_directory: Path,
     created_at: datetime | None = None,
     backup_id: str | None = None,
 ) -> BackupReport:
     _require_regular_no_symlink(database, "database_source_invalid")
     release, expected = _bindings(
-        release_manifest=release_manifest, migrations_directory=migrations_directory
+        source_binding=source_binding, migrations_directory=migrations_directory
     )
     now = created_at or datetime.now(UTC)
     if now.tzinfo is None or now.utcoffset() != UTC.utcoffset(now):
@@ -231,6 +236,8 @@ def backup_database(
             "created_at": now.isoformat().replace("+00:00", "Z"),
             "release_version": release.release_version,
             "source_commit": release.source_commit,
+            "source_class": release.source_class,
+            "source_manifest_status": release.source_manifest_status,
             "schema_version_current": applied[-1].version,
             "migration_versions": [item.version for item in applied],
             "migration_manifest_digest": release.migration_manifest_digest,
@@ -239,7 +246,14 @@ def backup_database(
             "evidence_class": "operator_private",
         }
         _write_archive(output, manifest=_json_bytes(manifest), database=snapshot, created_at=now)
-    return BackupReport("created", applied[-1].version, len(applied))
+    return BackupReport(
+        "created",
+        applied[-1].version,
+        len(applied),
+        release.release_version,
+        release.source_commit,
+        release.source_class,
+    )
 
 
 def _read_archive(archive_path: Path, staging: Path) -> dict[str, object]:
@@ -308,6 +322,8 @@ def _validate_manifest(
         "created_at",
         "release_version",
         "source_commit",
+        "source_class",
+        "source_manifest_status",
         "schema_version_current",
         "migration_versions",
         "migration_manifest_digest",
@@ -325,6 +341,8 @@ def _validate_manifest(
         or not BACKUP_ID_PATTERN.fullmatch(identifier)
         or manifest.get("release_version") != release.release_version
         or manifest.get("source_commit") != release.source_commit
+        or manifest.get("source_class") != release.source_class
+        or manifest.get("source_manifest_status") != release.source_manifest_status
         or manifest.get("migration_manifest_digest") != release.migration_manifest_digest
         or manifest.get("schema_version_current") != applied[-1].version
         or manifest.get("migration_versions") != [item.version for item in applied]
@@ -348,11 +366,11 @@ def _verified_backup(
     archive_path: Path,
     staging: Path,
     *,
-    release_manifest: Path,
+    source_binding: Path,
     migrations_directory: Path,
 ) -> tuple[dict[str, object], tuple[MigrationBinding, ...]]:
     release, expected = _bindings(
-        release_manifest=release_manifest, migrations_directory=migrations_directory
+        source_binding=source_binding, migrations_directory=migrations_directory
     )
     manifest = _read_archive(archive_path, staging)
     connection = _open_read_only(staging)
@@ -365,17 +383,24 @@ def _verified_backup(
 
 
 def verify_backup(
-    archive_path: Path, *, release_manifest: Path, migrations_directory: Path
+    archive_path: Path, *, source_binding: Path, migrations_directory: Path
 ) -> BackupReport:
     with tempfile.TemporaryDirectory(prefix="digital-colleagues-backup-verify-") as temporary:
         staging = Path(temporary) / "state.sqlite"
-        _, applied = _verified_backup(
+        manifest, applied = _verified_backup(
             archive_path,
             staging,
-            release_manifest=release_manifest,
+            source_binding=source_binding,
             migrations_directory=migrations_directory,
         )
-    return BackupReport("verified", applied[-1].version, len(applied))
+    return BackupReport(
+        "verified",
+        applied[-1].version,
+        len(applied),
+        cast(str, manifest["release_version"]),
+        cast(str, manifest["source_commit"]),
+        cast(str, manifest["source_class"]),
+    )
 
 
 def _fsync_directory(directory: Path) -> None:
@@ -390,8 +415,9 @@ def restore_database(
     archive_path: Path,
     database: Path,
     *,
-    release_manifest: Path,
+    backup_source_binding: Path,
     migrations_directory: Path,
+    current_source_binding: Path | None = None,
     replace: bool = False,
     offline_confirmed: bool = False,
     rollback_backup: Path | None = None,
@@ -402,6 +428,8 @@ def restore_database(
     destination_exists = database.exists()
     if destination_exists and (not replace or not offline_confirmed or rollback_backup is None):
         _raise("restore_existing_state_refused")
+    if destination_exists and current_source_binding is None:
+        _raise("restore_current_source_binding_required")
     if not destination_exists and (replace or offline_confirmed or rollback_backup is not None):
         _raise("restore_options_invalid")
     if rollback_backup is not None and rollback_backup.absolute() == archive_path.absolute():
@@ -409,24 +437,25 @@ def restore_database(
     descriptor: int | None = None
     staging_path: Path | None = None
     rollback_created = False
+    rollback_report: BackupReport | None = None
     try:
         descriptor, name = tempfile.mkstemp(prefix=".dc-restore-", dir=database.parent)
         os.close(descriptor)
         descriptor = None
         staging_path = Path(name)
         staging_path.unlink()
-        _, applied = _verified_backup(
+        manifest, applied = _verified_backup(
             archive_path,
             staging_path,
-            release_manifest=release_manifest,
+            source_binding=backup_source_binding,
             migrations_directory=migrations_directory,
         )
         if destination_exists:
-            assert rollback_backup is not None
-            backup_database(
+            assert rollback_backup is not None and current_source_binding is not None
+            rollback_report = backup_database(
                 database,
                 rollback_backup,
-                release_manifest=release_manifest,
+                source_binding=current_source_binding,
                 migrations_directory=migrations_directory,
             )
             rollback_created = True
@@ -456,4 +485,12 @@ def restore_database(
                 staging_path.unlink()
             except OSError:
                 pass
-    return RestoreReport("restored", applied[-1].version, len(applied), rollback_created)
+    return RestoreReport(
+        "restored",
+        applied[-1].version,
+        len(applied),
+        rollback_created,
+        cast(str, manifest["release_version"]),
+        cast(str, manifest["source_commit"]),
+        rollback_report.source_version if rollback_report is not None else None,
+    )

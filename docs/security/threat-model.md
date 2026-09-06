@@ -88,6 +88,8 @@ compatibility, and high availability remain gaps.
 | Restored stale authority or sessions | Documented mandatory session rotation and membership/approval/authority revalidation |
 | Diagnostic disclosure | Versioned field allowlist, finite errors, irreversible causal digests, and secret/path/private canaries |
 | Mutable release dependency | Python hashes, npm integrity, OCI manifest digests, Action commits, inventory drift gate |
+| First-release source confusion | Exact accepted-P7 commit/tree/version descriptor, pre-start backup, separate restored/replaced source bindings, matching-code rollback |
+| Host/container toolchain drift | Exact Node/npm execution checks in host and Docker build paths plus runtime-served bounded metadata |
 | Release archive includes private residue | Git-object allowlist plus database/backup/log/cache/path/private-data scans |
 | Reproducibility overclaim | Byte comparison only for six declared artifacts; OCI claim limited to immutable inputs/content/runtime |
 

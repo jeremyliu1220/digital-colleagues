@@ -40,6 +40,44 @@ REQUIRED_GATES = frozenset(
         "studio_vitest",
         "studio_vite_build",
         "git_diff_check",
+        "p2_architecture_current_tree",
+        "p2_core_current_tree",
+        "p3_architecture_current_tree",
+        "p3_migrations_current_tree",
+        "p3_persistence_current_tree",
+        "p3_runtime_current_tree",
+        "p3_golden_current_tree",
+        "p4_architecture_current_tree",
+        "p4_migrations_current_tree",
+        "p4_authentication_current_tree",
+        "p4_studio_current_tree",
+        "p4_compose_current_tree",
+        "p4_golden_current_tree",
+        "p5_architecture_current_tree",
+        "p5_migrations_current_tree",
+        "p5_builder_current_tree",
+        "p5_policy_current_tree",
+        "p5_studio_current_tree",
+        "p5_compose_current_tree",
+        "p5_golden_current_tree",
+        "p6_architecture_current_tree",
+        "p6_migrations_current_tree",
+        "p6_authentication_current_tree",
+        "p6_rbac_current_tree",
+        "p6_change_approval_current_tree",
+        "p6_effect_approval_current_tree",
+        "p6_audit_export_current_tree",
+        "p6_abuse_current_tree",
+        "p6_studio_current_tree",
+        "p6_compose_current_tree",
+        "p6_golden_current_tree",
+        "p7_architecture_current_tree",
+        "p7_model_adapter_current_tree",
+        "p7_channel_adapter_current_tree",
+        "p7_configuration_current_tree",
+        "p7_abuse_current_tree",
+        "p7_compose_current_tree",
+        "p7_golden_current_tree",
     }
 )
 COMMIT_PATTERN = re.compile(r"^[0-9a-f]{40}$")
@@ -121,6 +159,44 @@ def validate_unittest(value: dict[str, Any]) -> dict[str, Any]:
     return value
 
 
+def validate_studio_tests(value: dict[str, Any]) -> dict[str, Any]:
+    required = {
+        "command",
+        "test_files",
+        "test_count",
+        "passed",
+        "failed",
+        "skipped",
+        "errors",
+        "unexpected_failures",
+        "status",
+        "result",
+    }
+    if set(value) != required:
+        raise EvidenceError("Studio test result shape is incomplete")
+    count_fields = (
+        "test_files",
+        "test_count",
+        "passed",
+        "failed",
+        "skipped",
+        "errors",
+        "unexpected_failures",
+    )
+    if (
+        value["command"] != "corepack npm test -- --reporter=json --outputFile=<temporary>"
+        or any(type(value[key]) is not int or value[key] < 0 for key in count_fields)
+        or value["test_files"] < 1
+        or value["test_count"] < 1
+        or value["passed"] != value["test_count"]
+        or any(value[key] != 0 for key in ("failed", "skipped", "errors", "unexpected_failures"))
+        or value["status"] != "passed"
+        or value["result"] != "passed"
+    ):
+        raise EvidenceError("Studio tests did not pass with a positive count and zero skips")
+    return value
+
+
 def _assert_safe(value: object, *, root: Path) -> None:
     forbidden_values = (str(root), str(Path.home()))
     if isinstance(value, dict):
@@ -144,6 +220,7 @@ def write_p8_evidence(
     root: Path,
     results: dict[str, dict[str, Any]],
     unittest_outcome: dict[str, Any],
+    studio_test_outcome: dict[str, Any],
     verified_gates: set[str],
     branch: str,
     implementation_commit: str,
@@ -165,6 +242,7 @@ def write_p8_evidence(
     if missing:
         raise EvidenceError("P8 evidence is missing required mechanical gates")
     outcome = validate_unittest(unittest_outcome)
+    studio_outcome = validate_studio_tests(studio_test_outcome)
     repository = results.get("repository", {})
     if (
         repository.get("acceptance_documents_immutable") is not True
@@ -190,12 +268,31 @@ def write_p8_evidence(
         raise EvidenceError("P8 reproducibility claim is incomplete")
     runtime = results.get("compose_runtime", {})
     cleanup = runtime.get("cleanup") if isinstance(runtime, dict) else None
+    transition = runtime.get("first_release_transition") if isinstance(runtime, dict) else None
+    runtime_toolchain = runtime.get("studio_build_toolchain") if isinstance(runtime, dict) else None
     if (
         runtime.get("status") != "passed"
         or runtime.get("external_provider_calls") != 0
         or runtime.get("human_evaluation") != "not_evaluated"
         or runtime.get("live_provider_evidence") != "not_evaluated"
         or runtime.get("five_minute_target") != "not_evaluated"
+        or not isinstance(transition, dict)
+        or transition.get("status") != "passed"
+        or transition.get("source_commit") != BASE_COMMIT
+        or transition.get("source_version") != "0.0.0"
+        or transition.get("source_release_manifest") != "not_available_before_first_release"
+        or transition.get("target_version") != "0.1.0"
+        or transition.get("pre_upgrade_backup") != "created_and_verified_before_p8_service_start"
+        or transition.get("rollback_runtime") != "exact_accepted_p7_git_object"
+        or transition.get("rollback_state_equal") is not True
+        or runtime_toolchain
+        != {
+            "host_node": "24.15.0",
+            "host_npm": "11.12.1",
+            "container_node": "24.15.0",
+            "container_npm": "11.12.1",
+            "container_build_asserted_and_runtime_metadata_verified": True,
+        }
         or not isinstance(cleanup, dict)
         or cleanup.get("passed") is not True
         or any(
@@ -222,6 +319,18 @@ def write_p8_evidence(
         or golden.get("five_minute_target") != "not_evaluated"
     ):
         raise EvidenceError("P8 Golden Path claim boundary is incomplete")
+    current_tree_regressions = results.get("current_tree_regressions", {})
+    if (
+        not isinstance(current_tree_regressions, dict)
+        or len(current_tree_regressions) != 38
+        or any(
+            not isinstance(result, dict)
+            or not isinstance(result.get("gate"), str)
+            or not result["gate"].endswith("_clean")
+            for result in current_tree_regressions.values()
+        )
+    ):
+        raise EvidenceError("P0-P7 current-tree regressions are incomplete")
     summary: dict[str, Any] = {
         "schema_version": 1,
         "milestone": "P8",
@@ -237,6 +346,7 @@ def write_p8_evidence(
         "generated_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         "verified_gates": sorted(verified_gates),
         "unittest": outcome,
+        "studio_tests": studio_outcome,
         "repository": repository,
         "provenance": results["provenance"],
         "operations": results["operations"],
@@ -248,6 +358,7 @@ def write_p8_evidence(
         "compose_runtime": runtime,
         "golden_path": golden,
         "historical_boundary": results["accepted_p7"],
+        "current_tree_regressions": current_tree_regressions,
         "evidence_classes": {
             "mechanical": "synthetic_offline",
             "docker_runtime": "actually_executed_synthetic_offline",

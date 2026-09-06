@@ -18,10 +18,16 @@ from typing import Any
 from scripts.collect_p8_evidence import (
     EvidenceError,
     public_tree_digest,
+    validate_studio_tests,
     validate_unittest,
     write_p8_evidence,
 )
-from scripts.p8_release_support import ACCEPTANCE_COMMIT, BASE_COMMIT
+from scripts.p8_release_support import (
+    ACCEPTANCE_COMMIT,
+    BASE_COMMIT,
+    NODE_VERSION,
+    NPM_VERSION,
+)
 from scripts.run_p4_toolchain import ToolchainError, _json, _run
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -61,6 +67,198 @@ FOCUSED: dict[str, tuple[str, str, str]] = {
         "scripts/check_p8_compose_runtime.py",
     ),
     "golden": ("P8 Golden Path", "p8_golden_path", "scripts/check_p8_golden_path.py"),
+}
+PRIOR_CURRENT_TREE: dict[str, tuple[str, str, str]] = {
+    "p2_architecture": (
+        "P2 current-tree architecture",
+        "p2_architecture_current_tree",
+        "scripts/check_p2_architecture.py",
+    ),
+    "p2_core": (
+        "P2 current-tree core contracts",
+        "p2_core_current_tree",
+        "scripts/check_p2_core_contracts.py",
+    ),
+    "p3_architecture": (
+        "P3 current-tree architecture",
+        "p3_architecture_current_tree",
+        "scripts/check_p3_architecture.py",
+    ),
+    "p3_migrations": (
+        "P3 current-tree migrations",
+        "p3_migrations_current_tree",
+        "scripts/check_p3_migrations.py",
+    ),
+    "p3_persistence": (
+        "P3 current-tree persistence",
+        "p3_persistence_current_tree",
+        "scripts/check_p3_persistence.py",
+    ),
+    "p3_runtime": (
+        "P3 current-tree runtime",
+        "p3_runtime_current_tree",
+        "scripts/check_p3_runtime_contracts.py",
+    ),
+    "p3_golden": (
+        "P3 current-tree Golden Path",
+        "p3_golden_current_tree",
+        "scripts/check_p3_golden_path.py",
+    ),
+    "p4_architecture": (
+        "P4 current-tree architecture",
+        "p4_architecture_current_tree",
+        "scripts/check_p4_architecture.py",
+    ),
+    "p4_migrations": (
+        "P4 current-tree migrations",
+        "p4_migrations_current_tree",
+        "scripts/check_p4_migrations.py",
+    ),
+    "p4_authentication": (
+        "P4 current-tree authentication",
+        "p4_authentication_current_tree",
+        "scripts/check_p4_authentication.py",
+    ),
+    "p4_studio": (
+        "P4 current-tree Studio",
+        "p4_studio_current_tree",
+        "scripts/check_p4_studio.py",
+    ),
+    "p4_compose": (
+        "P4 current-tree Compose",
+        "p4_compose_current_tree",
+        "scripts/check_p4_compose.py",
+    ),
+    "p4_golden": (
+        "P4 current-tree Golden Path",
+        "p4_golden_current_tree",
+        "scripts/check_p4_golden_path.py",
+    ),
+    "p5_architecture": (
+        "P5 current-tree architecture",
+        "p5_architecture_current_tree",
+        "scripts/check_p5_architecture.py",
+    ),
+    "p5_migrations": (
+        "P5 current-tree migrations",
+        "p5_migrations_current_tree",
+        "scripts/check_p5_migrations.py",
+    ),
+    "p5_builder": (
+        "P5 current-tree builder",
+        "p5_builder_current_tree",
+        "scripts/check_p5_builder.py",
+    ),
+    "p5_policy": (
+        "P5 current-tree policy",
+        "p5_policy_current_tree",
+        "scripts/check_p5_policy.py",
+    ),
+    "p5_studio": (
+        "P5 current-tree Studio",
+        "p5_studio_current_tree",
+        "scripts/check_p5_studio.py",
+    ),
+    "p5_compose": (
+        "P5 current-tree Compose",
+        "p5_compose_current_tree",
+        "scripts/check_p5_compose.py",
+    ),
+    "p5_golden": (
+        "P5 current-tree Golden Path",
+        "p5_golden_current_tree",
+        "scripts/check_p5_golden_path.py",
+    ),
+    "p6_architecture": (
+        "P6 current-tree architecture",
+        "p6_architecture_current_tree",
+        "scripts/check_p6_architecture.py",
+    ),
+    "p6_migrations": (
+        "P6 current-tree migrations",
+        "p6_migrations_current_tree",
+        "scripts/check_p6_migrations.py",
+    ),
+    "p6_authentication": (
+        "P6 current-tree authentication",
+        "p6_authentication_current_tree",
+        "scripts/check_p6_authentication.py",
+    ),
+    "p6_rbac": (
+        "P6 current-tree RBAC",
+        "p6_rbac_current_tree",
+        "scripts/check_p6_rbac.py",
+    ),
+    "p6_change_approval": (
+        "P6 current-tree change approval",
+        "p6_change_approval_current_tree",
+        "scripts/check_p6_change_approval.py",
+    ),
+    "p6_effect_approval": (
+        "P6 current-tree effect approval",
+        "p6_effect_approval_current_tree",
+        "scripts/check_p6_effect_approval.py",
+    ),
+    "p6_audit_export": (
+        "P6 current-tree audit export",
+        "p6_audit_export_current_tree",
+        "scripts/check_p6_audit_export.py",
+    ),
+    "p6_abuse": (
+        "P6 current-tree abuse",
+        "p6_abuse_current_tree",
+        "scripts/check_p6_abuse.py",
+    ),
+    "p6_studio": (
+        "P6 current-tree Studio",
+        "p6_studio_current_tree",
+        "scripts/check_p6_studio.py",
+    ),
+    "p6_compose": (
+        "P6 current-tree Compose",
+        "p6_compose_current_tree",
+        "scripts/check_p6_compose.py",
+    ),
+    "p6_golden": (
+        "P6 current-tree Golden Path",
+        "p6_golden_current_tree",
+        "scripts/check_p6_golden_path.py",
+    ),
+    "p7_architecture": (
+        "P7 current-tree architecture",
+        "p7_architecture_current_tree",
+        "scripts/check_p7_architecture.py",
+    ),
+    "p7_model_adapter": (
+        "P7 current-tree model adapter",
+        "p7_model_adapter_current_tree",
+        "scripts/check_p7_model_adapter.py",
+    ),
+    "p7_channel_adapter": (
+        "P7 current-tree channel adapter",
+        "p7_channel_adapter_current_tree",
+        "scripts/check_p7_channel_adapter.py",
+    ),
+    "p7_configuration": (
+        "P7 current-tree configuration",
+        "p7_configuration_current_tree",
+        "scripts/check_p7_configuration.py",
+    ),
+    "p7_abuse": (
+        "P7 current-tree abuse",
+        "p7_abuse_current_tree",
+        "scripts/check_p7_abuse.py",
+    ),
+    "p7_compose": (
+        "P7 current-tree Compose",
+        "p7_compose_current_tree",
+        "scripts/check_p7_compose.py",
+    ),
+    "p7_golden": (
+        "P7 current-tree Golden Path",
+        "p7_golden_current_tree",
+        "scripts/check_p7_golden_path.py",
+    ),
 }
 SCOPES = {
     "all",
@@ -138,7 +336,7 @@ def _node_versions(temporary: Path) -> None:
         cwd=ROOT / "studio",
         temporary=temporary,
     ).strip()
-    if node != "v24.15.0" or npm != "11.12.1":
+    if node != f"v{NODE_VERSION}" or npm != NPM_VERSION:
         raise ToolchainError("P8 Node or npm version is not exact")
 
 
@@ -238,6 +436,58 @@ def _full_unittest(python: Path, *, temporary: Path, environment: dict[str, str]
     return validate_unittest(value)
 
 
+def _studio_tests(studio: Path, *, temporary: Path) -> dict[str, Any]:
+    output_path = temporary / "studio-vitest.json"
+    _run(
+        "Studio tests",
+        [
+            "corepack",
+            "npm",
+            "test",
+            "--",
+            "--reporter=json",
+            f"--outputFile={output_path}",
+        ],
+        cwd=studio,
+        temporary=temporary,
+    )
+    try:
+        raw = json.loads(output_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ToolchainError("Studio test outcome is invalid") from exc
+    if not isinstance(raw, dict):
+        raise ToolchainError("Studio test outcome is not an object")
+
+    def count(key: str) -> int:
+        value = raw.get(key)
+        if type(value) is not int or value < 0:
+            raise ToolchainError("Studio test counts are invalid")
+        return value
+
+    total = count("numTotalTests")
+    passed = count("numPassedTests")
+    failed = count("numFailedTests")
+    pending = count("numPendingTests")
+    todo = count("numTodoTests")
+    failed_suites = count("numFailedTestSuites")
+    test_results = raw.get("testResults")
+    if not isinstance(test_results, list) or raw.get("success") is not True:
+        raise ToolchainError("Studio test result did not pass")
+    outcome = {
+        "command": "corepack npm test -- --reporter=json --outputFile=<temporary>",
+        "test_files": len(test_results),
+        "test_count": total,
+        "passed": passed,
+        "failed": failed,
+        "skipped": pending + todo,
+        "errors": failed_suites,
+        "unexpected_failures": 0,
+        "status": "passed",
+        "result": "passed",
+    }
+    return validate_studio_tests(outcome)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run P8 gates in disposable environments.")
     parser.add_argument("--scope", choices=sorted(SCOPES), default="all")
@@ -249,6 +499,7 @@ def main(argv: list[str] | None = None) -> int:
     verified: set[str] = set()
     results: dict[str, dict[str, Any]] = {}
     unittest_outcome: dict[str, Any] | None = None
+    studio_test_outcome: dict[str, Any] | None = None
     try:
         with tempfile.TemporaryDirectory(prefix="digital-colleagues-p8-toolchain-") as name:
             temporary = Path(name)
@@ -278,6 +529,17 @@ def main(argv: list[str] | None = None) -> int:
                 assert python is not None and environment is not None
                 results["accepted_p7"] = _accepted_p7()
                 verified.add("accepted_p7_baseline")
+                current_tree_regressions: dict[str, Any] = {}
+                for key, (label, gate, script) in PRIOR_CURRENT_TREE.items():
+                    current_tree_regressions[key] = _gate(
+                        python,
+                        label=label,
+                        script=script,
+                        temporary=temporary,
+                        environment=environment,
+                    )
+                    verified.add(gate)
+                results["current_tree_regressions"] = current_tree_regressions
                 for key, (label, gate, script) in FOCUSED.items():
                     results[key.replace("-", "_")] = _gate(
                         python,
@@ -366,12 +628,8 @@ def main(argv: list[str] | None = None) -> int:
                     python, temporary=temporary, environment=environment
                 )
                 verified.add("python_unittest")
-                _run(
-                    "Studio tests",
-                    ["corepack", "npm", "test"],
-                    cwd=studio,
-                    temporary=temporary,
-                )
+                studio_test_outcome = _studio_tests(studio, temporary=temporary)
+                results["studio_tests"] = studio_test_outcome
                 verified.add("studio_vitest")
             if arguments.scope in {"all", "build"}:
                 assert studio is not None
@@ -387,6 +645,8 @@ def main(argv: list[str] | None = None) -> int:
                     raise ToolchainError("P8 evidence requires a clean implementation tree")
                 if unittest_outcome is None:
                     raise ToolchainError("P8 evidence lacks full unittest results")
+                if studio_test_outcome is None:
+                    raise ToolchainError("P8 evidence lacks Studio test results")
                 implementation_commit = _git("rev-parse", "HEAD")
                 branch = _git("branch", "--show-current")
                 merge_base = _git("merge-base", "HEAD", BASE_COMMIT)
@@ -397,6 +657,7 @@ def main(argv: list[str] | None = None) -> int:
                     root=ROOT,
                     results=results,
                     unittest_outcome=unittest_outcome,
+                    studio_test_outcome=studio_test_outcome,
                     verified_gates=verified,
                     branch=branch,
                     implementation_commit=implementation_commit,

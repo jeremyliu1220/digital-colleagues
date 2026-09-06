@@ -3,16 +3,18 @@
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
 from typing import Any, cast
 
-from scripts.check_p8_supply_chain import check_supply_chain
+from scripts.check_p8_supply_chain import SupplyChainError, check_supply_chain
 from scripts.p8_release_support import (
     ARTIFACT_NAMES,
     ReleaseError,
+    _npm_package_name,
     _source_entries,
     build_candidate,
     build_supply_chain_inventory,
@@ -36,6 +38,58 @@ class P8ReleaseTests(unittest.TestCase):
         bundled = [item for item in records if item["included_in_release_artifact"]]
         self.assertEqual({item["name"] for item in bundled}, {"react", "react-dom", "scheduler"})
         self.assertEqual(check_supply_chain(ROOT)["gate"], "p8_supply_chain_clean")
+
+    def test_nested_npm_package_identities_are_exact_and_scoped_names_survive(self) -> None:
+        commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+        records = cast(list[dict[str, Any]], build_supply_chain_inventory(ROOT, commit)["records"])
+        identities = {
+            (item["name"], item["version"]) for item in records if item["ecosystem"] == "npm"
+        }
+        self.assertIn(("eslint-visitor-keys", "3.4.3"), identities)
+        self.assertIn(("ignore", "7.0.6"), identities)
+        self.assertIn(("semver", "7.8.5"), identities)
+        self.assertNotIn(
+            ("@eslint-community/eslint-utils/node_modules/eslint-visitor-keys", "3.4.3"),
+            identities,
+        )
+        self.assertEqual(
+            _npm_package_name("node_modules/parent/node_modules/@scope/package"),
+            "@scope/package",
+        )
+        for malformed in ("package", "node_modules/@scope", "node_modules/a/b"):
+            with self.assertRaisesRegex(ReleaseError, "studio_lock_path_invalid"):
+                _npm_package_name(malformed)
+
+    def test_container_host_toolchain_and_os_dependency_drift_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="digital-colleagues-p8-toolchain-drift-") as name:
+            for label, relative, old, new in (
+                ("container-node", "studio/Dockerfile", "v24.15.0", "v24.20.0"),
+                ("host-node", ".nvmrc", "24.15.0", "24.20.0"),
+                (
+                    "os-package",
+                    "Dockerfile.p7",
+                    "RUN python -m pip install",
+                    "RUN apt-get install --yes iproute2 && python -m pip install",
+                ),
+            ):
+                root = Path(name) / label
+                subprocess.run(
+                    ["git", "clone", "--quiet", "--shared", str(ROOT), str(root)], check=True
+                )
+                for source_relative in (
+                    "Dockerfile.p7",
+                    "release/supply-chain-inputs.json",
+                    "studio/Dockerfile",
+                    "studio/Dockerfile.p7",
+                ):
+                    shutil.copyfile(ROOT / source_relative, root / source_relative)
+                self.assertEqual(check_supply_chain(root)["gate"], "p8_supply_chain_clean")
+                path = root / relative
+                content = path.read_text(encoding="utf-8")
+                self.assertIn(old, content)
+                path.write_text(content.replace(old, new, 1), encoding="utf-8")
+                with self.assertRaises(SupplyChainError, msg=label):
+                    check_supply_chain(root)
 
     def test_source_archive_policy_excludes_evidence_and_private_residue(self) -> None:
         entries = _source_entries(

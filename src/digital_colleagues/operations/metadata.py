@@ -12,6 +12,13 @@ from pathlib import Path
 from typing import Any
 
 RELEASE_VERSION = "0.1.0"
+ACCEPTED_P7_VERSION = "0.0.0"
+ACCEPTED_P7_COMMIT = "df47f8d075f7c0660ab5ed6035f8acfa3d3da4dc"
+ACCEPTED_P7_TREE = "4ebfc2bdfcd97e34256ec7a34ff58b0063c05ed7"
+ACCEPTED_P7_MIGRATION_MANIFEST_DIGEST = (
+    "sha256:5868262fec025a33082afddeb49add29df798f27370b0f71fcbb728de9444436"
+)
+ACCEPTED_P7_TIMESTAMP = "2026-09-06T02:43:24Z"
 COMMIT_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 DIGEST_PATTERN = re.compile(r"^sha256:[0-9a-f]{64}$")
 
@@ -25,6 +32,8 @@ class ReleaseBinding:
     release_version: str
     source_commit: str
     migration_manifest_digest: str
+    source_class: str
+    source_manifest_status: str
 
 
 @dataclass(frozen=True)
@@ -80,7 +89,63 @@ def load_release_binding(path: Path) -> ReleaseBinding:
         or not DIGEST_PATTERN.fullmatch(migration_digest)
     ):
         raise MetadataError("release_manifest_incompatible")
-    return ReleaseBinding(release_version, source_commit, migration_digest)
+    return ReleaseBinding(
+        release_version,
+        source_commit,
+        migration_digest,
+        "release_manifest",
+        "available",
+    )
+
+
+def accepted_p7_source_binding_document() -> dict[str, object]:
+    return {
+        "schema_version": 1,
+        "source_class": "accepted_p7_git_object",
+        "source_version": ACCEPTED_P7_VERSION,
+        "source_commit": ACCEPTED_P7_COMMIT,
+        "source_tree": ACCEPTED_P7_TREE,
+        "source_timestamp": ACCEPTED_P7_TIMESTAMP,
+        "migration_manifest_digest": ACCEPTED_P7_MIGRATION_MANIFEST_DIGEST,
+        "schema_version_current": 7,
+        "release_manifest_status": "not_available_before_first_release",
+    }
+
+
+def load_source_binding(path: Path) -> ReleaseBinding:
+    value = _object(path, "source_binding_invalid")
+    if value.get("source_class") != "accepted_p7_git_object":
+        return load_release_binding(path)
+    required = {
+        "schema_version",
+        "source_class",
+        "source_version",
+        "source_commit",
+        "source_tree",
+        "source_timestamp",
+        "migration_manifest_digest",
+        "schema_version_current",
+        "release_manifest_status",
+    }
+    if (
+        set(value) != required
+        or value.get("schema_version") != 1
+        or value.get("source_version") != ACCEPTED_P7_VERSION
+        or value.get("source_commit") != ACCEPTED_P7_COMMIT
+        or value.get("source_tree") != ACCEPTED_P7_TREE
+        or value.get("source_timestamp") != ACCEPTED_P7_TIMESTAMP
+        or value.get("schema_version_current") != 7
+        or value.get("release_manifest_status") != "not_available_before_first_release"
+        or value.get("migration_manifest_digest") != ACCEPTED_P7_MIGRATION_MANIFEST_DIGEST
+    ):
+        raise MetadataError("accepted_p7_source_binding_invalid")
+    return ReleaseBinding(
+        ACCEPTED_P7_VERSION,
+        ACCEPTED_P7_COMMIT,
+        ACCEPTED_P7_MIGRATION_MANIFEST_DIGEST,
+        "accepted_p7_git_object",
+        "not_available_before_first_release",
+    )
 
 
 def load_migration_bindings(directory: Path) -> tuple[str, tuple[MigrationBinding, ...]]:

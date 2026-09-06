@@ -9,8 +9,13 @@ import unittest
 from pathlib import Path
 
 from scripts.check_p8_repository import RepositoryError, check_repository
-from scripts.collect_p8_evidence import EvidenceError, write_p8_evidence
+from scripts.collect_p8_evidence import (
+    EvidenceError,
+    validate_studio_tests,
+    write_p8_evidence,
+)
 from scripts.p8_release_support import ACCEPTANCE_COMMIT, BASE_COMMIT
+from scripts.run_p8_toolchain import PRIOR_CURRENT_TREE
 from tests.p8.fixtures import ROOT
 
 
@@ -22,6 +27,71 @@ def _clone(directory: Path) -> Path:
 
 
 class P8RepositoryTests(unittest.TestCase):
+    def test_studio_evidence_requires_positive_machine_readable_counts(self) -> None:
+        valid = {
+            "command": "corepack npm test -- --reporter=json --outputFile=<temporary>",
+            "test_files": 1,
+            "test_count": 5,
+            "passed": 5,
+            "failed": 0,
+            "skipped": 0,
+            "errors": 0,
+            "unexpected_failures": 0,
+            "status": "passed",
+            "result": "passed",
+        }
+        self.assertEqual(validate_studio_tests(valid), valid)
+        for key, value in (("test_count", 0), ("passed", 4), ("skipped", 1), ("errors", 1)):
+            changed = {**valid, key: value}
+            with self.assertRaises(EvidenceError, msg=key):
+                validate_studio_tests(changed)
+
+    def test_p8_aggregate_executes_all_prior_current_tree_regressions(self) -> None:
+        self.assertEqual(len(PRIOR_CURRENT_TREE), 38)
+        self.assertEqual(
+            set(PRIOR_CURRENT_TREE),
+            {
+                "p2_architecture",
+                "p2_core",
+                "p3_architecture",
+                "p3_migrations",
+                "p3_persistence",
+                "p3_runtime",
+                "p3_golden",
+                "p4_architecture",
+                "p4_migrations",
+                "p4_authentication",
+                "p4_studio",
+                "p4_compose",
+                "p4_golden",
+                "p5_architecture",
+                "p5_migrations",
+                "p5_builder",
+                "p5_policy",
+                "p5_studio",
+                "p5_compose",
+                "p5_golden",
+                "p6_architecture",
+                "p6_migrations",
+                "p6_authentication",
+                "p6_rbac",
+                "p6_change_approval",
+                "p6_effect_approval",
+                "p6_audit_export",
+                "p6_abuse",
+                "p6_studio",
+                "p6_compose",
+                "p6_golden",
+                "p7_architecture",
+                "p7_model_adapter",
+                "p7_channel_adapter",
+                "p7_configuration",
+                "p7_abuse",
+                "p7_compose",
+                "p7_golden",
+            },
+        )
+
     def test_real_tree_has_fixed_base_acceptance_history_and_required_files(self) -> None:
         result = check_repository(ROOT)
         self.assertEqual(result["gate"], "p8_repository_clean")
@@ -85,6 +155,7 @@ class P8RepositoryTests(unittest.TestCase):
                     root=ROOT,
                     results={},
                     unittest_outcome={},
+                    studio_test_outcome={},
                     verified_gates=set(),
                     branch="codex/p8-release-readiness",
                     implementation_commit="2" * 40,

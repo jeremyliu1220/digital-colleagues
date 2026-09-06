@@ -35,10 +35,15 @@ from scripts.check_p4_compose_runtime import (
 from scripts.check_p5_compose_runtime import _create_update_review
 from scripts.p8_release_support import (
     ARTIFACT_NAMES,
+    BASE_COMMIT,
+    NODE_VERSION,
+    NPM_VERSION,
     ReleaseError,
     _extract_source,
+    _source_entries,
     build_candidate,
 )
+from scripts.p8_release_support import _run as _release_run
 
 COLLEAGUE_FIELD = "colleague" + "_id"
 
@@ -134,6 +139,590 @@ def _scan_bytes(paths: tuple[Path, ...], forbidden: tuple[str, ...]) -> None:
             raise ComposeRuntimeError("a runtime canary entered an artifact")
 
 
+def _extract_accepted_p7(root: Path, destination: Path) -> None:
+    if destination.exists():
+        raise ComposeRuntimeError("accepted P7 extraction destination already exists")
+    destination.mkdir()
+    tree = _release_run(["git", "rev-parse", f"{BASE_COMMIT}^{{tree}}"], cwd=root).decode().strip()
+    if tree != "4ebfc2bdfcd97e34256ec7a34ff58b0063c05ed7":
+        raise ComposeRuntimeError("accepted P7 Git tree identity drifted")
+    for relative, mode, object_id in _source_entries(root, BASE_COMMIT):
+        target = destination / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(_release_run(["git", "cat-file", "blob", object_id], cwd=root))
+        target.chmod(0o755 if mode == "100755" else 0o644)
+
+
+def _private_json(path: Path) -> dict[str, Any]:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise ComposeRuntimeError("private transition metadata was invalid") from exc
+    if not isinstance(value, dict):
+        raise ComposeRuntimeError("private transition metadata was invalid")
+    return value
+
+
+def _write_private_json(path: Path, value: dict[str, Any]) -> None:
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+        handle.write(json.dumps(value, sort_keys=True) + "\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+
+
+def _create_p7_fixture(p7_source: Path, database: Path, private_metadata: Path) -> None:
+    sys.path.insert(0, str(p7_source))
+    sys.path.insert(0, str(p7_source / "src"))
+    from digital_colleagues import __version__
+    from digital_colleagues.application.p4_contracts import WorkAssignmentRequest
+    from digital_colleagues.application.p6_contracts import ChangeDecisionRequest
+    from digital_colleagues.core.effects import ApprovalChoice
+    from digital_colleagues.core.governance import ChangeChoice
+    from digital_colleagues.core.principals import HumanRole
+    from tests.p6.fixtures import build_harness, initial_request
+    from tests.p6.test_authentication_rbac import bootstrap, enroll
+
+    if __version__ != "0.0.0" or database.exists() or private_metadata.exists():
+        raise ComposeRuntimeError("P7 fixture boundary was invalid")
+    harness = build_harness(database)
+    first_credential, first = bootstrap(harness)
+    _, second = enroll(
+        harness,
+        issuer=first,
+        role=HumanRole.TENANT_ADMIN,
+        scopes=("*",),
+        key="p8-upgrade-second-admin",
+    )
+    profile, _, _ = harness.colleagues.create(session=first.session, request=initial_request())
+    colleague_id = profile.namespace.scope_id
+    if colleague_id is None:
+        raise ComposeRuntimeError("P7 fixture namespace was invalid")
+    first_session = harness.authentication.bind_colleague(
+        first.session,
+        colleague_id,
+        idempotency_key="p8-upgrade-first-bind",
+    )
+    second_session = harness.authentication.bind_colleague(
+        second.session_grant.session,
+        colleague_id,
+        idempotency_key="p8-upgrade-second-bind",
+    )
+    draft = harness.inner_builder.create(
+        session=first_session,
+        idempotency_key="p8-upgrade-policy-draft",
+    )
+    reviewed = harness.inner_builder.review(
+        session=first_session,
+        draft_id=draft.draft_id,
+        expected_revision=draft.revision,
+    )
+    proposed = harness.changes.propose_draft(
+        session=first_session,
+        draft_id=reviewed.draft_id,
+        expected_revision=reviewed.revision,
+        expected_digest=reviewed.canonical_digest,
+        idempotency_key="p8-upgrade-policy-proposal",
+    )
+    _, decision = harness.changes.decide(
+        session=second_session,
+        namespace=profile.namespace,
+        proposal_id=proposed.proposal_id,
+        request=ChangeDecisionRequest(
+            proposal_revision=proposed.revision,
+            proposal_digest=proposed.canonical_digest,
+            choice=ChangeChoice.APPROVE,
+            idempotency_key="p8-upgrade-policy-approval",
+        ),
+    )
+    harness.changes.apply_draft(
+        session=first_session,
+        namespace=profile.namespace,
+        proposal_id=proposed.proposal_id,
+        decision_id=decision.decision_id,
+        idempotency_key="p8-upgrade-policy-confirm",
+    )
+    active_profile, active_mandate = harness.store.active_configuration(profile.namespace)
+    work, _ = harness.colleagues.assign_work(
+        session=first_session,
+        request=WorkAssignmentRequest(
+            title="P7 durable pre-upgrade work",
+            description="Synthetic first-release transition fixture.",
+            responsibility_id=active_mandate.responsibilities[0].responsibility_id,
+            idempotency_key="p8-upgrade-work",
+        ),
+    )
+    event_correlation = ""
+    for trigger_class, no_op, key in (
+        ("timer", True, "p8-upgrade-timer"),
+        ("event", False, "p8-upgrade-event"),
+    ):
+        trigger = harness.controller.submit_trigger(
+            session=first_session,
+            work_id=work.work_id,
+            trigger_class=trigger_class,
+            deterministic_noop=no_op,
+            idempotency_key=key,
+        )
+        if trigger_class == "event":
+            if not isinstance(trigger, dict) or not isinstance(trigger.get("correlation_id"), str):
+                raise ComposeRuntimeError("P7 fixture correlation was invalid")
+            event_correlation = trigger["correlation_id"]
+        harness.controller.process_once(
+            harness.controller.service_context(active_profile.namespace)
+        )
+    snapshot = harness.store.studio_snapshot(active_profile.namespace)
+    proposal = snapshot.proposals[0]
+    harness.controller.decide_proposal(
+        session=first_session,
+        proposal=proposal,
+        choice=ApprovalChoice.APPROVE,
+        idempotency_key="p8-upgrade-effect-approval",
+        expected_proposal_revision=proposal.revision,
+        expected_payload_digest=proposal.payload_digest,
+        expected_proposal_digest=proposal.proposal_digest,
+        expected_mandate_id=proposal.mandate_id or "missing",
+        expected_mandate_revision=proposal.mandate_revision or 1,
+        expected_policy_id=proposal.policy_id,
+        expected_policy_revision=proposal.policy_revision,
+    )
+    harness.controller.process_once(harness.controller.service_context(active_profile.namespace))
+    health = harness.store.healthcheck()
+    harness.store.close()
+    if health.get("migration_count") != 7 or not event_correlation:
+        raise ComposeRuntimeError("P7 fixture state was invalid")
+    os.chmod(database, 0o600)
+    _write_private_json(
+        private_metadata,
+        {
+            "schema_version": 1,
+            "source_version": "0.0.0",
+            "source_commit": BASE_COMMIT,
+            "migration_count": 7,
+            COLLEAGUE_FIELD: colleague_id,
+            "event_correlation": event_correlation,
+            "session_credential": first_credential,
+            "csrf_token": first.csrf_token,
+        },
+    )
+
+
+def _host_operations(
+    source: Path,
+    environment: dict[str, str],
+    arguments: list[str],
+) -> dict[str, Any]:
+    operation_environment = environment.copy()
+    operation_environment["PYTHONPATH"] = str(source / "src")
+    completed = _run(
+        [sys.executable, "-B", "-m", "digital_colleagues.operations", *arguments],
+        root=source,
+        environment=operation_environment,
+    )
+    try:
+        value = json.loads(completed.stdout)
+    except json.JSONDecodeError as exc:
+        raise ComposeRuntimeError("host operation returned invalid JSON") from exc
+    if not isinstance(value, dict):
+        raise ComposeRuntimeError("host operation returned invalid JSON")
+    return value
+
+
+def _first_release_transition(
+    *,
+    docker: str,
+    project: str,
+    repository: Path,
+    source: Path,
+    temporary: Path,
+    operator: Path,
+    environment: dict[str, str],
+    api_port: int,
+    origin: str,
+) -> dict[str, object]:
+    transition_project = project + "-upgrade"
+    p7_source = temporary / "accepted-p7-source"
+    p7_database = operator / "accepted-p7-state.sqlite"
+    private_metadata = operator / "accepted-p7-private.json"
+    p7_binding = operator / "accepted-p7-source-binding.json"
+    pre_upgrade = operator / "p7-pre-upgrade.tar.gz"
+    p8_rollback = operator / "p8-transition-rollback.tar.gz"
+    rollback_container = ""
+    cleanup: dict[str, object] = {"passed": False}
+    try:
+        _extract_accepted_p7(repository, p7_source)
+        binding = _host_operations(source, environment, ["accepted-p7-source-binding"])
+        _write_private_json(p7_binding, binding)
+        fixture_environment = environment.copy()
+        fixture_environment.update(
+            {
+                "PYTHONPATH": os.pathsep.join((str(p7_source / "src"), str(p7_source))),
+                "PYTHONDONTWRITEBYTECODE": "1",
+            }
+        )
+        _run(
+            [
+                sys.executable,
+                "-B",
+                str(source / "scripts/check_p8_compose_runtime.py"),
+                "--create-p7-fixture",
+                "--p7-source",
+                str(p7_source),
+                "--database",
+                str(p7_database),
+                "--private-metadata",
+                str(private_metadata),
+            ],
+            root=p7_source,
+            environment=fixture_environment,
+        )
+        metadata = _private_json(private_metadata)
+        if (
+            set(metadata)
+            != {
+                "schema_version",
+                "source_version",
+                "source_commit",
+                "migration_count",
+                COLLEAGUE_FIELD,
+                "event_correlation",
+                "session_credential",
+                "csrf_token",
+            }
+            or metadata.get("schema_version") != 1
+            or metadata.get("source_version") != "0.0.0"
+            or metadata.get("source_commit") != BASE_COMMIT
+            or metadata.get("migration_count") != 7
+            or any(
+                not isinstance(metadata.get(key), str) or not metadata[key]
+                for key in (
+                    COLLEAGUE_FIELD,
+                    "event_correlation",
+                    "session_credential",
+                    "csrf_token",
+                )
+            )
+        ):
+            raise ComposeRuntimeError("accepted P7 fixture binding was invalid")
+        backup_result = _host_operations(
+            source,
+            environment,
+            [
+                "backup",
+                "--database",
+                str(p7_database),
+                "--backup",
+                str(pre_upgrade),
+                "--source-binding",
+                str(p7_binding),
+                "--migrations",
+                str(p7_source / "migrations"),
+            ],
+        )
+        verified = _host_operations(
+            source,
+            environment,
+            [
+                "verify-backup",
+                "--backup",
+                str(pre_upgrade),
+                "--source-binding",
+                str(p7_binding),
+                "--migrations",
+                str(p7_source / "migrations"),
+            ],
+        )
+        if (
+            backup_result.get("status") != "created"
+            or verified.get("status") != "verified"
+            or verified.get("source_version") != "0.0.0"
+            or verified.get("source_commit") != BASE_COMMIT
+        ):
+            raise ComposeRuntimeError("accepted P7 pre-upgrade backup did not verify")
+        p7_database.unlink()
+        install_stdout, _ = _operations_command(
+            docker,
+            transition_project,
+            source,
+            environment,
+            [
+                "restore",
+                "--backup",
+                "/operator/p7-pre-upgrade.tar.gz",
+                "--database",
+                "/state/state.sqlite",
+                "--backup-source-binding",
+                "/operator/accepted-p7-source-binding.json",
+                "--migrations",
+                "/app/migrations",
+            ],
+            running=False,
+        )
+        installed = json.loads(install_stdout)
+        if (
+            installed.get("status") != "restored"
+            or installed.get("restored_source_version") != "0.0.0"
+            or installed.get("restored_source_commit") != BASE_COMMIT
+        ):
+            raise ComposeRuntimeError("P7 state was not installed before P8 startup")
+
+        _compose(
+            docker,
+            transition_project,
+            ["up", "--build", "--detach", "api", "worker", "studio"],
+            root=source,
+            environment=environment,
+        )
+        api = f"http://127.0.0.1:{api_port}"
+        opener = urllib.request.build_opener()
+        health = _wait_json(opener, api + "/health")
+        toolchain = _wait_json(opener, origin + "/build-toolchain.json")
+        if health.get("status") != "ok" or toolchain != {
+            "schema_version": 1,
+            "node": NODE_VERSION,
+            "npm": NPM_VERSION,
+        }:
+            raise ComposeRuntimeError("P8 first startup or container toolchain was invalid")
+        cookie_header = "dc_session=" + cast(str, metadata["session_credential"])
+        session = _request(opener, api + "/auth/session", headers={"Cookie": cookie_header})
+        csrf = session.get("csrf_token")
+        if not isinstance(csrf, str) or not csrf:
+            raise ComposeRuntimeError("accepted P7 session did not survive P8 startup")
+        headers = {"Cookie": cookie_header, "Origin": origin, "X-CSRF-Token": csrf}
+        before_studio = _request(opener, api + "/studio/state", headers={"Cookie": cookie_header})
+        before_p5 = _request(opener, api + "/p5/studio/state", headers={"Cookie": cookie_header})
+        before_governance = _request(
+            opener, api + "/governance/state", headers={"Cookie": cookie_header}
+        )
+        before_audit = _request(
+            opener,
+            api + "/audit/" + cast(str, metadata["event_correlation"]),
+            headers={"Cookie": cookie_header},
+        )
+        wake_classes = {
+            wake.get("trigger_class")
+            for wake in before_studio.get("wakes", [])
+            if isinstance(wake, dict)
+        }
+        if (
+            not isinstance(before_p5.get("active"), dict)
+            or len(before_governance.get("memberships", [])) < 2
+            or not {"event", "timer"}.issubset(wake_classes)
+            or not before_studio.get("proposals")
+            or not before_studio.get("approvals")
+            or not before_studio.get("results")
+            or not before_audit.get("records")
+        ):
+            raise ComposeRuntimeError("P7 durable governance state did not survive upgrade")
+        responsibility_id = before_studio["identity"]["mandate"]["responsibilities"][0][
+            "responsibility_id"
+        ]
+        _request(
+            opener,
+            api + "/work",
+            method="POST",
+            headers=headers,
+            payload={
+                "title": "P8 transition mutation",
+                "description": "Must disappear when rolling back to the P7 backup.",
+                "responsibility_id": responsibility_id,
+                "idempotency_key": "p8-first-release-transition-mutation",
+            },
+        )
+        if (
+            _request(opener, api + "/studio/state", headers={"Cookie": cookie_header})
+            == before_studio
+        ):
+            raise ComposeRuntimeError("P8 transition mutation was not observed")
+        _compose(
+            docker,
+            transition_project,
+            ["stop", "api", "worker", "studio"],
+            root=source,
+            environment=environment,
+        )
+        restore_stdout, _ = _operations_command(
+            docker,
+            transition_project,
+            source,
+            environment,
+            [
+                "restore",
+                "--backup",
+                "/operator/p7-pre-upgrade.tar.gz",
+                "--database",
+                "/state/state.sqlite",
+                "--backup-source-binding",
+                "/operator/accepted-p7-source-binding.json",
+                "--current-source-binding",
+                "/operator/release-manifest.json",
+                "--migrations",
+                "/app/migrations",
+                "--replace",
+                "--offline-confirmed",
+                "--rollback-backup",
+                "/operator/p8-transition-rollback.tar.gz",
+            ],
+            running=False,
+        )
+        restored = json.loads(restore_stdout)
+        rollback_stdout, _ = _operations_command(
+            docker,
+            transition_project,
+            source,
+            environment,
+            [
+                "verify-backup",
+                "--backup",
+                "/operator/p8-transition-rollback.tar.gz",
+                "--source-binding",
+                "/operator/release-manifest.json",
+                "--migrations",
+                "/app/migrations",
+            ],
+            running=False,
+        )
+        if (
+            restored.get("restored_source_version") != "0.0.0"
+            or restored.get("replaced_source_version") != "0.1.0"
+            or json.loads(rollback_stdout).get("source_version") != "0.1.0"
+        ):
+            raise ComposeRuntimeError("cross-version rollback binding was invalid")
+
+        rollback_port = _port()
+        version = _compose(
+            docker,
+            transition_project,
+            [
+                "run",
+                "--rm",
+                "--no-deps",
+                "-T",
+                "--volume",
+                f"{p7_source}:/p7:ro",
+                "--env",
+                "PYTHONPATH=/p7/src",
+                "api",
+                "python",
+                "-B",
+                "-c",
+                "import digital_colleagues; print(digital_colleagues.__version__)",
+            ],
+            root=source,
+            environment=environment,
+        ).stdout.strip()
+        if version != "0.0.0":
+            raise ComposeRuntimeError("matching accepted P7 code was not selected")
+        launched = _compose(
+            docker,
+            transition_project,
+            [
+                "run",
+                "--rm",
+                "--no-deps",
+                "--detach",
+                "--publish",
+                f"127.0.0.1:{rollback_port}:8000",
+                "--volume",
+                f"{p7_source}:/p7:ro",
+                "--env",
+                "PYTHONPATH=/p7/src",
+                "api",
+                "python",
+                "-B",
+                "-m",
+                "uvicorn",
+                "digital_colleagues.local.asgi:app",
+                "--host",
+                "0.0.0.0",
+                "--port",
+                "8000",
+                "--no-access-log",
+            ],
+            root=source,
+            environment=environment,
+        )
+        rollback_container = launched.stdout.strip()
+        if not rollback_container:
+            raise ComposeRuntimeError("matching accepted P7 runtime did not start")
+        rollback_api = f"http://127.0.0.1:{rollback_port}"
+        _wait_json(opener, rollback_api + "/health")
+        after_studio = _request(
+            opener,
+            rollback_api + "/studio/state",
+            headers={"Cookie": cookie_header},
+        )
+        after_p5 = _request(
+            opener,
+            rollback_api + "/p5/studio/state",
+            headers={"Cookie": cookie_header},
+        )
+        after_governance = _request(
+            opener,
+            rollback_api + "/governance/state",
+            headers={"Cookie": cookie_header},
+        )
+        after_audit = _request(
+            opener,
+            rollback_api + "/audit/" + cast(str, metadata["event_correlation"]),
+            headers={"Cookie": cookie_header},
+        )
+        if after_studio != before_studio or after_p5 != before_p5 or after_audit != before_audit:
+            raise ComposeRuntimeError("matching P7 rollback state drifted")
+        if {key: value for key, value in after_governance.items() if key != "generated_at"} != {
+            key: value for key, value in before_governance.items() if key != "generated_at"
+        }:
+            raise ComposeRuntimeError("matching P7 rollback governance drifted")
+        forbidden = tuple(cast(str, metadata[key]) for key in ("session_credential", "csrf_token"))
+        _scan_bytes((pre_upgrade, p8_rollback), forbidden)
+        transition_logs = _compose(
+            docker,
+            transition_project,
+            ["logs", "--no-color", "api", "worker", "studio"],
+            root=source,
+            environment=environment,
+        )
+        if any(value in transition_logs.stdout + transition_logs.stderr for value in forbidden):
+            raise ComposeRuntimeError("P7 transition credential entered service logs")
+        return {
+            "schema_version": 1,
+            "status": "passed",
+            "source_class": "accepted_p7_git_object",
+            "source_commit": BASE_COMMIT,
+            "source_tree": "4ebfc2bdfcd97e34256ec7a34ff58b0063c05ed7",
+            "source_version": "0.0.0",
+            "source_release_manifest": "not_available_before_first_release",
+            "target_version": "0.1.0",
+            "pre_upgrade_backup": "created_and_verified_before_p8_service_start",
+            "schema_migrations": list(range(1, 8)),
+            "durable_governance_state": "preserved",
+            "p8_mutation": "observed",
+            "rollback_backup": "p8_source_bound_and_verified",
+            "rollback_runtime": "exact_accepted_p7_git_object",
+            "rollback_state_equal": True,
+        }
+    finally:
+        if rollback_container:
+            _run(
+                [docker, "container", "rm", "--force", rollback_container],
+                root=source,
+                environment=environment,
+                check=False,
+            )
+        cleanup = _cleanup(
+            docker,
+            transition_project,
+            root=source,
+            environment=environment,
+        )
+        for path in (p7_database, private_metadata, p7_binding, pre_upgrade, p8_rollback):
+            path.unlink(missing_ok=True)
+        if p7_source.exists():
+            shutil.rmtree(p7_source)
+        if not cleanup.get("passed"):
+            raise ComposeRuntimeError("P7 to P8 transition cleanup failed")
+
+
 def _exact_approval(
     opener: urllib.request.OpenerDirector,
     api: str,
@@ -223,6 +812,18 @@ def check_compose_runtime(root: Path) -> dict[str, object]:
             release_manifest = operator / "release-manifest.json"
             shutil.copyfile(candidate / ARTIFACT_NAMES[4], release_manifest)
             os.chmod(release_manifest, 0o600)
+
+            first_release_transition = _first_release_transition(
+                docker=docker,
+                project=project,
+                repository=root,
+                source=source,
+                temporary=temporary,
+                operator=operator,
+                environment=environment,
+                api_port=api_port,
+                origin=origin,
+            )
 
             _compose(
                 docker,
@@ -480,7 +1081,7 @@ def check_compose_runtime(root: Path) -> dict[str, object]:
                     "/state/state.sqlite",
                     "--backup",
                     "/operator/pre-upgrade.tar.gz",
-                    "--release-manifest",
+                    "--source-binding",
                     "/operator/release-manifest.json",
                     "--migrations",
                     "/app/migrations",
@@ -497,7 +1098,7 @@ def check_compose_runtime(root: Path) -> dict[str, object]:
                     "verify-backup",
                     "--backup",
                     "/operator/pre-upgrade.tar.gz",
-                    "--release-manifest",
+                    "--source-binding",
                     "/operator/release-manifest.json",
                     "--migrations",
                     "/app/migrations",
@@ -545,7 +1146,9 @@ def check_compose_runtime(root: Path) -> dict[str, object]:
                     "/operator/pre-upgrade.tar.gz",
                     "--database",
                     "/state/state.sqlite",
-                    "--release-manifest",
+                    "--backup-source-binding",
+                    "/operator/release-manifest.json",
+                    "--current-source-binding",
                     "/operator/release-manifest.json",
                     "--migrations",
                     "/app/migrations",
@@ -568,7 +1171,7 @@ def check_compose_runtime(root: Path) -> dict[str, object]:
                     "verify-backup",
                     "--backup",
                     "/operator/pre-restore-rollback.tar.gz",
-                    "--release-manifest",
+                    "--source-binding",
                     "/operator/release-manifest.json",
                     "--migrations",
                     "/app/migrations",
@@ -696,6 +1299,14 @@ def check_compose_runtime(root: Path) -> dict[str, object]:
                 "started_at": started_at,
                 "release_source_commit": candidate_result.source_commit,
                 "release_artifact_count": len(candidate_result.artifacts),
+                "first_release_transition": first_release_transition,
+                "studio_build_toolchain": {
+                    "host_node": NODE_VERSION,
+                    "host_npm": NPM_VERSION,
+                    "container_node": NODE_VERSION,
+                    "container_npm": NPM_VERSION,
+                    "container_build_asserted_and_runtime_metadata_verified": True,
+                },
                 "default_model": "deterministic",
                 "default_channel": "reference",
                 "external_provider_calls": 0,
@@ -755,9 +1366,27 @@ def check_compose_runtime(root: Path) -> dict[str, object]:
 
 
 def main(argv: list[str] | None = None) -> int:
+    effective_argv = sys.argv[1:] if argv is None else argv
+    if effective_argv and effective_argv[0] == "--create-p7-fixture":
+        fixture_parser = argparse.ArgumentParser(add_help=False)
+        fixture_parser.add_argument("--create-p7-fixture", action="store_true")
+        fixture_parser.add_argument("--p7-source", type=Path, required=True)
+        fixture_parser.add_argument("--database", type=Path, required=True)
+        fixture_parser.add_argument("--private-metadata", type=Path, required=True)
+        fixture_arguments = fixture_parser.parse_args(effective_argv)
+        try:
+            _create_p7_fixture(
+                fixture_arguments.p7_source,
+                fixture_arguments.database,
+                fixture_arguments.private_metadata,
+            )
+        except (OSError, ComposeRuntimeError, RuntimeError, ValueError):
+            print("P7 upgrade fixture creation failed", file=sys.stderr)
+            return 2
+        return 0
     parser = argparse.ArgumentParser(description="Run actual P8 Compose operations acceptance.")
     parser.add_argument("root", nargs="?", default=".")
-    arguments = parser.parse_args(argv)
+    arguments = parser.parse_args(effective_argv)
     try:
         result = check_compose_runtime(Path(arguments.root).resolve())
     except (OSError, ComposeRuntimeError) as exc:

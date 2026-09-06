@@ -60,7 +60,7 @@ def _payload(
     try:
         _require_regular_no_symlink(database, "database_source_invalid")
         release, expected = _bindings(
-            release_manifest=release_manifest, migrations_directory=migrations_directory
+            source_binding=release_manifest, migrations_directory=migrations_directory
         )
         connection = _open_read_only(database)
         try:

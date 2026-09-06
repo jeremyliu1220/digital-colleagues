@@ -163,12 +163,13 @@ Skill Learning, shared knowledge, multi-person collaboration, and Self-initiated
 remain separate.
 
 Current development status: P8 has a fixed acceptance contract from the accepted P7 base.
-It will build an unpublished `0.1.0` local reference candidate, add WAL-consistent private
-backup and fail-closed restore, allowlisted diagnostics, a deterministic supply-chain
-inventory, double-build comparison, public release checks, and an actual default Compose
-operations path. Until implementation, evidence, and independent acceptance pass, no P8
-completion, formal release, tag, publication, five-minute result, human result, live-
-provider result, or production property is claimed.
+Development builds an unpublished `0.1.0` local reference candidate and implements
+WAL-consistent private backup, fail-closed restore, allowlisted diagnostics, deterministic
+supply-chain inventory, double-build comparison, public release checks, and actual default
+Compose operations. Independent acceptance returned findings; the original branch now
+contains the scoped corrections and regenerated evidence awaiting independent
+re-acceptance. P8 is not accepted, merged, tagged, published, or formally released, and no
+five-minute, human, live-provider, or production property is claimed.
 
 ## Post-v0.1 outlook
 

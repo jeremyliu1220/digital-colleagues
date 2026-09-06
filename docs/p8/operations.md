@@ -18,9 +18,11 @@ v0.1 does not provide encryption at rest. Secure deletion on SSD, snapshots, bac
 container storage depends on the operator's platform and is not guaranteed by `unlink`.
 
 The tools emit only finite status/category JSON. Paths, database contents, credential
-values, private payloads, and raw exceptions are not output. Keep the release manifest
-beside the candidate: backup and restore use it to bind release `0.1.0`, the public source
-commit, and the exact migration manifest.
+values, private payloads, and raw exceptions are not output. Every backup receives an
+explicit source binding. A P8-state binding is the candidate release manifest. The P8
+operator emits the first-release P7 binding from fixed, mechanically checked metadata; it
+identifies accepted P7 version `0.0.0`, commit and tree, schema 7, and the exact migration
+manifest while explicitly recording that no P7 release manifest existed.
 
 ## Verify a release candidate
 
@@ -48,11 +50,11 @@ umask 077
 PYTHONPATH=src python3 -B -m digital_colleagues.operations backup \
   --database /operator/private/state.sqlite \
   --backup /operator/private/pre-upgrade.tar.gz \
-  --release-manifest /operator/private/rc/digital-colleagues-release-manifest-0.1.0.json \
+  --source-binding /operator/private/rc/digital-colleagues-release-manifest-0.1.0.json \
   --migrations migrations
 PYTHONPATH=src python3 -B -m digital_colleagues.operations verify-backup \
   --backup /operator/private/pre-upgrade.tar.gz \
-  --release-manifest /operator/private/rc/digital-colleagues-release-manifest-0.1.0.json \
+  --source-binding /operator/private/rc/digital-colleagues-release-manifest-0.1.0.json \
   --migrations migrations
 ```
 
@@ -61,12 +63,42 @@ migration versions, migration-manifest digest, database digest and size, UTC cre
 and a random non-secret identifier. It contains no local path. Creating a backup refuses an
 existing output rather than overwriting it.
 
+## First release: accepted P7 to P8
+
+P7 predates the release-manifest format. Do not fabricate or require a P7 release manifest.
+Before any P8 API or worker starts against the state, verify that the running/source version
+is the accepted P7 Git object `df47f8d075f7c0660ab5ed6035f8acfa3d3da4dc`, stop its
+writers, and run the verified P8 operator tool against that state with the fixed descriptor:
+
+```bash
+umask 077
+PYTHONPATH=src python3 -B -m digital_colleagues.operations \
+  accepted-p7-source-binding > /operator/private/accepted-p7-source-binding.json
+PYTHONPATH=src python3 -B -m digital_colleagues.operations backup \
+  --database /operator/private/state.sqlite \
+  --backup /operator/private/p7-pre-upgrade.tar.gz \
+  --source-binding /operator/private/accepted-p7-source-binding.json \
+  --migrations migrations
+PYTHONPATH=src python3 -B -m digital_colleagues.operations verify-backup \
+  --backup /operator/private/p7-pre-upgrade.tar.gz \
+  --source-binding /operator/private/accepted-p7-source-binding.json \
+  --migrations migrations
+```
+
+The descriptor is not a retroactive release artifact. It is a P8-authored, mechanically
+checked transition binding to the immutable P7 Git object. Its migration digest must match
+the supplied 001–007 files. An unknown P7 tree, version, schema, source descriptor, or
+migration drift stops the transition.
+
 ## Upgrade
 
 1. Verify candidate checksums, release manifest, supply-chain inventory, and archive
    allowlist.
-2. Create and verify a pre-upgrade backup using the current matching release manifest.
-3. Stop API and worker writers normally. Keep the pre-upgrade code and manifest available.
+2. Create and verify a pre-upgrade backup using the current source binding. For the first
+   release use the exact P7 descriptor above; for later P8-state operations use the P8
+   release manifest.
+3. Stop API and worker writers normally. Keep the matching source code and source binding
+   available.
 4. Start the candidate source archive through default Compose. The store applies only
    migrations 001-007 and checks every immutable checksum; P8 adds no migration 008.
 5. Verify `/health`, exchange a local bootstrap/session only if required, and perform the
@@ -85,7 +117,8 @@ for an automatically verified rollback backup:
 PYTHONPATH=src python3 -B -m digital_colleagues.operations restore \
   --backup /operator/private/pre-upgrade.tar.gz \
   --database /operator/private/state.sqlite \
-  --release-manifest /operator/private/rc/digital-colleagues-release-manifest-0.1.0.json \
+  --backup-source-binding /operator/private/accepted-p7-source-binding.json \
+  --current-source-binding /operator/private/rc/digital-colleagues-release-manifest-0.1.0.json \
   --migrations migrations \
   --replace \
   --offline-confirmed \
@@ -98,9 +131,12 @@ digest and integrity, refuses future schema or incompatible migration history/ma
 then uses a same-directory temporary file plus atomic replacement. It never silently
 overwrites existing state.
 
-Release rollback is: stop the candidate, restore the verified pre-upgrade backup, and start
-the matching previous code and manifest. Destructive down-migration is unsupported. Do not
-start newer code against restored older state and call that rollback.
+For the first release, rollback is: stop P8, restore the verified P7-bound pre-upgrade
+backup while creating a separately P8-bound rollback backup of the replaced state, then
+start the exact accepted P7 Git object. P7 has no previous release manifest; its fixed
+source descriptor supplies the required source/version/schema binding. For later releases,
+start the matching previous code and release manifest. Destructive down-migration is
+unsupported. Do not start newer code against restored older state and call that rollback.
 
 Restoring older bytes also rolls session state, credential digests, approval expiry state,
 membership and authority revisions, and audit history back to that instant. Treat all

@@ -37,6 +37,9 @@ treatment. Mechanically verify the root `LICENSE` and `NOTICE` against the accep
 - OCI images are local operational evidence, not P8 release artifacts and are not pushed or
   published. Their manifest-list digests are fixed, but this review does not claim a full
   legal census of every base-image OS package.
+- The exact Node 24.15.0 build image and Corepack npm 11.12.1 are checked in host and
+  container paths. The unused `iproute2` installation was removed, so no added Debian
+  package bytes or attribution treatment is hidden outside the inventory.
 - The generated deterministic inventory records 242 entries with no missing declared
   license, immutable reference, inclusion classification, or attribution treatment.
 
