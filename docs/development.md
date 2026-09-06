@@ -31,8 +31,8 @@ build packages are exact and hash-checked. Studio packages are exact and carry n
 integrity values. The Studio Docker build uses the exact `node:24.15.0-alpine` manifest
 digest, checks Node/npm inside the build stage, invokes npm only through Corepack, and
 generates matching bounded build-toolchain metadata in the served bundle. No Dockerfile
-performs a separate OS
-package-manager install.
+performs an OS package-manager install. The optional P7 publisher guard copies only the
+version-asserted `ip` applet from the exact inventoried BusyBox build-stage image.
 
 The current schema applies immutable migrations 001-007. P7 adapters are stateless and P8
 adds no migration 008. Never edit an applied migration. A future schema change belongs to a
@@ -52,9 +52,11 @@ make p8-golden
 - full Python unittest with zero skips/failures/errors and required P0-P8 identities;
 - Studio ESLint, Prettier, TypeScript, Vitest, and Vite build;
 - zero-exception public-boundary scan;
-- all 38 applicable P2-P7 current-tree architecture, migration, security, policy, Studio,
+- all 37 applicable P2-P7 current-tree core, architecture, migration, security, policy, Studio,
   Compose, adapter, and Golden Path regressions, plus the fixed P7 historical evidence
-  identity, without running a historical evidence writer;
+  identity, without running a historical evidence writer. The P2 development-stage
+  architecture gate itself is historical because it intentionally rejects every P3+
+  directory; its retained pure-core contract gate still runs against the current tree;
 - P8 repository/provenance, operations, backup/restore, diagnostics, supply-chain,
   reproducibility, release, Compose runtime, and Golden Path gates; and
 - Git whitespace, residue, immutable-input, claim-boundary, and cleanup checks.

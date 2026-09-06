@@ -93,8 +93,22 @@ def check_supply_chain(root: Path) -> dict[str, object]:
         if re.search(r"\b(?:apt-get|apk|dnf|yum)\s+(?:install|add)\b", document):
             raise SupplyChainError("a Dockerfile installs an uninventoried OS package")
         actual_bases.update(matches)
-    if not actual_bases.issubset(expected_bases) or len(actual_bases) != 3:
+    if not actual_bases.issubset(expected_bases) or len(actual_bases) != 4:
         raise SupplyChainError("Docker base inventory drifted")
+    p7_dockerfile = (root / "Dockerfile.p7").read_text(encoding="utf-8")
+    network_guard_base = (
+        "busybox:1.37.0-glibc@"
+        "sha256:4279d9b47df4c1b02d80efd8d02cd59b3a8182c1e785a4ff3f6983bee19dc8b0"
+    )
+    if any(
+        token not in p7_dockerfile
+        for token in (
+            f"FROM {network_guard_base} AS network-tools",
+            "COPY --from=network-tools /bin/busybox /usr/local/bin/ip",
+            'RUN /usr/local/bin/ip 2>&1 | grep -Fq "BusyBox v1.37.0"',
+        )
+    ):
+        raise SupplyChainError("P7 network guard toolchain drifted")
     package = json.loads((root / "studio/package.json").read_text(encoding="utf-8"))
     manager = package.get("packageManager")
     manager_match = PACKAGE_MANAGER_PATTERN.fullmatch(manager) if isinstance(manager, str) else None
@@ -137,9 +151,20 @@ def check_supply_chain(root: Path) -> dict[str, object]:
         raise SupplyChainError("root NOTICE changed without a reviewed P8 decision")
     counts = Counter(str(record["ecosystem"]) for record in records)
     if counts != Counter(
-        {"python": 27, "npm": 202, "oci": 3, "github_action": 3, "operator_tool": 7}
+        {"python": 27, "npm": 202, "oci": 4, "github_action": 3, "operator_tool": 7}
     ):
         raise SupplyChainError("supply-chain coverage count drifted")
+    network_guard_records = [
+        record
+        for record in records
+        if record["ecosystem"] == "oci"
+        and record["name"] == "docker.io/library/busybox"
+        and record["version"] == "1.37.0-glibc"
+    ]
+    if len(network_guard_records) != 1 or network_guard_records[0]["immutable_references"] != [
+        "sha256:4279d9b47df4c1b02d80efd8d02cd59b3a8182c1e785a4ff3f6983bee19dc8b0"
+    ]:
+        raise SupplyChainError("P7 network guard inventory drifted")
     bundled = [
         record
         for record in records
@@ -163,6 +188,7 @@ def check_supply_chain(root: Path) -> dict[str, object]:
         "container_node_version": NODE_VERSION,
         "container_npm_version": NPM_VERSION,
         "container_toolchain_build_asserted": True,
+        "p7_network_guard_tool": network_guard_base,
         "uninventoried_os_packages": 0,
         "bundled_studio_license_text_count": len(bundled),
         "root_notice": "unchanged_reviewed_project_notice",

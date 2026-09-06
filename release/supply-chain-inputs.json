@@ -30,6 +30,7 @@
     {"name": "uvicorn", "version": "0.41.0", "license": "BSD-3-Clause", "role": "direct_runtime"}
   ],
   "docker_bases": [
+    {"name": "docker.io/library/busybox", "version": "1.37.0-glibc", "digest": "sha256:4279d9b47df4c1b02d80efd8d02cd59b3a8182c1e785a4ff3f6983bee19dc8b0", "license": "GPL-2.0-only", "role": "p7_network_guard_tool"},
     {"name": "docker.io/library/nginx", "version": "1.29-alpine", "digest": "sha256:5616878291a2eed594aee8db4dade5878cf7edcb475e59193904b198d9b830de", "license": "BSD-2-Clause", "role": "studio_runtime"},
     {"name": "docker.io/library/node", "version": "24.15.0-alpine", "digest": "sha256:d1b3b4da11eefd5941e7f0b9cf17783fc99d9c6fc34884a665f40a06dbdfc94f", "license": "MIT", "role": "studio_build"},
     {"name": "docker.io/library/python", "version": "3.13-slim", "digest": "sha256:9d2e5553305c7c7b0097999bb17187c69b921ccd6bc9d40e4bb5ebe652c00285", "license": "PSF-2.0", "role": "api_worker_runtime"}

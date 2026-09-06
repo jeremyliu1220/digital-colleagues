@@ -1,5 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
+FROM busybox:1.37.0-glibc@sha256:4279d9b47df4c1b02d80efd8d02cd59b3a8182c1e785a4ff3f6983bee19dc8b0 AS network-tools
+
 FROM python:3.13-slim@sha256:9d2e5553305c7c7b0097999bb17187c69b921ccd6bc9d40e4bb5ebe652c00285
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -7,6 +9,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONPATH=/app/src
 
 WORKDIR /app
+
+# The exact BusyBox ip applet replaces the former distro-provided iproute2 package.
+COPY --from=network-tools /bin/busybox /usr/local/bin/ip
+RUN /usr/local/bin/ip 2>&1 | grep -Fq "BusyBox v1.37.0"
 
 COPY requirements/p8.lock /app/requirements/p8.lock
 RUN python -m pip install --no-cache-dir --require-hashes -r /app/requirements/p8.lock

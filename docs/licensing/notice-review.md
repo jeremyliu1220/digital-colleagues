@@ -38,9 +38,10 @@ treatment. Mechanically verify the root `LICENSE` and `NOTICE` against the accep
   published. Their manifest-list digests are fixed, but this review does not claim a full
   legal census of every base-image OS package.
 - The exact Node 24.15.0 build image and Corepack npm 11.12.1 are checked in host and
-  container paths. The unused `iproute2` installation was removed, so no added Debian
-  package bytes or attribution treatment is hidden outside the inventory.
-- The generated deterministic inventory records 242 entries with no missing declared
+  container paths. The mutable `iproute2` installation was removed; the required route
+  operation instead uses the version-asserted `ip` applet copied from the digest-pinned
+  BusyBox 1.37.0 glibc image, which is explicitly inventoried as GPL-2.0-only.
+- The generated deterministic inventory records 243 entries with no missing declared
   license, immutable reference, inclusion classification, or attribution treatment.
 
 The root Apache-2.0 `LICENSE` is unchanged. No reviewed item for this exact candidate

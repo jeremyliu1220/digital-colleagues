@@ -29,12 +29,23 @@ class P8ReleaseTests(unittest.TestCase):
         second = build_supply_chain_inventory(ROOT, commit)
         self.assertEqual(first, second)
         records = cast(list[dict[str, Any]], first["records"])
-        self.assertEqual(len(records), 242)
+        self.assertEqual(len(records), 243)
         identities = [(item["ecosystem"], item["name"], item["version"]) for item in records]
         self.assertEqual(identities, sorted(identities))
         self.assertEqual(len(identities), len(set(identities)))
         self.assertTrue(all(item["declared_license"] for item in records))
         self.assertTrue(all(item["immutable_references"] for item in records))
+        network_guard = [
+            item
+            for item in records
+            if item["ecosystem"] == "oci" and item["name"] == "docker.io/library/busybox"
+        ]
+        self.assertEqual(len(network_guard), 1)
+        self.assertEqual(network_guard[0]["version"], "1.37.0-glibc")
+        self.assertEqual(
+            network_guard[0]["immutable_references"],
+            ["sha256:4279d9b47df4c1b02d80efd8d02cd59b3a8182c1e785a4ff3f6983bee19dc8b0"],
+        )
         bundled = [item for item in records if item["included_in_release_artifact"]]
         self.assertEqual({item["name"] for item in bundled}, {"react", "react-dom", "scheduler"})
         self.assertEqual(check_supply_chain(ROOT)["gate"], "p8_supply_chain_clean")
@@ -70,6 +81,12 @@ class P8ReleaseTests(unittest.TestCase):
                     "Dockerfile.p7",
                     "RUN python -m pip install",
                     "RUN apt-get install --yes iproute2 && python -m pip install",
+                ),
+                (
+                    "network-guard",
+                    "Dockerfile.p7",
+                    "BusyBox v1.37.0",
+                    "BusyBox v1.36.1",
                 ),
             ):
                 root = Path(name) / label

@@ -26,6 +26,8 @@ formal release exists.
   commits; no release-critical `latest` or mutable-only reference exists.
 - [ ] Host and both Studio container builds execute Node 24.15.0 and integrity-pinned npm
   11.12.1 checks; no Dockerfile installs an uninventoried OS package.
+- [ ] The P7 route guard uses the version-asserted BusyBox 1.37.0 `ip` applet from its exact
+  OCI digest; no mutable `iproute2` package-manager install remains.
 - [ ] Deterministically sorted SBOM covers Python, npm, Hatchling, OCI bases, Actions, and
   release/operator tools with inclusion and attribution treatment.
 - [ ] Built Studio archive contains license texts for React, React DOM, and Scheduler.

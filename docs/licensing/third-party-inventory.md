@@ -72,6 +72,7 @@ Operational Dockerfiles pin manifest-list digests for:
 
 | Base reference | Immutable manifest-list digest | Use |
 | --- | --- | --- |
+| `busybox:1.37.0-glibc` | `sha256:4279d9b47df4c1b02d80efd8d02cd59b3a8182c1e785a4ff3f6983bee19dc8b0` | Exact `ip` applet copied into the P7 publisher guard image |
 | `python:3.13-slim` | `sha256:9d2e5553305c7c7b0097999bb17187c69b921ccd6bc9d40e4bb5ebe652c00285` | API, worker, operator, gates |
 | `node:24.15.0-alpine` | `sha256:d1b3b4da11eefd5941e7f0b9cf17783fc99d9c6fc34884a665f40a06dbdfc94f` | Studio build stage |
 | `nginx:1.29-alpine` | `sha256:5616878291a2eed594aee8db4dade5878cf7edcb475e59193904b198d9b830de` | Studio runtime stage |
@@ -82,8 +83,10 @@ locally and does not publish them. Raw image byte reproducibility is not claimed
 
 The Studio Dockerfiles assert Node 24.15.0 and Corepack npm 11.12.1 inside the actual build
 stage, matching `.nvmrc`, package metadata, host release checks, and the generated static
-toolchain record. `Dockerfile.p7` no longer installs `iproute2`: the no-egress Gate reads
-`/proc/net/route` directly, so no separate unpinned OS package installation is required.
+toolchain record. `Dockerfile.p7` no longer installs `iproute2`. It copies the `ip` applet
+from the exact BusyBox 1.37.0 glibc image above and asserts its version during build; the
+guard uses it only to delete the publisher default route and verifies the result through
+`/proc/net/route`. No package-manager installation or mutable repository index is used.
 
 CI uses Actions Checkout v6, Setup Python v6, and Setup Node v6 at exact 40-character
 commits, all declaring MIT. P8 does not vendor the Actions. The release inventory also

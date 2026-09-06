@@ -69,11 +69,6 @@ FOCUSED: dict[str, tuple[str, str, str]] = {
     "golden": ("P8 Golden Path", "p8_golden_path", "scripts/check_p8_golden_path.py"),
 }
 PRIOR_CURRENT_TREE: dict[str, tuple[str, str, str]] = {
-    "p2_architecture": (
-        "P2 current-tree architecture",
-        "p2_architecture_current_tree",
-        "scripts/check_p2_architecture.py",
-    ),
     "p2_core": (
         "P2 current-tree core contracts",
         "p2_core_current_tree",

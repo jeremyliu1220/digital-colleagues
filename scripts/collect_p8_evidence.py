@@ -40,7 +40,6 @@ REQUIRED_GATES = frozenset(
         "studio_vitest",
         "studio_vite_build",
         "git_diff_check",
-        "p2_architecture_current_tree",
         "p2_core_current_tree",
         "p3_architecture_current_tree",
         "p3_migrations_current_tree",
@@ -255,7 +254,7 @@ def write_p8_evidence(
     if (
         supply_chain.get("unresolved_licenses") != 0
         or supply_chain.get("unresolved_attributions") != 0
-        or supply_chain.get("record_count") != 242
+        or supply_chain.get("record_count") != 243
     ):
         raise EvidenceError("P8 supply-chain boundary is incomplete")
     reproducibility = results.get("reproducibility", {})
@@ -322,7 +321,7 @@ def write_p8_evidence(
     current_tree_regressions = results.get("current_tree_regressions", {})
     if (
         not isinstance(current_tree_regressions, dict)
-        or len(current_tree_regressions) != 38
+        or len(current_tree_regressions) != 37
         or any(
             not isinstance(result, dict)
             or not isinstance(result.get("gate"), str)

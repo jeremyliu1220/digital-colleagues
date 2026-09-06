@@ -59,11 +59,10 @@ class P8RepositoryTests(unittest.TestCase):
                 validate_studio_tests(changed)
 
     def test_p8_aggregate_executes_all_prior_current_tree_regressions(self) -> None:
-        self.assertEqual(len(PRIOR_CURRENT_TREE), 38)
+        self.assertEqual(len(PRIOR_CURRENT_TREE), 37)
         self.assertEqual(
             set(PRIOR_CURRENT_TREE),
             {
-                "p2_architecture",
                 "p2_core",
                 "p3_architecture",
                 "p3_migrations",
