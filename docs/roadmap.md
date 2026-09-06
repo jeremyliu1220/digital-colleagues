@@ -11,10 +11,10 @@ Current checkpoint:
   `df47f8d075f7c0660ab5ed6035f8acfa3d3da4dc`.
 - Historical P0–P7 acceptance, artifacts, evidence, receipts, and migrations remain
   unchanged.
-- P8 release-readiness development starts from that fixed base on
-  `codex/p8-release-readiness`. Its acceptance contract is fixed; implementation has not
-  passed the P8 Gate or independent acceptance and must not be described as accepted,
-  published, production-ready, or a formal release.
+- P8 release-readiness development started from that fixed base on
+  `codex/p8-release-readiness`. P8 development complete, awaiting independent
+  acceptance. It must not be described as accepted, published, production-ready, or a
+  formal release.
 
 Rebaseline boundary:
 
