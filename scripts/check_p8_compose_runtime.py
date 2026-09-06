@@ -13,6 +13,7 @@ import secrets
 import shutil
 import sys
 import tempfile
+import urllib.error
 import urllib.request
 from datetime import UTC, datetime
 from pathlib import Path
@@ -727,7 +728,9 @@ def _first_release_transition(
             "rollback_state_equal": True,
         }
     except ComposeRuntimeError as exc:
-        raise ComposeRuntimeError(f"P7 to P8 transition failed at {phase}") from exc
+        cause = exc.__cause__
+        status = f"_http_{cause.code}" if isinstance(cause, urllib.error.HTTPError) else ""
+        raise ComposeRuntimeError(f"P7 to P8 transition failed at {phase}{status}") from exc
     finally:
         if rollback_container:
             _run(
