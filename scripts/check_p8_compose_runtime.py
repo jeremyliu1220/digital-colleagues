@@ -15,7 +15,6 @@ import sys
 import tempfile
 import urllib.error
 import urllib.request
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
 
@@ -185,60 +184,93 @@ def _write_private_json(path: Path, value: dict[str, Any]) -> None:
         os.fsync(handle.fileno())
 
 
-def _create_p7_fixture(p7_source: Path, database: Path, private_metadata: Path) -> None:
+def _create_p7_fixture(p7_source: Path, state_directory: Path, private_metadata: Path) -> None:
     sys.path.insert(0, str(p7_source))
     sys.path.insert(0, str(p7_source / "src"))
     from digital_colleagues import __version__
-    from digital_colleagues.application.p4_contracts import WorkAssignmentRequest
-    from digital_colleagues.application.p6_contracts import ChangeDecisionRequest
+    from digital_colleagues.application.p4_contracts import (
+        InitialColleagueRequest,
+        WorkAssignmentRequest,
+    )
+    from digital_colleagues.application.p6_contracts import (
+        ChangeDecisionRequest,
+        EnrollmentAuthorizationRequest,
+    )
+    from digital_colleagues.core.common import FrozenJsonObject
     from digital_colleagues.core.effects import ApprovalChoice
     from digital_colleagues.core.governance import ChangeChoice
     from digital_colleagues.core.principals import HumanRole
-    from tests.p6.fixtures import build_harness, initial_request
-    from tests.p6.test_authentication_rbac import bootstrap, enroll
+    from digital_colleagues.local.runtime import build_local_runtime
+    from digital_colleagues.local.security import retrieve_bootstrap_for_operator
 
-    if __version__ != "0.0.0" or database.exists() or private_metadata.exists():
+    if __version__ != "0.0.0" or state_directory.exists() or private_metadata.exists():
         raise ComposeRuntimeError("P7 fixture boundary was invalid")
-    harness = build_harness(database, now=datetime.now(UTC))
-    first_credential, first = bootstrap(harness)
-    _, second = enroll(
-        harness,
-        issuer=first,
-        role=HumanRole.TENANT_ADMIN,
-        scopes=("*",),
-        key="p8-upgrade-second-admin",
+    runtime = build_local_runtime(state_directory)
+    first_token = retrieve_bootstrap_for_operator(runtime.authentication)
+    first = runtime.authentication.exchange(first_token)
+    second_credential = runtime.authentication.authorize_enrollment(
+        session=first.session,
+        request=EnrollmentAuthorizationRequest(
+            role=HumanRole.TENANT_ADMIN,
+            colleague_ids=("*",),
+            idempotency_key="p8-upgrade-second-admin",
+        ),
     )
-    profile, _, _ = harness.colleagues.create(session=first.session, request=initial_request())
+    second_token = runtime.authentication.retrieve_operator_credential(
+        second_credential.credential_id
+    )
+    second = runtime.authentication.exchange_enrollment(second_token)
+    profile, _, _ = runtime.colleagues.create(
+        session=first.session,
+        request=InitialColleagueRequest(
+            display_name="P7 Transition Atlas",
+            role_description="Synthetic operations colleague",
+            service_relationship="Serves the isolated local operator",
+            mission="Verify the first release transition",
+            timezone="UTC",
+            working_context="Synthetic offline P7 state",
+            working_hours="display-only initial text",
+            working_style="Direct and inspectable",
+            responsibilities=("Own finite synthetic work",),
+            capabilities=("Propose a reference message",),
+            constraints=("No external network",),
+            effect_kind="reference_message",
+            destination_kind="reference_channel",
+            action="record_message",
+            effect_constraints=FrozenJsonObject.from_mapping({"network": False}),
+            idempotency_key="p8-upgrade-initial-colleague",
+        ),
+    )
     colleague_id = profile.namespace.scope_id
     if colleague_id is None:
         raise ComposeRuntimeError("P7 fixture namespace was invalid")
-    first_session = harness.authentication.bind_colleague(
+    first_session = runtime.authentication.bind_colleague(
         first.session,
         colleague_id,
         idempotency_key="p8-upgrade-first-bind",
     )
-    second_session = harness.authentication.bind_colleague(
+    second_session = runtime.authentication.bind_colleague(
         second.session_grant.session,
         colleague_id,
         idempotency_key="p8-upgrade-second-bind",
     )
-    draft = harness.inner_builder.create(
+    draft = runtime.builder.create(
         session=first_session,
         idempotency_key="p8-upgrade-policy-draft",
     )
-    reviewed = harness.inner_builder.review(
+    reviewed = runtime.builder.review(
         session=first_session,
         draft_id=draft.draft_id,
         expected_revision=draft.revision,
     )
-    proposed = harness.changes.propose_draft(
+    proposed = runtime.changes.propose_draft(
         session=first_session,
         draft_id=reviewed.draft_id,
         expected_revision=reviewed.revision,
         expected_digest=reviewed.canonical_digest,
         idempotency_key="p8-upgrade-policy-proposal",
     )
-    _, decision = harness.changes.decide(
+    _, decision = runtime.changes.decide(
         session=second_session,
         namespace=profile.namespace,
         proposal_id=proposed.proposal_id,
@@ -249,15 +281,15 @@ def _create_p7_fixture(p7_source: Path, database: Path, private_metadata: Path) 
             idempotency_key="p8-upgrade-policy-approval",
         ),
     )
-    harness.changes.apply_draft(
+    runtime.changes.apply_draft(
         session=first_session,
         namespace=profile.namespace,
         proposal_id=proposed.proposal_id,
         decision_id=decision.decision_id,
         idempotency_key="p8-upgrade-policy-confirm",
     )
-    active_profile, active_mandate = harness.store.active_configuration(profile.namespace)
-    work, _ = harness.colleagues.assign_work(
+    active_profile, active_mandate = runtime.store.active_configuration(profile.namespace)
+    work, _ = runtime.colleagues.assign_work(
         session=first_session,
         request=WorkAssignmentRequest(
             title="P7 durable pre-upgrade work",
@@ -271,7 +303,7 @@ def _create_p7_fixture(p7_source: Path, database: Path, private_metadata: Path) 
         ("timer", True, "p8-upgrade-timer"),
         ("event", False, "p8-upgrade-event"),
     ):
-        trigger = harness.controller.submit_trigger(
+        trigger = runtime.controller.submit_trigger(
             session=first_session,
             work_id=work.work_id,
             trigger_class=trigger_class,
@@ -282,12 +314,12 @@ def _create_p7_fixture(p7_source: Path, database: Path, private_metadata: Path) 
             if not isinstance(trigger, dict) or not isinstance(trigger.get("correlation_id"), str):
                 raise ComposeRuntimeError("P7 fixture correlation was invalid")
             event_correlation = trigger["correlation_id"]
-        harness.controller.process_once(
-            harness.controller.service_context(active_profile.namespace)
+        runtime.controller.process_once(
+            runtime.controller.service_context(active_profile.namespace)
         )
-    snapshot = harness.store.studio_snapshot(active_profile.namespace)
+    snapshot = runtime.store.studio_snapshot(active_profile.namespace)
     proposal = snapshot.proposals[0]
-    harness.controller.decide_proposal(
+    runtime.controller.decide_proposal(
         session=first_session,
         proposal=proposal,
         choice=ApprovalChoice.APPROVE,
@@ -300,12 +332,12 @@ def _create_p7_fixture(p7_source: Path, database: Path, private_metadata: Path) 
         expected_policy_id=proposal.policy_id,
         expected_policy_revision=proposal.policy_revision,
     )
-    harness.controller.process_once(harness.controller.service_context(active_profile.namespace))
-    health = harness.store.healthcheck()
-    harness.store.close()
+    runtime.controller.process_once(runtime.controller.service_context(active_profile.namespace))
+    health = runtime.store.healthcheck()
+    runtime.close()
     if health.get("migration_count") != 7 or not event_correlation:
         raise ComposeRuntimeError("P7 fixture state was invalid")
-    os.chmod(database, 0o600)
+    os.chmod(state_directory / "state.sqlite", 0o600)
     _write_private_json(
         private_metadata,
         {
@@ -315,7 +347,7 @@ def _create_p7_fixture(p7_source: Path, database: Path, private_metadata: Path) 
             "migration_count": 7,
             COLLEAGUE_FIELD: colleague_id,
             "event_correlation": event_correlation,
-            "session_credential": first_credential,
+            "session_credential": first.session_credential,
             "csrf_token": first.csrf_token,
         },
     )
@@ -356,7 +388,8 @@ def _first_release_transition(
 ) -> dict[str, object]:
     transition_project = project + "-upgrade"
     p7_source = temporary / "accepted-p7-source"
-    p7_database = operator / "accepted-p7-state.sqlite"
+    p7_state_directory = operator / "accepted-p7-state"
+    p7_database = p7_state_directory / "state.sqlite"
     private_metadata = operator / "accepted-p7-private.json"
     p7_binding = operator / "accepted-p7-source-binding.json"
     pre_upgrade = operator / "p7-pre-upgrade.tar.gz"
@@ -384,8 +417,8 @@ def _first_release_transition(
                 "--create-p7-fixture",
                 "--p7-source",
                 str(p7_source),
-                "--database",
-                str(p7_database),
+                "--state-directory",
+                str(p7_state_directory),
                 "--private-metadata",
                 str(private_metadata),
             ],
@@ -747,6 +780,8 @@ def _first_release_transition(
         )
         for path in (p7_database, private_metadata, p7_binding, pre_upgrade, p8_rollback):
             path.unlink(missing_ok=True)
+        if p7_state_directory.exists():
+            shutil.rmtree(p7_state_directory)
         if p7_source.exists():
             shutil.rmtree(p7_source)
         if not cleanup.get("passed"):
@@ -1404,13 +1439,13 @@ def main(argv: list[str] | None = None) -> int:
         fixture_parser = argparse.ArgumentParser(add_help=False)
         fixture_parser.add_argument("--create-p7-fixture", action="store_true")
         fixture_parser.add_argument("--p7-source", type=Path, required=True)
-        fixture_parser.add_argument("--database", type=Path, required=True)
+        fixture_parser.add_argument("--state-directory", type=Path, required=True)
         fixture_parser.add_argument("--private-metadata", type=Path, required=True)
         fixture_arguments = fixture_parser.parse_args(effective_argv)
         try:
             _create_p7_fixture(
                 fixture_arguments.p7_source,
-                fixture_arguments.database,
+                fixture_arguments.state_directory,
                 fixture_arguments.private_metadata,
             )
         except (OSError, ComposeRuntimeError, RuntimeError, ValueError):
