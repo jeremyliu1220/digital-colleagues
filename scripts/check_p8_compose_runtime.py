@@ -14,6 +14,7 @@ import shutil
 import sys
 import tempfile
 import urllib.request
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
 
@@ -197,7 +198,7 @@ def _create_p7_fixture(p7_source: Path, database: Path, private_metadata: Path) 
 
     if __version__ != "0.0.0" or database.exists() or private_metadata.exists():
         raise ComposeRuntimeError("P7 fixture boundary was invalid")
-    harness = build_harness(database)
+    harness = build_harness(database, now=datetime.now(UTC))
     first_credential, first = bootstrap(harness)
     _, second = enroll(
         harness,
@@ -361,10 +362,12 @@ def _first_release_transition(
     p8_rollback = operator / "p8-transition-rollback.tar.gz"
     rollback_container = ""
     cleanup: dict[str, object] = {"passed": False}
+    phase = "source_extraction"
     try:
         _extract_accepted_p7(repository, p7_source)
         binding = _host_operations(source, environment, ["accepted-p7-source-binding"])
         _write_private_json(p7_binding, binding)
+        phase = "p7_fixture"
         fixture_environment = environment.copy()
         fixture_environment.update(
             {
@@ -416,6 +419,7 @@ def _first_release_transition(
             )
         ):
             raise ComposeRuntimeError("accepted P7 fixture binding was invalid")
+        phase = "pre_upgrade_backup"
         backup_result = _host_operations(
             source,
             environment,
@@ -452,6 +456,7 @@ def _first_release_transition(
         ):
             raise ComposeRuntimeError("accepted P7 pre-upgrade backup did not verify")
         p7_database.unlink()
+        phase = "pre_start_restore"
         install_stdout, install_stderr = _operations_command(
             docker,
             transition_project,
@@ -478,6 +483,7 @@ def _first_release_transition(
         ):
             raise ComposeRuntimeError("P7 state was not installed before P8 startup")
 
+        phase = "p8_start"
         _compose(
             docker,
             transition_project,
@@ -501,6 +507,7 @@ def _first_release_transition(
         if not isinstance(csrf, str) or not csrf:
             raise ComposeRuntimeError("accepted P7 session did not survive P8 startup")
         headers = {"Cookie": cookie_header, "Origin": origin, "X-CSRF-Token": csrf}
+        phase = "p8_state_validation"
         before_studio = _request(opener, api + "/studio/state", headers={"Cookie": cookie_header})
         before_p5 = _request(opener, api + "/p5/studio/state", headers={"Cookie": cookie_header})
         before_governance = _request(
@@ -518,7 +525,8 @@ def _first_release_transition(
         }
         if (
             not isinstance(before_p5.get("active"), dict)
-            or len(before_governance.get("memberships", [])) < 2
+            or not isinstance(before_governance.get("membership"), dict)
+            or not before_governance.get("change_decisions")
             or not {"event", "timer"}.issubset(wake_classes)
             or not before_studio.get("proposals")
             or not before_studio.get("approvals")
@@ -529,6 +537,7 @@ def _first_release_transition(
         responsibility_id = before_studio["identity"]["mandate"]["responsibilities"][0][
             "responsibility_id"
         ]
+        phase = "p8_mutation"
         _request(
             opener,
             api + "/work",
@@ -546,6 +555,7 @@ def _first_release_transition(
             == before_studio
         ):
             raise ComposeRuntimeError("P8 transition mutation was not observed")
+        phase = "p8_stop_and_restore"
         _compose(
             docker,
             transition_project,
@@ -601,6 +611,7 @@ def _first_release_transition(
         ):
             raise ComposeRuntimeError("cross-version rollback binding was invalid")
 
+        phase = "p7_matching_runtime"
         rollback_port = _port()
         version = _compose(
             docker,
@@ -659,6 +670,7 @@ def _first_release_transition(
             raise ComposeRuntimeError("matching accepted P7 runtime did not start")
         rollback_api = f"http://127.0.0.1:{rollback_port}"
         _wait_json(opener, rollback_api + "/health")
+        phase = "rollback_state_validation"
         after_studio = _request(
             opener,
             rollback_api + "/studio/state",
@@ -685,6 +697,7 @@ def _first_release_transition(
             key: value for key, value in before_governance.items() if key != "generated_at"
         }:
             raise ComposeRuntimeError("matching P7 rollback governance drifted")
+        phase = "private_boundary_scan"
         forbidden = tuple(cast(str, metadata[key]) for key in ("session_credential", "csrf_token"))
         _scan_bytes((pre_upgrade, p8_rollback), forbidden)
         transition_logs = _compose(
@@ -713,6 +726,8 @@ def _first_release_transition(
             "rollback_runtime": "exact_accepted_p7_git_object",
             "rollback_state_equal": True,
         }
+    except ComposeRuntimeError as exc:
+        raise ComposeRuntimeError(f"P7 to P8 transition failed at {phase}") from exc
     finally:
         if rollback_container:
             _run(
