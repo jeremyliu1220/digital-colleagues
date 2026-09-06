@@ -28,6 +28,19 @@ from scripts.p8_release_support import ACCEPTANCE_COMMIT, BASE_COMMIT
 from scripts.run_p8_toolchain import PRIOR_CURRENT_TREE
 from tests.p8.fixtures import ROOT
 
+EXPECTED_POST_MERGE_PATHS = {
+    "README.md",
+    "SECURITY.md",
+    "docs/p8/release-checklist.md",
+    "docs/product/capability-matrix.md",
+    "docs/roadmap.md",
+    "scripts/check_p8_provenance.py",
+    "scripts/check_p8_release.py",
+    "scripts/check_p8_repository.py",
+    "tests/p8/test_release.py",
+    "tests/p8/test_repository.py",
+}
+
 
 def _clone(directory: Path) -> Path:
     directory.mkdir(parents=True, exist_ok=True)
@@ -52,6 +65,13 @@ def _commit(root: Path, message: str, *, allow_empty: bool = False) -> str:
         arguments.append("--allow-empty")
     subprocess.run(arguments, cwd=root, check=True)
     return subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip()
+
+
+def _append_and_commit(root: Path, relative: str) -> str:
+    path = root / relative
+    path.write_bytes(path.read_bytes() + b"\npost-merge descendant drift\n")
+    subprocess.run(["git", "add", relative], cwd=root, check=True)
+    return _commit(root, f"change {relative}")
 
 
 class P8RepositoryTests(unittest.TestCase):
@@ -142,6 +162,118 @@ class P8RepositoryTests(unittest.TestCase):
         self.assertEqual(result["historical_drift_count"], 0)
         self.assertEqual(result["residue_count"], 0)
         self.assertFalse(result["migration_008"])
+        self.assertEqual(result["descendant_boundary_status"], "passed")
+        self.assertEqual(result["post_merge_change_count"], 10)
+        self.assertEqual(result["post_merge_path_count"], 10)
+        self.assertEqual(result["post_merge_allowed_path_count"], 10)
+        self.assertEqual(result["post_merge_unexpected_path_count"], 0)
+
+    def test_real_hotfix_committed_delta_is_exactly_the_reviewed_ten_paths(self) -> None:
+        changed = set(
+            subprocess.check_output(
+                ["git", "diff", "--name-only", ACCEPTED_P8_COMMIT, "HEAD", "--"],
+                cwd=ROOT,
+                text=True,
+            ).splitlines()
+        )
+        self.assertEqual(changed, EXPECTED_POST_MERGE_PATHS)
+        repository = check_repository(ROOT)
+        provenance = check_provenance(ROOT)
+        for result in (repository, provenance):
+            self.assertEqual(result["descendant_boundary_status"], "passed")
+            self.assertEqual(result["post_merge_path_count"], len(EXPECTED_POST_MERGE_PATHS))
+            self.assertEqual(result["post_merge_unexpected_path_count"], 0)
+
+    def test_committed_out_of_scope_descendant_paths_fail_both_gates(self) -> None:
+        paths = (
+            "src/digital_colleagues/__init__.py",
+            "Dockerfile",
+            "Dockerfile.p7",
+            "compose.yaml",
+            "requirements/p8.lock",
+            "release/supply-chain-inputs.json",
+            "artifacts/p8/summary.json",
+            "provenance/p8-migration-receipt.json",
+            "migrations/manifest.json",
+            "docs/p8/acceptance.md",
+            "docs/p7/acceptance.md",
+            "artifacts/p7/summary.json",
+            "provenance/p7-migration-receipt.json",
+            "docs/development.md",
+            "scripts/check_p8_operations.py",
+            "tests/p8/test_backup_restore.py",
+        )
+        with tempfile.TemporaryDirectory(prefix="digital-colleagues-p8-scope-") as name:
+            temporary = Path(name)
+            for index, relative in enumerate(paths):
+                with self.subTest(relative=relative):
+                    root = _clone(temporary / str(index))
+                    _append_and_commit(root, relative)
+                    with self.assertRaisesRegex(RepositoryError, "post-merge commit"):
+                        check_repository(root)
+                    with self.assertRaisesRegex(ProvenanceError, "post-merge commit"):
+                        check_provenance(root)
+
+    def test_rename_and_copy_sources_and_destinations_cannot_escape_scope(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="digital-colleagues-p8-rename-") as name:
+            temporary = Path(name)
+
+            outside_to_allowed = _clone(temporary / "outside-to-allowed")
+            (outside_to_allowed / "README.md").unlink()
+            subprocess.run(
+                ["git", "mv", "-f", "docs/development.md", "README.md"],
+                cwd=outside_to_allowed,
+                check=True,
+            )
+            _commit(outside_to_allowed, "rename outside path to allowed path")
+
+            allowed_to_outside = _clone(temporary / "allowed-to-outside")
+            subprocess.run(
+                ["git", "mv", "README.md", "docs/post-merge-escape.md"],
+                cwd=allowed_to_outside,
+                check=True,
+            )
+            _commit(allowed_to_outside, "rename allowed path to outside path")
+
+            copy_to_allowed = _clone(temporary / "copy-to-allowed")
+            shutil.copyfile(copy_to_allowed / "docs/development.md", copy_to_allowed / "README.md")
+            subprocess.run(["git", "add", "README.md"], cwd=copy_to_allowed, check=True)
+            _commit(copy_to_allowed, "copy outside path to allowed path")
+
+            for label, root in (
+                ("outside-to-allowed", outside_to_allowed),
+                ("allowed-to-outside", allowed_to_outside),
+                ("copy-to-allowed", copy_to_allowed),
+            ):
+                with self.subTest(label=label):
+                    with self.assertRaisesRegex(RepositoryError, "post-merge commit"):
+                        check_repository(root)
+                    with self.assertRaisesRegex(ProvenanceError, "post-merge commit"):
+                        check_provenance(root)
+
+    def test_out_of_scope_staged_unstaged_and_untracked_paths_fail_both_gates(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="digital-colleagues-p8-dirty-") as name:
+            temporary = Path(name)
+            for state in ("staged", "unstaged", "untracked"):
+                with self.subTest(state=state):
+                    root = _clone(temporary / state)
+                    if state == "untracked":
+                        (root / "docs/post-merge-untracked.md").write_text(
+                            "post-merge descendant drift\n", encoding="utf-8"
+                        )
+                    else:
+                        path = root / "src/digital_colleagues/__init__.py"
+                        path.write_bytes(path.read_bytes() + b"\npost-merge descendant drift\n")
+                        if state == "staged":
+                            subprocess.run(
+                                ["git", "add", "src/digital_colleagues/__init__.py"],
+                                cwd=root,
+                                check=True,
+                            )
+                    with self.assertRaisesRegex(RepositoryError, "working tree"):
+                        check_repository(root)
+                    with self.assertRaisesRegex(ProvenanceError, "working tree"):
+                        check_provenance(root)
 
     def test_accepted_p8_immutable_files_modified_or_deleted_fail_closed(self) -> None:
         with tempfile.TemporaryDirectory(prefix="digital-colleagues-p8-immutable-") as name:
@@ -159,6 +291,8 @@ class P8RepositoryTests(unittest.TestCase):
                         RepositoryError, "accepted P8 immutable file", msg=label
                     ):
                         check_repository(root)
+                    with self.assertRaises(ProvenanceError, msg=label):
+                        check_provenance(root)
 
     def test_historical_migration_and_residue_drift_fail_closed(self) -> None:
         with tempfile.TemporaryDirectory(prefix="digital-colleagues-p8-repository-") as name:
@@ -176,6 +310,9 @@ class P8RepositoryTests(unittest.TestCase):
                     (root / "runtime.log").write_text("residue\n", encoding="utf-8")
                 with self.assertRaises(RepositoryError, msg=category):
                     check_repository(root)
+                if category != "residue":
+                    with self.assertRaises(ProvenanceError, msg=category):
+                        check_provenance(root)
 
     def test_wrong_ancestry_and_missing_required_file_fail_closed(self) -> None:
         with tempfile.TemporaryDirectory(prefix="digital-colleagues-p8-ancestry-") as name:
@@ -250,7 +387,7 @@ class P8RepositoryTests(unittest.TestCase):
             drifted = _clone(temporary / "receipt-drift")
             receipt = drifted / "provenance/p8-migration-receipt.json"
             receipt.write_bytes(receipt.read_bytes() + b"\n")
-            with self.assertRaisesRegex(ProvenanceError, "accepted P8 receipt changed"):
+            with self.assertRaises(ProvenanceError):
                 check_provenance(drifted)
 
     def test_missing_accepted_implementation_object_fails_closed(self) -> None:

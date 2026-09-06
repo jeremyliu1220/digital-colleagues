@@ -9,23 +9,44 @@ import hashlib
 import json
 import subprocess
 import sys
+from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any
 
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from scripts.check_p8_repository import ACCEPTED_P8_COMMIT
 from scripts.p8_release_support import BASE_COMMIT
 
 RECEIPT = "provenance/p8-migration-receipt.json"
 EXCLUDED = {RECEIPT, "artifacts/p8/summary.json"}
 FIELDS = {"destination", "classification", "implementation_basis", "gate_result"}
 BASIS = "public_documents_and_accepted_p7_implementation"
+ACCEPTED_P8_COMMIT = "0bb80ab187932fbad42fbf665b8310987609a1f5"
+POST_MERGE_ALLOWED_PATHS = frozenset(
+    {
+        "README.md",
+        "SECURITY.md",
+        "docs/p8/release-checklist.md",
+        "docs/product/capability-matrix.md",
+        "docs/roadmap.md",
+        "scripts/check_p8_provenance.py",
+        "scripts/check_p8_release.py",
+        "scripts/check_p8_repository.py",
+        "tests/p8/test_release.py",
+        "tests/p8/test_repository.py",
+    }
+)
 
 
 class ProvenanceError(RuntimeError):
     """P8 provenance coverage is incomplete or unsafe."""
+
+
+@dataclass(frozen=True)
+class ProvenanceGitChange:
+    status: str
+    paths: tuple[str, ...]
 
 
 def _git(root: Path, *arguments: str) -> tuple[str, ...]:
@@ -81,6 +102,127 @@ def _require_accepted_ancestor(root: Path) -> None:
         raise ProvenanceError("Git P8 ancestry inspection failed")
 
 
+def _descendant_path(field: bytes) -> str:
+    try:
+        value = field.decode("utf-8")
+    except UnicodeError as exc:
+        raise ProvenanceError("Git P8 descendant path is not UTF-8") from exc
+    path = PurePosixPath(value)
+    if not value or path.is_absolute() or ".." in path.parts or path.as_posix() != value:
+        raise ProvenanceError("Git P8 descendant path is invalid")
+    return value
+
+
+def _parse_descendant_status(output: bytes) -> tuple[ProvenanceGitChange, ...]:
+    if not output:
+        return ()
+    fields = output.split(b"\0")
+    if fields[-1] != b"":
+        raise ProvenanceError("Git P8 descendant status is malformed")
+    fields.pop()
+    changes: list[ProvenanceGitChange] = []
+    index = 0
+    while index < len(fields):
+        try:
+            status = fields[index].decode("ascii")
+        except UnicodeError as exc:
+            raise ProvenanceError("Git P8 descendant status is invalid") from exc
+        index += 1
+        code = status[:1]
+        if code in {"R", "C"}:
+            score = status[1:]
+            if not score.isdigit() or int(score) > 100:
+                raise ProvenanceError("Git P8 descendant rename or copy status is invalid")
+            path_count = 2
+        elif status in {"A", "D", "M", "T"}:
+            path_count = 1
+        elif status in {"U", "X", "B"}:
+            raise ProvenanceError("Git P8 descendant change state is unresolved")
+        else:
+            raise ProvenanceError("Git P8 descendant status is unsupported")
+        if index + path_count > len(fields):
+            raise ProvenanceError("Git P8 descendant status is malformed")
+        paths = tuple(_descendant_path(field) for field in fields[index : index + path_count])
+        index += path_count
+        changes.append(ProvenanceGitChange(status=status, paths=paths))
+    return tuple(changes)
+
+
+def _descendant_diff(root: Path, *arguments: str) -> tuple[ProvenanceGitChange, ...]:
+    completed = subprocess.run(
+        [
+            "git",
+            "diff",
+            "--no-ext-diff",
+            "--no-textconv",
+            "--name-status",
+            "-z",
+            "--break-rewrites",
+            "--find-renames",
+            "--find-copies-harder",
+            *arguments,
+            "--",
+        ],
+        cwd=root,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    if completed.returncode != 0:
+        raise ProvenanceError("Git P8 descendant change inspection failed")
+    return _parse_descendant_status(completed.stdout)
+
+
+def _descendant_untracked(root: Path) -> tuple[str, ...]:
+    completed = subprocess.run(
+        ["git", "ls-files", "--others", "--exclude-standard", "-z"],
+        cwd=root,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    if completed.returncode != 0:
+        raise ProvenanceError("Git P8 descendant untracked inspection failed")
+    if not completed.stdout:
+        return ()
+    fields = completed.stdout.split(b"\0")
+    if fields[-1] != b"":
+        raise ProvenanceError("Git P8 descendant untracked output is malformed")
+    return tuple(_descendant_path(field) for field in fields[:-1])
+
+
+def _descendant_paths(changes: tuple[ProvenanceGitChange, ...]) -> set[str]:
+    return {path for change in changes for path in change.paths}
+
+
+def _check_descendant_boundary(root: Path) -> dict[str, int | str]:
+    committed = _descendant_diff(root, ACCEPTED_P8_COMMIT, "HEAD")
+    committed_paths = _descendant_paths(committed)
+    if committed_paths - POST_MERGE_ALLOWED_PATHS:
+        raise ProvenanceError("P8 post-merge commit changed a path outside the allowlist")
+    if committed_paths != POST_MERGE_ALLOWED_PATHS:
+        raise ProvenanceError("P8 post-merge checkpoint delta is incomplete")
+
+    staged = _descendant_diff(root, "--cached", "HEAD")
+    unstaged = _descendant_diff(root)
+    untracked = _descendant_untracked(root)
+    staged_paths = _descendant_paths(staged)
+    unstaged_paths = _descendant_paths(unstaged)
+    working_paths = staged_paths | unstaged_paths | set(untracked)
+    if working_paths - POST_MERGE_ALLOWED_PATHS:
+        raise ProvenanceError("P8 working tree changed a path outside the allowlist")
+    return {
+        "descendant_boundary_status": "passed",
+        "post_merge_change_count": len(committed),
+        "post_merge_path_count": len(committed_paths),
+        "post_merge_allowed_path_count": len(POST_MERGE_ALLOWED_PATHS),
+        "post_merge_unexpected_path_count": 0,
+        "staged_change_path_count": len(staged_paths),
+        "unstaged_change_path_count": len(unstaged_paths),
+        "untracked_path_count": len(untracked),
+    }
+
+
 def _safe_path(value: object) -> str:
     if not isinstance(value, str) or not value:
         raise ProvenanceError("receipt destination is invalid")
@@ -109,6 +251,7 @@ def check_provenance(root: Path) -> dict[str, object]:
     root = root.resolve()
     _require_commit(root)
     _require_accepted_ancestor(root)
+    descendant = _check_descendant_boundary(root)
     path = root / RECEIPT
     try:
         current_receipt = path.read_bytes()
@@ -160,6 +303,7 @@ def check_provenance(root: Path) -> dict[str, object]:
         "source_basis": BASIS,
         "receipt_digest": "sha256:" + hashlib.sha256(accepted_receipt).hexdigest(),
         "implementation_tree_digest": framed_digest(root, actual),
+        **descendant,
     }
 
 

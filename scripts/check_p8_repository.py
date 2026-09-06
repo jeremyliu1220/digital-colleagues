@@ -8,7 +8,8 @@ import argparse
 import json
 import subprocess
 import sys
-from pathlib import Path
+from dataclasses import dataclass
+from pathlib import Path, PurePosixPath
 from typing import cast
 
 if __package__ in {None, ""}:
@@ -26,6 +27,20 @@ ACCEPTED_P8_IMMUTABLE_PATHS = (
     "artifacts/p8/summary.json",
     "docs/p8/acceptance.md",
     "provenance/p8-migration-receipt.json",
+)
+POST_MERGE_ALLOWED_PATHS = frozenset(
+    {
+        "README.md",
+        "SECURITY.md",
+        "docs/p8/release-checklist.md",
+        "docs/product/capability-matrix.md",
+        "docs/roadmap.md",
+        "scripts/check_p8_provenance.py",
+        "scripts/check_p8_release.py",
+        "scripts/check_p8_repository.py",
+        "tests/p8/test_release.py",
+        "tests/p8/test_repository.py",
+    }
 )
 ACCEPTANCE_DOCUMENT_PATHS = ("docs/p8/acceptance.md",)
 HISTORICAL_PATHS = (
@@ -117,6 +132,12 @@ class RepositoryError(RuntimeError):
     """The repository does not satisfy the fixed P8 development boundary."""
 
 
+@dataclass(frozen=True)
+class GitChange:
+    status: str
+    paths: tuple[str, ...]
+
+
 def _git(root: Path, *arguments: str, text: bool = True) -> str | bytes:
     completed = subprocess.run(
         ["git", *arguments],
@@ -142,6 +163,132 @@ def _is_ancestor(root: Path, ancestor: str, descendant: str) -> bool:
     if completed.returncode not in {0, 1}:
         raise RepositoryError("Git P8 ancestry inspection failed")
     return completed.returncode == 0
+
+
+def _change_path(field: bytes) -> str:
+    try:
+        value = field.decode("utf-8")
+    except UnicodeError as exc:
+        raise RepositoryError("Git P8 change path is not UTF-8") from exc
+    path = PurePosixPath(value)
+    if not value or path.is_absolute() or ".." in path.parts or path.as_posix() != value:
+        raise RepositoryError("Git P8 change path is invalid")
+    return value
+
+
+def _parse_name_status(output: bytes) -> tuple[GitChange, ...]:
+    if not output:
+        return ()
+    fields = output.split(b"\0")
+    if fields[-1] != b"":
+        raise RepositoryError("Git P8 change status is malformed")
+    fields.pop()
+    changes: list[GitChange] = []
+    index = 0
+    while index < len(fields):
+        try:
+            status = fields[index].decode("ascii")
+        except UnicodeError as exc:
+            raise RepositoryError("Git P8 change status is invalid") from exc
+        index += 1
+        code = status[:1]
+        if code in {"R", "C"}:
+            score = status[1:]
+            if not score.isdigit() or int(score) > 100:
+                raise RepositoryError("Git P8 rename or copy status is invalid")
+            path_count = 2
+        elif status in {"A", "D", "M", "T"}:
+            path_count = 1
+        elif status in {"U", "X", "B"}:
+            raise RepositoryError("Git P8 change state is unresolved")
+        else:
+            raise RepositoryError("Git P8 change status is unsupported")
+        if index + path_count > len(fields):
+            raise RepositoryError("Git P8 change status is malformed")
+        paths = tuple(_change_path(field) for field in fields[index : index + path_count])
+        index += path_count
+        changes.append(GitChange(status=status, paths=paths))
+    return tuple(changes)
+
+
+def _diff_changes(root: Path, *arguments: str) -> tuple[GitChange, ...]:
+    completed = subprocess.run(
+        [
+            "git",
+            "diff",
+            "--no-ext-diff",
+            "--no-textconv",
+            "--name-status",
+            "-z",
+            "--break-rewrites",
+            "--find-renames",
+            "--find-copies-harder",
+            *arguments,
+            "--",
+        ],
+        cwd=root,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    if completed.returncode != 0:
+        raise RepositoryError("Git P8 descendant change inspection failed")
+    return _parse_name_status(completed.stdout)
+
+
+def _untracked_paths(root: Path) -> tuple[str, ...]:
+    completed = subprocess.run(
+        ["git", "ls-files", "--others", "--exclude-standard", "-z"],
+        cwd=root,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    if completed.returncode != 0:
+        raise RepositoryError("Git P8 untracked path inspection failed")
+    if not completed.stdout:
+        return ()
+    fields = completed.stdout.split(b"\0")
+    if fields[-1] != b"":
+        raise RepositoryError("Git P8 untracked path output is malformed")
+    return tuple(_change_path(field) for field in fields[:-1])
+
+
+def _changed_paths(changes: tuple[GitChange, ...]) -> set[str]:
+    return {path for change in changes for path in change.paths}
+
+
+def _committed_descendant_boundary(root: Path) -> dict[str, int | str]:
+    committed = _diff_changes(root, ACCEPTED_P8_COMMIT, "HEAD")
+    committed_paths = _changed_paths(committed)
+    unexpected_committed = committed_paths - POST_MERGE_ALLOWED_PATHS
+    if unexpected_committed:
+        raise RepositoryError("P8 post-merge commit changed a path outside the allowlist")
+    if committed_paths != POST_MERGE_ALLOWED_PATHS:
+        raise RepositoryError("P8 post-merge checkpoint delta is incomplete")
+    return {
+        "descendant_boundary_status": "passed",
+        "post_merge_change_count": len(committed),
+        "post_merge_path_count": len(committed_paths),
+        "post_merge_allowed_path_count": len(POST_MERGE_ALLOWED_PATHS),
+        "post_merge_unexpected_path_count": 0,
+    }
+
+
+def _working_tree_boundary(root: Path) -> dict[str, int]:
+    staged = _diff_changes(root, "--cached", "HEAD")
+    unstaged = _diff_changes(root)
+    untracked = _untracked_paths(root)
+    staged_paths = _changed_paths(staged)
+    unstaged_paths = _changed_paths(unstaged)
+    working_paths = staged_paths | unstaged_paths | set(untracked)
+    if working_paths - POST_MERGE_ALLOWED_PATHS:
+        raise RepositoryError("P8 working tree changed a path outside the allowlist")
+    return {
+        "staged_change_path_count": len(staged_paths),
+        "unstaged_change_path_count": len(unstaged_paths),
+        "untracked_path_count": len(untracked),
+    }
 
 
 def _require_commit(root: Path, commit: str) -> None:
@@ -197,6 +344,7 @@ def check_repository(root: Path) -> dict[str, object]:
     _require_commit(root, ACCEPTED_P8_COMMIT)
     if not _is_ancestor(root, ACCEPTED_P8_COMMIT, "HEAD"):
         raise RepositoryError("the accepted P8 commit is not an ancestor of HEAD")
+    descendant = _committed_descendant_boundary(root)
     if not _is_ancestor(root, BASE_COMMIT, "HEAD") or not _is_ancestor(
         root, ACCEPTANCE_COMMIT, "HEAD"
     ):
@@ -237,6 +385,7 @@ def check_repository(root: Path) -> dict[str, object]:
     residue = _residue(root)
     if residue:
         raise RepositoryError("repository contains forbidden runtime or build residue")
+    descendant.update(_working_tree_boundary(root))
     return {
         "schema_version": 1,
         "gate": "p8_repository_clean",
@@ -254,6 +403,7 @@ def check_repository(root: Path) -> dict[str, object]:
         "migration_008": False,
         "residue_count": 0,
         "retained_p7_gate": prior["gate"],
+        **descendant,
     }
 
 
