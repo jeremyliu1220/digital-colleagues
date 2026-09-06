@@ -592,14 +592,16 @@ def check_compose_runtime(root: Path) -> dict[str, object]:
             after_p5 = _request(first, api + "/p5/studio/state")
             after_governance = _request(first, api + "/governance/state")
             after_audit = _request(first, api + "/audit/" + event_correlation)
-            if (
-                after_studio != before_studio
-                or after_p5 != before_p5
-                or after_governance != before_governance
-                or after_audit != before_audit
-                or set(initial_ids) & set(after_ids)
-            ):
-                raise ComposeRuntimeError("restored durable state or fresh restart drifted")
+            if after_studio != before_studio:
+                raise ComposeRuntimeError("restored Studio durable state drifted")
+            if after_p5 != before_p5:
+                raise ComposeRuntimeError("restored P5 durable state drifted")
+            if after_governance != before_governance:
+                raise ComposeRuntimeError("restored governance durable state drifted")
+            if after_audit != before_audit:
+                raise ComposeRuntimeError("restored causal audit state drifted")
+            if set(initial_ids) & set(after_ids):
+                raise ComposeRuntimeError("restored restart reused a service container")
 
             _request(
                 first,
