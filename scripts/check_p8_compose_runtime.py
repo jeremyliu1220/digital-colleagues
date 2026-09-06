@@ -437,10 +437,17 @@ def check_compose_runtime(root: Path) -> dict[str, object]:
             before_p5 = _request(first, api + "/p5/studio/state")
             before_governance = _request(first, api + "/governance/state")
             before_audit = _request(first, api + "/audit/" + event_correlation)
+            p5_active = before_p5.get("active")
+            wake_classes = {
+                wake.get("trigger_class")
+                for wake in before_studio.get("wakes", [])
+                if isinstance(wake, dict)
+            }
             if (
-                before_p5.get("policy") is None
-                or len(before_studio.get("timers", [])) < 1
+                not isinstance(p5_active, dict)
+                or p5_active.get("policy") is None
                 or len(before_studio.get("wakes", [])) < 2
+                or not {"event", "timer"}.issubset(wake_classes)
                 or len(before_studio.get("proposals", [])) < 1
                 or len(before_studio.get("approvals", [])) < 1
                 or len(before_studio.get("results", [])) < 1
