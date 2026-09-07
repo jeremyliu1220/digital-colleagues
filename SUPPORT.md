@@ -2,10 +2,16 @@
 
 # Support
 
-P1 is an unsupported pre-release scaffold. Use repository discussions for setup questions
-and the issue templates for reproducible defects or scoped proposals. Search existing
-threads first and include tool versions, the exact safe command, expected behavior, and
-sanitized output.
+Digital Colleagues is unsupported pre-release research software. P10 is a Public Pilot
+development candidate, not a published release or supported service. Use repository
+discussions for setup questions and the issue templates for reproducible defects or scoped
+proposals. Search existing threads first and include tool versions, the exact safe command,
+expected behavior, and sanitized finite output.
 
 Never post credentials, personal data, private source content, local absolute paths, or
 live-provider evidence. Security concerns follow `SECURITY.md`.
+
+For a downloaded Mac candidate, start with `./dc doctor --json`. Share only its finite
+category/version/readiness fields. Never share Application Support content, a database,
+backup, release lock, Docker inspection output, credential, local path, user/host name, or
+container identifier. There is no authorized GHCR download or update channel at P10.

@@ -10,6 +10,7 @@ from typing import Any
 from fastapi import Depends, FastAPI, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
+from digital_colleagues import API_TITLE, __version__
 from digital_colleagues.application.contracts import (
     ApprovalRequest,
     InputEventRequest,
@@ -106,7 +107,7 @@ def create_app(
     store: PersistencePort,
     context_provider: Callable[[], RequestPrincipalContext],
 ) -> FastAPI:
-    app = FastAPI(title="Digital Colleagues P3 headless edge", version="0.0.0-p3")
+    app = FastAPI(title=API_TITLE, version=__version__)
     app.state.authentication_boundary = "server_context_injected_p4_authentication_not_implemented"
 
     @app.post("/events", response_model=InputEventResponse, status_code=201)

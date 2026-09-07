@@ -1,33 +1,39 @@
 // SPDX-License-Identifier: Apache-2.0
 
-export const studioContract = {
+import type { TranslationKey } from "./locales/en-US";
+
+export const studioContract: {
+  controls: TranslationKey[];
+  states: string[];
+  diffClassifications: string[];
+} = {
   controls: [
-    "Bootstrap token",
-    "Descriptive Profile",
-    "Authoritative Mandate",
-    "Revisioned colleague builder",
-    "Typed policy",
-    "Explicit defaults",
-    "Review exact revision",
-    "Confirm exact revision & digest",
-    "Cancel draft",
-    "Finite work",
-    "Wake-cycle inspector",
-    "Proposal inbox",
-    "Approve exact revision",
-    "Reject exact revision",
-    "Causal audit",
-    "Governance & access",
-    "Session role and membership revision",
-    "Enrollment status without plaintext",
-    "Recovery status without plaintext",
-    "Credential lifecycle status",
-    "Pending exact change approval",
-    "Reviewed exact change diff",
-    "Separate proposer and approver",
-    "Role-filtered navigation",
-    "Bounded safe audit export",
-    "ACTIONRESULT",
+    "bootstrap.token",
+    "builder.profile_kicker",
+    "builder.mandate_kicker",
+    "revision.kicker",
+    "revision.typed_policy",
+    "revision.defaults",
+    "builder.review_exact",
+    "revision.confirm_digest",
+    "revision.cancel",
+    "work.kicker",
+    "wake.kicker",
+    "proposal.kicker",
+    "proposal.approve",
+    "proposal.reject",
+    "audit.kicker",
+    "governance.kicker",
+    "governance.session_binding",
+    "governance.no_credentials",
+    "governance.authorize_recovery",
+    "governance.credentials",
+    "governance.pending_changes",
+    "governance.reviewed_diff_aria",
+    "governance.separate_admin",
+    "nav.aria",
+    "governance.safe_export",
+    "audit.result_stamp",
   ],
   states: [
     "loading",
@@ -52,4 +58,4 @@ export const studioContract = {
     "expanded",
     "unchanged",
   ],
-} as const;
+};

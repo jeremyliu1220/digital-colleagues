@@ -439,3 +439,22 @@ without rebuilding authority. Migration 008 can first be considered in P11 only 
 additive schema need exists. Package upgrade is a new draft, connection revocation
 invalidates grants and pending effects, and database rollback uses verified backup with
 matching code rather than destructive down migration.
+
+## P10 Mac quickstart and distribution boundary
+
+P10 changes only the local operator/distribution edge and product presentation. A root
+POSIX-shell launcher verifies an immutable bundle and drives an image-only Compose topology
+from exact digests. API, worker, and one-shot operations share a non-root runtime image;
+Studio uses a separate image. Both local OCI indexes contain exactly `linux/amd64` and
+`linux/arm64`. State is an explicit Application Support bind mount; Studio has no secret
+mount. Existing application/core/store authority and migrations 001-007 are unchanged.
+
+FileVault status and safe filesystem modes classify encrypted-storage readiness without
+enabling FileVault or accepting a credential. The deterministic reference path remains
+provider-free. Studio translation resources change presentation only; route/payload/schema
+and authority behavior remain identical. Existing milestone-named routes remain compatible
+while public metadata uses stable product terms.
+
+Remote GHCR publication, signature, and attestation are not evaluated or authorized. P10
+therefore supplies a local distribution implementation candidate, not a public release or
+complete P10 exit.

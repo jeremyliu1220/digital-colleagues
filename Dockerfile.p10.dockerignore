@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: Apache-2.0
+.git
+.github
+artifacts
+docs
+examples
+provenance
+tests
+studio
+distribution
+**/__pycache__
+*.sqlite*
+*.db
+*.log
+.env*

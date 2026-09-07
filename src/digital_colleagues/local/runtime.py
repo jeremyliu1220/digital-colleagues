@@ -9,6 +9,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
+from digital_colleagues import API_TITLE, __version__
 from digital_colleagues.adapters.sqlite.p6_store import SQLiteP6Store
 from digital_colleagues.adapters.system.deterministic import StableHashIdentifier
 from digital_colleagues.application.p4_services import (
@@ -189,8 +190,8 @@ def build_app_from_environment() -> object:
         expected_origin=expected_origin,
         secure_cookie=secure_cookie,
     )
-    app.title = "Digital Colleagues P7 optional adapters API"
-    app.version = "0.0.0-p7"
+    app.title = API_TITLE
+    app.version = __version__
     install_p5_routes(
         app,
         authentication=runtime.authentication,

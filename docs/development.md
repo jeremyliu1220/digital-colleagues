@@ -8,7 +8,7 @@
 - Node.js 24.15.0
 - Corepack with npm 11.12.1 from Studio's integrity-pinned `packageManager`
 - Git and Make
-- Docker Engine and Compose v2-compatible CLI for required P8 runtime gates
+- Docker Desktop with a running daemon, Compose v2+, and Buildx for P10 Mac gates
 
 No provider account, live credential, parent checkout, or checked-in database is needed.
 The default path uses deterministic intelligence, a synthetic reference channel, and OS
@@ -140,7 +140,7 @@ acceptance**. It is not a tag, publication, formal release, or production-readin
 Human evaluation, live-provider acceptance, production properties, post-v0.1 capabilities,
 and an unmeasured five-minute target remain excluded or `not_evaluated`.
 
-## P9 Productization Rebaseline development
+## P9 Productization Rebaseline history
 
 P9 adds documentation, fixed product/architecture/security decisions, governance gates,
 tests, provenance, and static/synthetic evidence only. The executable version remains the
@@ -173,8 +173,51 @@ make evidence-p9
 That command writes only `artifacts/p9/summary.json`, with `static` and
 `synthetic_offline` evidence. OpenAI live, Microsoft 365 live, and human evaluation remain
 `not_evaluated`. Commit the summary alone and rerun all final gates. The resulting claim is
-only **P9 development complete, awaiting independent acceptance**; do not merge, push, tag,
-publish, upload, create a Release, or begin P10.
+only **P9 development complete, awaiting independent acceptance**. P10 begins only from
+the exact accepted P9 object and its separately fixed contract.
+
+## P10 Mac Quickstart and Distribution development
+
+P10 uses a downloaded, checksum-bound bundle and separate digest-selected runtime and
+Studio images. The host quickstart needs macOS, Docker Desktop, the bundle, and standard
+macOS tools; it does not need host Python, Node, npm, Make, Git, jq, or a provider
+credential. Development gates additionally use this repository's locked Python and Studio
+toolchains.
+
+Focused verification is available through:
+
+```bash
+make p10-repository
+make p10-provenance
+make p10-distribution
+make p10-security
+make p10-operations
+make p10-i18n
+make p10-compatibility
+make p10-reproducibility
+make p10-compose-runtime
+make p10-quickstart
+make p10-test
+make p10-check
+```
+
+`make p10-check` materializes the exact accepted P9 Git object in an OS-temporary clone
+and runs its retained `make check`. It then checks current lint, types, Studio tests/build,
+public boundary, P10 static gates, two complete multi-platform OCI layouts, an actual
+native digest-only Compose restart, and three actual clean Mac quickstarts. Builds happen
+before the timing interval. Every trial must report API, worker, Studio, and JSON status
+ready in under 300 seconds, with cleanup complete and no provider credential.
+
+The default private root is `~/Library/Application Support/Digital Colleagues`; see
+[P10 operations](p10/operations.md). FileVault off or unknown blocks live readiness but
+does not prevent the deterministic reference mode. Do not place a secret in environment,
+Compose interpolation, an argument, SQLite, logs, diagnostics, Studio state, or evidence.
+
+Only after a clean implementation commit and the complete aggregate passes may the
+developer run `make evidence-p10`. It writes only `artifacts/p10/summary.json`; commit that
+file alone and rerun `make check`. Remote GHCR publication, signing, and attestation remain
+`not_evaluated` and require separate authorization. Do not push, tag, publish, upload,
+create a Release, merge, or begin P11.
 
 ## Authenticated Studio and HTTP boundaries
 

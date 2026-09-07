@@ -10,6 +10,7 @@ from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
+from digital_colleagues import API_TITLE, __version__
 from digital_colleagues.application.errors import (
     ApplicationError,
     ConflictError,
@@ -249,7 +250,7 @@ def create_p4_app(
     expected_origin: str,
     secure_cookie: bool = False,
 ) -> FastAPI:
-    app = FastAPI(title="Digital Colleagues P4 local Studio API", version="0.0.0-p4")
+    app = FastAPI(title=API_TITLE, version=__version__)
     app.state.authentication_boundary = "digest_only_bootstrap_and_server_session"
     app.state.expected_origin = expected_origin
     evaluation = P4EvaluationService(studio_store)

@@ -16,12 +16,18 @@ target remain `not_evaluated`. Post-v0.1 S1–S4 and Self-initiated autonomy hav
 and do not start automatically. P0–P8 accepted artifacts, evidence, acceptance contracts,
 receipts, and migrations remain historical and unchanged.
 
-P9 Productization Rebaseline is documentation/governance work for a future v0.2 Public
-Pilot. It implements no package runtime, model/provider call, OAuth, connector, automatic
-effect, Semantic Memory, Agent collaboration, or executable Skill. See the
+P10 is a Mac quickstart and local distribution development candidate for a future v0.2
+Public Pilot. It adds no package runtime, model/provider call, OAuth, connector, automatic
+effect, Semantic Memory, Agent collaboration, or executable Skill. GHCR publication,
+registry signature, and registry attestation are unauthorized and `not_evaluated`. See the
 [v0.2 threat model](docs/security/v0.2-public-pilot-threat-model.md) and
 [v0.2 privacy boundary](docs/security/v0.2-public-pilot-privacy-boundary.md). Their planned
 controls are not evidence of live-provider security or production readiness.
+
+P10 stores state and backups below Application Support with private modes, uses exact
+digest image selection, binds ports only to loopback, gives Studio no secret mount, and
+checks FileVault without changing it. These are local contract controls, not proof of host,
+registry, supply-chain, production security, privacy, encryption, or tenant isolation.
 
 ## Reporting a vulnerability
 

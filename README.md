@@ -18,11 +18,12 @@ approvals, effects, persistence, and audit causality explicit and testable.
 > evidence, and the unmeasured five-minute target remain `not_evaluated`. Post-v0.1 S1–S4
 > and Self-initiated autonomy have not started and do not start automatically.
 
-> **P9 planning status.** Productization Rebaseline development is authorized under the
-> fixed [P9 acceptance contract](docs/p9/acceptance.md). It adds documentation,
-> governance gates, tests, provenance, and static/synthetic evidence only. The target is a
-> future **v0.2 Public Pilot**, not production-ready 1.0; no v0.2 runtime capability is
-> implemented or accepted, and P10-P15 have not started.
+> **P10 development status.** Mac Quickstart and Distribution work is isolated on its
+> fixed [P10 acceptance contract](docs/p10/acceptance.md). The version is
+> `0.2.0.dev0`/`0.2.0-dev.0` with maturity **Public Pilot development candidate**. Local
+> digest-bound OCI and actual Mac quickstart evidence may be developed. GHCR publication,
+> registry signature, and registry attestation are unauthorized and `not_evaluated`; the
+> complete P10 exit and P11 remain blocked pending separate authorization and acceptance.
 
 ## What makes a digital colleague different?
 
@@ -63,7 +64,7 @@ fixed historical [acceptance contract](docs/p8/acceptance.md),
 and [release Golden Path](docs/p8/release-golden-path.md). The accepted P0–P8 artifacts,
 evidence, acceptance contracts, receipts, and migrations remain historical and unchanged.
 
-## P8 release-candidate verification
+## P10 development verification
 
 Prerequisites are Python 3.12+, Node.js 24.15.0, npm 11.12.1 through Corepack, Git, Make,
 and Docker Engine/Compose for the required actual operational Gate.
@@ -73,9 +74,11 @@ make check
 make studio-dev
 ```
 
-`make check` resolves the hash-checked Python lock in OS temporary workspaces, first runs
-the complete retained P8 toolchain, then runs the P9 repository, provenance, rebaseline,
-and negative/abuse tests. The retained run still covers Python and Studio
+`make check` first checks out exact accepted P9 object
+`11aa240af8db2ca515325dc059b1a77f7badc874` in an OS-temporary clone and runs its complete
+retained `make check`, then runs the P10 repository, provenance, distribution, security,
+operations, i18n, compatibility, reproducibility, local OCI/runtime, actual Mac quickstart,
+evidence, and negative/abuse gates. The retained run still covers Python and Studio
 lint/type/test/build, the public boundary, historical regressions, and P8 repository,
 operations, backup/restore, diagnostics, supply-chain, reproducibility, release, Compose,
 and Golden Path gates. Private databases, package environments, candidate artifacts,
@@ -149,6 +152,9 @@ make p9-provenance
 make p9-rebaseline
 make p9-test
 make p9-check
+make p10-compose-runtime
+make p10-quickstart
+make p10-check
 make p3-provenance
 make p3-architecture
 make p3-migrations
@@ -184,6 +190,7 @@ tests/p6/                local RBAC, recovery, change approval, export, and abus
 tests/p7/                offline optional-adapter contracts, configuration, and abuse fixtures
 tests/p8/                release, backup/restore, diagnostics, inventory, and operations fixtures
 tests/p9/                productization rebaseline governance, negative, and evidence fixtures
+tests/p10/               Mac distribution, operator, i18n, compatibility, abuse, and evidence fixtures
 tests/persistence/       SQLite migration, namespace, transaction, and fencing tests
 tests/runtime/           Agenda, authorization, outbox, ambiguity, and crash tests
 tests/api/               in-process typed FastAPI mapping tests
@@ -218,6 +225,26 @@ temporary context, not Semantic Memory.
 The planned first providers are OpenAI `gpt-5.5` through Responses API with Structured
 Outputs and `store:false`, and delegated Microsoft 365 device-code connections for
 Outlook, Teams, Planner, and selected read-only SharePoint. P9 makes no provider call.
+
+## P10 Mac quickstart boundary
+
+A downloaded candidate bundle needs only macOS and a running Docker Desktop:
+
+```bash
+./dc doctor
+./dc quickstart
+./dc status --json
+```
+
+The launcher uses prebuilt exact-digest images and an image-only Compose file. It creates
+private `0700` directories below Application Support, keeps private files at `0600`, probes
+FileVault without changing it, and accepts no provider credential. See the
+[operator guide](docs/p10/operations.md), [distribution contract](docs/p10/distribution.md),
+and [compatibility inventory](docs/p10/compatibility.md).
+
+This is a deterministic local implementation candidate only. There is no public GHCR
+download, verified registry signature/attestation, provider compatibility, always-on
+operation, production security/privacy, or production-readiness claim.
 OpenAI live, Microsoft 365 live, and human evaluation remain `not_evaluated`; mock, stub,
 or loopback evidence cannot establish live or named-provider compatibility.
 

@@ -132,3 +132,17 @@ multi-Agent, OpenAI, Microsoft 365, connection/grant, temporary-source, and auto
 authorization requirements. P9 implements none of those capabilities. This v0.1 model and
 all accepted P0-P8 statements remain unchanged in meaning; the v0.2 model cannot be cited
 as evidence that a planned control exists or works.
+
+## P10 local distribution additions
+
+P10 adds contract-tested defenses for mutable image selection, bundle/manifest checksum
+confusion, malicious manifest execution, unsafe Application Support roots, concurrent
+operator mutation, path traversal and destructive purge, wrong file modes, secret mounts
+into Studio, FileVault readiness overclaim, quickstart source builds, unbounded Docker
+output, and synthetic attestation promotion. The launcher uses exact release/root/Compose
+identities, digest-only images, a bounded lock, finite output/errors, and no `eval` or
+manifest sourcing. FileVault is read-only readiness evidence, not encryption enforcement.
+
+The local OCI and Mac runtime gates do not prove registry integrity, signature,
+attestation, distribution availability, production supply-chain security, host security,
+or production readiness. Those remote results remain not evaluated.

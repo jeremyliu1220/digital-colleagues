@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "distribution_format": "digital-colleagues-p10-bundle-v1",
+  "template": true,
+  "product_name": "Digital Colleagues",
+  "python_version": "0.2.0.dev0",
+  "display_version": "0.2.0-dev.0",
+  "maturity": "Public Pilot development candidate",
+  "source_revision": "IMPLEMENTATION_COMMIT_REQUIRED",
+  "compose_project": "digital-colleagues-p10",
+  "runtime_image": "LOCAL_REGISTRY_REQUIRED/digital-colleagues/runtime@sha256:EXACT_DIGEST_REQUIRED",
+  "studio_image": "LOCAL_REGISTRY_REQUIRED/digital-colleagues/studio@sha256:EXACT_DIGEST_REQUIRED",
+  "platforms": [
+    "linux/amd64",
+    "linux/arm64"
+  ],
+  "schema_versions": [1, 2, 3, 4, 5, 6, 7],
+  "migration_008": "absent",
+  "ghcr_publication": "not_evaluated",
+  "registry_image_signature": "not_evaluated",
+  "registry_attestation": "not_evaluated",
+  "remote_distribution_gate": "authorization_required"
+}

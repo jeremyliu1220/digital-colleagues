@@ -1,0 +1,122 @@
+# SPDX-License-Identifier: Apache-2.0
+
+name: ${DC_COMPOSE_PROJECT_NAME:?verified Compose project identity required}
+
+services:
+  api:
+    image: ${DC_RUNTIME_IMAGE:?verified runtime image digest required}
+    entrypoint:
+      - /bin/sh
+      - -c
+    command:
+      - >-
+        umask 077;
+        exec python -m uvicorn digital_colleagues.local.asgi:app
+        --host 0.0.0.0 --port 8000 --no-access-log
+    environment:
+      DC_EXPECTED_ORIGIN: http://127.0.0.1:${DC_STUDIO_PORT:?verified Studio port required}
+      DC_STATE_DIR: /state
+      PYTHONDONTWRITEBYTECODE: "1"
+    user: ${DC_RUNTIME_UID:?non-root runtime uid required}:${DC_RUNTIME_GID:?non-root runtime gid required}
+    ports:
+      - 127.0.0.1:${DC_API_PORT:?verified API port required}:8000
+    volumes:
+      - type: bind
+        source: ${DC_STATE_DIR:?verified state directory required}
+        target: /state
+    read_only: true
+    tmpfs:
+      - /tmp:mode=0700,uid=${DC_RUNTIME_UID:?non-root runtime uid required},gid=${DC_RUNTIME_GID:?non-root runtime gid required}
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2).read()
+      interval: 1s
+      timeout: 3s
+      retries: 60
+    restart: on-failure:3
+
+  worker:
+    image: ${DC_RUNTIME_IMAGE:?verified runtime image digest required}
+    entrypoint:
+      - /bin/sh
+      - -c
+    command:
+      - umask 077; exec python -m digital_colleagues.local.worker
+    environment:
+      DC_STATE_DIR: /state
+      PYTHONDONTWRITEBYTECODE: "1"
+    user: ${DC_RUNTIME_UID:?non-root runtime uid required}:${DC_RUNTIME_GID:?non-root runtime gid required}
+    depends_on:
+      api:
+        condition: service_healthy
+    volumes:
+      - type: bind
+        source: ${DC_STATE_DIR:?verified state directory required}
+        target: /state
+    read_only: true
+    tmpfs:
+      - /tmp:mode=0700,uid=${DC_RUNTIME_UID:?non-root runtime uid required},gid=${DC_RUNTIME_GID:?non-root runtime gid required}
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import sqlite3; c=sqlite3.connect('file:/state/state.sqlite?mode=ro',uri=True); assert c.execute('select max(version) from schema_migrations').fetchone()[0] == 7; c.close()
+      interval: 1s
+      timeout: 3s
+      retries: 60
+    restart: on-failure:3
+
+  studio:
+    image: ${DC_STUDIO_IMAGE:?verified Studio image digest required}
+    depends_on:
+      api:
+        condition: service_healthy
+      worker:
+        condition: service_healthy
+    ports:
+      - 127.0.0.1:${DC_STUDIO_PORT:?verified Studio port required}:8080
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx:mode=0700
+      - /var/run:mode=0700
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - -q
+        - -O
+        - /dev/null
+        - http://127.0.0.1:8080/
+      interval: 1s
+      timeout: 3s
+      retries: 60
+    restart: on-failure:3
+
+  operator:
+    profiles:
+      - operator
+    image: ${DC_RUNTIME_IMAGE:?verified runtime image digest required}
+    environment:
+      DC_STATE_DIR: /state
+      PYTHONDONTWRITEBYTECODE: "1"
+    user: ${DC_RUNTIME_UID:?non-root runtime uid required}:${DC_RUNTIME_GID:?non-root runtime gid required}
+    volumes:
+      - type: bind
+        source: ${DC_STATE_DIR:?verified state directory required}
+        target: /state
+      - type: bind
+        source: ${DC_BACKUPS_DIR:?verified backups directory required}
+        target: /backups
+      - type: bind
+        source: ${DC_RELEASE_DIR:?verified release directory required}
+        target: /release
+        read_only: true
+    read_only: true
+    tmpfs:
+      - /tmp:mode=0700,uid=${DC_RUNTIME_UID:?non-root runtime uid required},gid=${DC_RUNTIME_GID:?non-root runtime gid required}
+    network_mode: none
+    restart: "no"

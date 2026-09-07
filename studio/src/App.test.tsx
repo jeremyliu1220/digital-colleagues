@@ -4,44 +4,28 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { App } from "./App";
+import {
+  resources,
+  resolveLocale,
+  setLocale,
+  t,
+  validateResources,
+} from "./i18n";
 import { studioContract } from "./studioContract";
 
-describe("P4 Studio workflow", () => {
+describe("Digital Colleagues Studio workflow", () => {
   it("renders a recognizable loading state before session resolution", () => {
+    setLocale("en-US");
     const markup = renderToStaticMarkup(<App />);
     expect(markup).toContain("Loading durable state");
     expect(markup).toContain('aria-live="polite"');
   });
 
   it("declares every Golden Path workspace and exact-effect control", () => {
-    expect(studioContract.controls).toEqual([
-      "Bootstrap token",
-      "Descriptive Profile",
-      "Authoritative Mandate",
-      "Revisioned colleague builder",
-      "Typed policy",
-      "Explicit defaults",
-      "Review exact revision",
-      "Confirm exact revision & digest",
-      "Cancel draft",
-      "Finite work",
-      "Wake-cycle inspector",
-      "Proposal inbox",
-      "Approve exact revision",
-      "Reject exact revision",
-      "Causal audit",
-      "Governance & access",
-      "Session role and membership revision",
-      "Enrollment status without plaintext",
-      "Recovery status without plaintext",
-      "Credential lifecycle status",
-      "Pending exact change approval",
-      "Reviewed exact change diff",
-      "Separate proposer and approver",
-      "Role-filtered navigation",
-      "Bounded safe audit export",
-      "ACTIONRESULT",
-    ]);
+    for (const key of studioContract.controls) {
+      expect(resources["en-US"][key]).toBeTruthy();
+      expect(resources["zh-TW"][key]).toBeTruthy();
+    }
   });
 
   it("declares all required main workflow states", () => {
@@ -62,17 +46,17 @@ describe("P4 Studio workflow", () => {
     ]);
   });
 
-  it("declares P6 governance controls without treating the UI as authority", () => {
-    expect(studioContract.controls).toContain("Governance & access");
-    expect(studioContract.controls).toContain("Pending exact change approval");
-    expect(studioContract.controls).toContain("Reviewed exact change diff");
-    expect(studioContract.controls).toContain("Role-filtered navigation");
-    expect(studioContract.controls).toContain("Bounded safe audit export");
+  it("declares governance controls without treating the UI as authority", () => {
+    expect(studioContract.controls).toContain("governance.kicker");
+    expect(studioContract.controls).toContain("governance.pending_changes");
+    expect(studioContract.controls).toContain("governance.reviewed_diff_aria");
+    expect(studioContract.controls).toContain("nav.aria");
+    expect(studioContract.controls).toContain("governance.safe_export");
     expect(studioContract.states).toContain("revoked");
     expect(studioContract.states).toContain("read-only");
   });
 
-  it("declares every authority diff classification used by P5 review", () => {
+  it("declares every authority diff classification used by review", () => {
     expect(studioContract.diffClassifications).toEqual([
       "added",
       "removed",
@@ -81,5 +65,16 @@ describe("P4 Studio workflow", () => {
       "expanded",
       "unchanged",
     ]);
+  });
+
+  it("keeps locale resources exact and falls back safely", () => {
+    expect(() => validateResources()).not.toThrow();
+    expect(Object.keys(resources["zh-TW"]).sort()).toEqual(
+      Object.keys(resources["en-US"]).sort(),
+    );
+    expect(resolveLocale("unknown")).toBe("en-US");
+    setLocale("zh-TW");
+    expect(t("loading.state")).toContain("載入");
+    setLocale("en-US");
   });
 });

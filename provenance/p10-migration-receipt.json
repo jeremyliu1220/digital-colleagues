@@ -1,0 +1,407 @@
+{
+  "schema_version": 1,
+  "milestone": "P10",
+  "source_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+  "parent_research_working_tree_read": false,
+  "source_migration_count": 0,
+  "transformed_migration_count": 0,
+  "official_documentation": [
+    {
+      "url": "https://docs.docker.com/build/building/multi-platform/",
+      "checked_at": "2026-09-07T15:12:21Z",
+      "observed_contract": "Multi-platform output uses an OCI index with platform-specific manifests; emulation or multi-node builders may supply non-native builds."
+    },
+    {
+      "url": "https://docs.github.com/en/actions/concepts/security/artifact-attestations",
+      "checked_at": "2026-09-07T15:12:21Z",
+      "observed_contract": "An attestation binds artifact provenance but is not a safety guarantee and must be verified."
+    },
+    {
+      "url": "https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations",
+      "checked_at": "2026-09-07T15:12:21Z",
+      "observed_contract": "Container attestation needs contents, packages, id-token, and attestations permissions and binds a fully qualified untagged subject name to a sha256 digest."
+    },
+    {
+      "url": "https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry",
+      "checked_at": "2026-09-07T15:12:21Z",
+      "observed_contract": "GHCR supports digest-pinned container pulls; publishing requires package write authority."
+    },
+    {
+      "url": "https://docs.sigstore.dev/cosign/signing/signing_with_containers/",
+      "checked_at": "2026-09-07T15:12:21Z",
+      "observed_contract": "Cosign signing and signature attachment change registry state and require separately authorized identity and write access."
+    },
+    {
+      "url": "https://developer.apple.com/documentation/foundation/url/applicationsupportdirectory",
+      "checked_at": "2026-09-07T15:12:21Z",
+      "observed_contract": "Application Support is the durable per-user location for application-managed support data."
+    },
+    {
+      "url": "https://support.apple.com/en-gb/guide/deployment/dep0a2cb7686/web",
+      "checked_at": "2026-09-07T15:12:21Z",
+      "observed_contract": "FileVault provides full-volume encryption; P10 may inspect status but does not change encryption or recovery configuration."
+    }
+  ],
+  "new_implementations": [
+    {
+      "destination": ".github/workflows/ci.yml",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "Dockerfile.p10",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "Dockerfile.p10.dockerignore",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "Makefile",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "README.md",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "SECURITY.md",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "SUPPORT.md",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "compose.p10.yaml",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "dc",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "distribution/p10/release-manifest.template.json",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "distribution/p10/verification-policy.json",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "docs/adr/0009-mac-quickstart-and-distribution.md",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "docs/architecture/target-architecture.md",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "docs/development.md",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "docs/p10/acceptance.md",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "docs/p10/compatibility.md",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "docs/p10/distribution.md",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "docs/p10/operations.md",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "docs/roadmap.md",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "docs/security/privacy-boundary.md",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "docs/security/threat-model.md",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "pyproject.toml",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "scripts/build_p10_candidate.py",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "scripts/check_p10_compatibility.py",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "scripts/check_p10_compose_runtime.py",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "scripts/check_p10_distribution.py",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "scripts/check_p10_evidence.py",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "scripts/check_p10_i18n.py",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "scripts/check_p10_operations.py",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "scripts/check_p10_provenance.py",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "scripts/check_p10_quickstart.py",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "scripts/check_p10_repository.py",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "scripts/check_p10_reproducibility.py",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "scripts/check_p10_security.py",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "scripts/collect_p10_evidence.py",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "scripts/p10_gate_support.py",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "scripts/run_p10_toolchain.py",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "src/digital_colleagues/__init__.py",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "src/digital_colleagues/api/app.py",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "src/digital_colleagues/api/p4_app.py",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "src/digital_colleagues/local/runtime.py",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "studio/Dockerfile.p10",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "studio/package-lock.json",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "studio/package.json",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "studio/src/App.test.tsx",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "studio/src/App.tsx",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "studio/src/i18n.ts",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "studio/src/locales/en-US.ts",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "studio/src/locales/zh-TW.ts",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "studio/src/studioContract.ts",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "tests/p10/__init__.py",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "tests/p10/fixtures.py",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "tests/p10/test_compatibility.py",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "tests/p10/test_distribution.py",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "tests/p10/test_evidence_gate.py",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "tests/p10/test_i18n.py",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "tests/p10/test_operations.py",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "tests/p10/test_repository.py",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "tests/p10/test_reproducibility.py",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "tests/p10/test_security.py",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    }
+  ]
+}

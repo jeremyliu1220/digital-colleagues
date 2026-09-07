@@ -212,3 +212,18 @@ minimization, SourceReference/SourceCursor, bounded temporary-body processing, r
 discard timing, crash cleanup, and private live-evidence requirements. P9 implements none
 of them. Existing P0-P8 privacy and evidence statements remain historical and unchanged;
 planned controls are not accepted effectiveness evidence.
+
+## P10 Application Support and distribution boundary
+
+P10 stores private state, secrets, backups, diagnostics, release locks, configuration, and
+cache in separated Application Support directories. Private directories use `0700` and
+private files use `0600`; state is an explicit bind mount. Provider-free reference mode
+mounts no credential, and Studio never receives a secret mount. FileVault is queried only
+for a finite readiness classification and the actual host result is not written to public
+evidence.
+
+Launcher output, local OCI evidence, and quickstart evidence exclude host paths, user or
+host names, container IDs, IPs, environment, SQLite bytes/content, credential values or
+digests, logs, private backup metadata, and raw exceptions. Synthetic signature and
+attestation fixtures remain synthetic/offline and cannot be represented as remote or live
+evidence.

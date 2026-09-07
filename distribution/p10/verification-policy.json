@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "policy_id": "digital-colleagues-p10-distribution-v1",
+  "required_product_name": "Digital Colleagues",
+  "required_python_version": "0.2.0.dev0",
+  "required_display_version": "0.2.0-dev.0",
+  "required_maturity": "Public Pilot development candidate",
+  "required_platforms": [
+    "linux/amd64",
+    "linux/arm64"
+  ],
+  "runtime_selection": "exact_digest_only",
+  "remote_subject_name": "authorization_required",
+  "remote_repository": "authorization_required",
+  "remote_workflow": "authorization_required",
+  "remote_signer": "authorization_required",
+  "ghcr_publication": "not_evaluated",
+  "registry_image_signature": "not_evaluated",
+  "registry_attestation": "not_evaluated",
+  "remote_distribution_gate": "authorization_required",
+  "synthetic_fixture_may_satisfy_remote_gate": false
+}

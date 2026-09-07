@@ -2,6 +2,9 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
+import { initialLocale, setLocale, t, type Locale } from "./i18n";
+import type { TranslationKey } from "./locales/en-US";
+
 type Phase = "checking" | "bootstrap" | "builder" | "workspace";
 type View =
   | "identity"
@@ -359,14 +362,14 @@ const initialBuilder: BuilderData = {
   action: "record_message",
 };
 
-const navigation: { id: View; label: string; index: string }[] = [
-  { id: "identity", label: "Identity & authority", index: "01" },
-  { id: "builder", label: "Revisioned builder", index: "02" },
-  { id: "work", label: "Finite work", index: "03" },
-  { id: "wake", label: "Wake cycles", index: "04" },
-  { id: "proposals", label: "Proposal inbox", index: "05" },
-  { id: "audit", label: "Causal audit", index: "06" },
-  { id: "governance", label: "Governance & access", index: "07" },
+const navigation: { id: View; label: TranslationKey; index: string }[] = [
+  { id: "identity", label: "nav.identity", index: "01" },
+  { id: "builder", label: "nav.builder", index: "02" },
+  { id: "work", label: "nav.work", index: "03" },
+  { id: "wake", label: "nav.wake", index: "04" },
+  { id: "proposals", label: "nav.proposals", index: "05" },
+  { id: "audit", label: "nav.audit", index: "06" },
+  { id: "governance", label: "nav.governance", index: "07" },
 ];
 
 function randomKey(prefix: string) {
@@ -391,7 +394,7 @@ async function api<T>(
       detail?: { code?: string; message?: string };
     };
     const error = new Error(
-      body.detail?.message || `Request failed (${response.status})`,
+      t("common.request_failed", { status: response.status }),
     );
     error.name = body.detail?.code || `HTTP_${response.status}`;
     throw error;
@@ -400,11 +403,44 @@ async function api<T>(
 }
 
 function Notice({ kind, message }: { kind: NoticeKind; message: string }) {
+  const labels: Record<NoticeKind, TranslationKey> = {
+    success: "notice.success",
+    validation: "notice.validation",
+    permission: "notice.permission",
+    rejection: "notice.rejection",
+    stale: "notice.stale",
+    conflict: "notice.conflict",
+    cancelled: "notice.cancelled",
+    revoked: "notice.revoked",
+    error: "notice.error",
+  };
   return (
     <div className={`notice notice-${kind}`} role="status" tabIndex={-1}>
-      <span>{kind}</span>
+      <span>{t(labels[kind])}</span>
       <p>{message}</p>
     </div>
+  );
+}
+
+function LanguagePicker({
+  locale,
+  change,
+}: {
+  locale: Locale;
+  change: (locale: Locale) => void;
+}) {
+  return (
+    <label className="locale-picker">
+      {t("nav.language")}
+      <select
+        aria-label={t("nav.language")}
+        value={locale}
+        onChange={(event) => change(event.target.value as Locale)}
+      >
+        <option value="zh-TW">繁體中文</option>
+        <option value="en-US">English</option>
+      </select>
+    </label>
   );
 }
 
@@ -430,10 +466,8 @@ function Bootstrap({
       });
       setToken("");
       onReady(session);
-    } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : "Bootstrap exchange failed",
-      );
+    } catch {
+      setError(t("bootstrap.failed"));
     } finally {
       setBusy(false);
     }
@@ -442,26 +476,22 @@ function Bootstrap({
   return (
     <main className="entry-screen">
       <header className="entry-brand">
-        <span className="brand-mark">DC</span>
+        <span className="brand-mark">{t("common.dc")}</span>
         <div>
-          <strong>Digital Colleagues</strong>
-          <span>P6 local governance control plane</span>
+          <strong>{t("product.name")}</strong>
+          <span>{t("bootstrap.subtitle")}</span>
         </div>
       </header>
       <section className="entry-composition" aria-labelledby="bootstrap-title">
         <div className="entry-index" aria-hidden="true">
-          01 / AUTHORITY
+          {t("bootstrap.index")}
         </div>
         <div className="entry-copy">
-          <p className="eyebrow">One-time operator handoff</p>
-          <h1 id="bootstrap-title">Establish the first durable human.</h1>
-          <p>
-            Exchange the token retrieved by the local operator. The server fixes
-            tenant, HUMAN principal kind, and <code>tenant_admin</code>{" "}
-            authority.
-          </p>
+          <p className="eyebrow">{t("bootstrap.eyebrow")}</p>
+          <h1 id="bootstrap-title">{t("bootstrap.title")}</h1>
+          <p>{t("bootstrap.explanation")}</p>
           <form onSubmit={(event) => void submit(event)} className="token-form">
-            <label htmlFor="bootstrap-token">Bootstrap token</label>
+            <label htmlFor="bootstrap-token">{t("bootstrap.token")}</label>
             <div>
               <input
                 id="bootstrap-token"
@@ -474,26 +504,22 @@ function Bootstrap({
                 disabled={busy}
               />
               <button type="submit" disabled={busy}>
-                {busy ? "Exchanging…" : "Create Admin session"}
+                {busy
+                  ? t("bootstrap.exchanging")
+                  : t("bootstrap.create_session")}
               </button>
             </div>
           </form>
           {sessionNotice && <Notice kind="revoked" message={sessionNotice} />}
           {error && <Notice kind="rejection" message={error} />}
-          <p className="boundary-copy">
-            Loopback reduces host exposure. It is not authentication,
-            encryption, sandboxing, or production isolation.
-          </p>
+          <p className="boundary-copy">{t("bootstrap.boundary")}</p>
         </div>
-        <div
-          className="entry-ledger"
-          aria-label="Bootstrap security properties"
-        >
+        <div className="entry-ledger" aria-label={t("bootstrap.security_aria")}>
           {[
-            ["256+", "bits of entropy"],
-            ["01", "successful exchange"],
-            ["≤10m", "bootstrap lifetime"],
-            ["HTTP", "only session cookie"],
+            ["256+", t("bootstrap.entropy")],
+            ["01", t("bootstrap.exchange")],
+            ["≤10m", t("bootstrap.lifetime")],
+            ["HTTP", t("bootstrap.cookie")],
           ].map(([value, label]) => (
             <div key={label}>
               <strong>{value}</strong>
@@ -549,10 +575,10 @@ function Builder({
         csrf,
       );
       setReview(true);
-    } catch (cause) {
+    } catch {
       setNotice({
         kind: "error",
-        message: cause instanceof Error ? cause.message : "Preview failed",
+        message: t("builder.preview_failed"),
       });
     } finally {
       setBusy(false);
@@ -570,12 +596,14 @@ function Builder({
       );
       setNotice({
         kind: "success",
-        message: "Exact Profile and Mandate revision 1 created.",
+        message: t("builder.created"),
       });
       await onCreated();
     } catch (cause) {
       const error =
-        cause instanceof Error ? cause : new Error("Creation failed");
+        cause instanceof Error
+          ? cause
+          : new Error(t("builder.creation_failed"));
       setNotice({
         kind: error.name === "ConflictError" ? "stale" : "rejection",
         message: error.message,
@@ -589,14 +617,15 @@ function Builder({
     <main className="builder-shell">
       <header className="builder-header">
         <div className="brand-lockup">
-          <span className="brand-mark">DC</span>
+          <span className="brand-mark">{t("common.dc")}</span>
           <div>
-            <strong>Initial colleague</strong>
-            <span>revision 1 · one-time flow</span>
+            <strong>{t("builder.initial")}</strong>
+            <span>{t("builder.initial_subtitle")}</span>
           </div>
         </div>
         <span className="step-count">
-          {review ? "REVIEW" : "DEFINE"} / CONFIRM
+          {review ? t("builder.review") : t("builder.define")} /{" "}
+          {t("builder.confirm")}
         </span>
       </header>
       {!review ? (
@@ -605,13 +634,11 @@ function Builder({
           onSubmit={(event) => void continueToReview(event)}
         >
           <section aria-labelledby="profile-heading">
-            <p className="section-kicker">Descriptive Profile</p>
-            <h1 id="profile-heading">How this colleague appears.</h1>
-            <p className="section-note">
-              Profile describes. It never grants authority.
-            </p>
+            <p className="section-kicker">{t("builder.profile_kicker")}</p>
+            <h1 id="profile-heading">{t("builder.profile_title")}</h1>
+            <p className="section-note">{t("builder.profile_note")}</p>
             <label>
-              Display name
+              {t("builder.display_name")}
               <input
                 value={data.display_name}
                 onChange={(e) => update("display_name", e.target.value)}
@@ -619,7 +646,7 @@ function Builder({
               />
             </label>
             <label>
-              Role description
+              {t("builder.role_description")}
               <textarea
                 value={data.role_description}
                 onChange={(e) => update("role_description", e.target.value)}
@@ -627,7 +654,7 @@ function Builder({
               />
             </label>
             <label>
-              Working style
+              {t("builder.working_style")}
               <textarea
                 value={data.working_style}
                 onChange={(e) => update("working_style", e.target.value)}
@@ -637,12 +664,12 @@ function Builder({
           </section>
           <section aria-labelledby="mandate-heading">
             <p className="section-kicker authority-kicker">
-              Authoritative Mandate
+              {t("builder.mandate_kicker")}
             </p>
-            <h2 id="mandate-heading">What this colleague may and must do.</h2>
+            <h2 id="mandate-heading">{t("builder.mandate_title")}</h2>
             <div className="form-columns">
               <label>
-                Serves
+                {t("builder.serves")}
                 <textarea
                   value={data.service_relationship}
                   onChange={(e) =>
@@ -652,7 +679,7 @@ function Builder({
                 />
               </label>
               <label>
-                Mission
+                {t("builder.mission")}
                 <textarea
                   value={data.mission}
                   onChange={(e) => update("mission", e.target.value)}
@@ -660,7 +687,7 @@ function Builder({
                 />
               </label>
               <label>
-                Timezone
+                {t("builder.timezone")}
                 <input
                   value={data.timezone}
                   onChange={(e) => update("timezone", e.target.value)}
@@ -668,7 +695,7 @@ function Builder({
                 />
               </label>
               <label>
-                Initial working hours
+                {t("builder.initial_hours")}
                 <input
                   value={data.working_hours}
                   onChange={(e) => update("working_hours", e.target.value)}
@@ -676,7 +703,7 @@ function Builder({
                 />
               </label>
               <label>
-                Initial context
+                {t("builder.initial_context")}
                 <textarea
                   value={data.working_context}
                   onChange={(e) => update("working_context", e.target.value)}
@@ -684,7 +711,7 @@ function Builder({
                 />
               </label>
               <label>
-                Responsibilities
+                {t("builder.responsibilities")}
                 <textarea
                   value={data.responsibilities}
                   onChange={(e) => update("responsibilities", e.target.value)}
@@ -692,7 +719,7 @@ function Builder({
                 />
               </label>
               <label>
-                Capabilities
+                {t("builder.capabilities")}
                 <textarea
                   value={data.capabilities}
                   onChange={(e) => update("capabilities", e.target.value)}
@@ -700,7 +727,7 @@ function Builder({
                 />
               </label>
               <label>
-                Constraints & scope
+                {t("builder.constraints_scope")}
                 <textarea
                   value={data.constraints}
                   onChange={(e) => update("constraints", e.target.value)}
@@ -708,7 +735,7 @@ function Builder({
                 />
               </label>
               <label>
-                Destination kind
+                {t("builder.destination_kind")}
                 <input
                   value={data.destination_kind}
                   onChange={(e) => update("destination_kind", e.target.value)}
@@ -716,7 +743,7 @@ function Builder({
                 />
               </label>
               <label>
-                Exact action
+                {t("builder.exact_action")}
                 <input
                   value={data.action}
                   onChange={(e) => update("action", e.target.value)}
@@ -725,50 +752,47 @@ function Builder({
               </label>
             </div>
             <button className="primary-action" type="submit" disabled={busy}>
-              {busy ? "Preparing review…" : "Review exact revision"}
+              {busy ? t("builder.preparing") : t("builder.review_exact")}
             </button>
           </section>
         </form>
       ) : (
         <section className="authority-review" aria-labelledby="review-heading">
-          <p className="section-kicker">Exact revision to create</p>
-          <h1 id="review-heading">
-            Profile is presentation. Mandate is authority.
-          </h1>
+          <p className="section-kicker">{t("builder.exact_kicker")}</p>
+          <h1 id="review-heading">{t("builder.exact_title")}</h1>
           <div className="review-columns">
             <div>
-              <span className="review-type descriptive">DESCRIPTIVE</span>
+              <span className="review-type descriptive">
+                {t("builder.descriptive")}
+              </span>
               <h2>{data.display_name}</h2>
               <p>{data.role_description}</p>
               <dl>
-                <dt>Working style</dt>
+                <dt>{t("builder.working_style")}</dt>
                 <dd>{data.working_style}</dd>
               </dl>
             </div>
             <div>
               <span className="review-type authoritative">
-                AUTHORITATIVE · REVISION 1
+                {t("builder.authoritative_revision")}
               </span>
               <h2>{data.mission}</h2>
               <dl>
-                <dt>Service relationship</dt>
+                <dt>{t("builder.service_relationship")}</dt>
                 <dd>{data.service_relationship}</dd>
-                <dt>Responsibility</dt>
+                <dt>{t("builder.responsibility")}</dt>
                 <dd>{data.responsibilities}</dd>
-                <dt>Capability</dt>
+                <dt>{t("builder.capability")}</dt>
                 <dd>{data.capabilities}</dd>
-                <dt>Constraint</dt>
+                <dt>{t("builder.constraint")}</dt>
                 <dd>{data.constraints}</dd>
-                <dt>Effect boundary</dt>
+                <dt>{t("builder.effect_boundary")}</dt>
                 <dd>
-                  {data.destination_kind} → {data.action} · human approval
-                  required
+                  {data.destination_kind} → {data.action} ·{" "}
+                  {t("builder.human_approval_required")}
                 </dd>
-                <dt>Working-hours boundary</dt>
-                <dd>
-                  Legacy display data only; P5 typed policy requires a separate
-                  revisioned confirmation.
-                </dd>
+                <dt>{t("builder.hours_boundary")}</dt>
+                <dd>{t("builder.legacy_hours")}</dd>
               </dl>
             </div>
           </div>
@@ -779,14 +803,14 @@ function Builder({
               onClick={() => setReview(false)}
               disabled={busy}
             >
-              Back to definition
+              {t("builder.back")}
             </button>
             <button
               className="primary-action"
               onClick={() => void confirm()}
               disabled={busy}
             >
-              {busy ? "Committing…" : "Confirm exact revision 1"}
+              {busy ? t("builder.committing") : t("builder.confirm_revision")}
             </button>
           </div>
         </section>
@@ -895,18 +919,26 @@ function RevisionedBuilder({
     setNotice(null);
     try {
       await action();
-      setNotice({ kind: "success", message: `${label} completed.` });
+      setNotice({
+        kind: "success",
+        message: t("common.completed", { operation: label }),
+      });
     } catch (cause) {
       const error =
-        cause instanceof Error ? cause : new Error(`${label} failed`);
-      setNotice({ kind: noticeFor(error), message: error.message });
+        cause instanceof Error
+          ? cause
+          : new Error(t("common.operation_failed"));
+      setNotice({
+        kind: noticeFor(error),
+        message: t("common.operation_failed"),
+      });
     } finally {
       setBusy("");
     }
   }
 
   async function createDraft() {
-    await operation("Draft creation", async () => {
+    await operation(t("operation.draft_create"), async () => {
       const response = await api<DraftEnvelope>(
         "/colleagues/drafts",
         {
@@ -935,7 +967,7 @@ function RevisionedBuilder({
     event.preventDefault();
     if (!selected || !edit) return;
     const draft = selected.draft;
-    await operation("Draft update", async () => {
+    await operation(t("operation.draft_update"), async () => {
       const response = await api<DraftEnvelope>(
         `/colleagues/drafts/${draft.draft_id}`,
         {
@@ -1018,7 +1050,9 @@ function RevisionedBuilder({
     if (!selected) return;
     const draft = selected.draft;
     await operation(
-      target === "review" ? "Review binding" : "Draft cancellation",
+      target === "review"
+        ? t("operation.review_binding")
+        : t("operation.draft_cancel"),
       async () => {
         await api(
           `/colleagues/drafts/${draft.draft_id}/${target}`,
@@ -1035,7 +1069,7 @@ function RevisionedBuilder({
         if (target === "cancel")
           setNotice({
             kind: "cancelled",
-            message: "Draft cancelled. Active authority was not changed.",
+            message: t("revision.cancelled_terminal"),
           });
       },
     );
@@ -1044,7 +1078,7 @@ function RevisionedBuilder({
   async function confirm() {
     if (!selected) return;
     const draft = selected.draft;
-    await operation("Exact revision confirmation", async () => {
+    await operation(t("operation.revision_confirm"), async () => {
       await api(
         `/colleagues/drafts/${draft.draft_id}/confirm`,
         {
@@ -1086,74 +1120,86 @@ function RevisionedBuilder({
     >
       <div className="view-heading">
         <div>
-          <p className="section-kicker">Revisioned colleague builder</p>
-          <h1 id="revision-builder-title">Change authority safely.</h1>
-          <p>
-            Drafts are inert until an Admin confirms the exact revision and
-            canonical digest shown here.
-          </p>
+          <p className="section-kicker">{t("revision.kicker")}</p>
+          <h1 id="revision-builder-title">{t("revision.title")}</h1>
+          <p>{t("revision.explanation")}</p>
         </div>
         <button
           className="primary-action"
           onClick={() => void createDraft()}
           disabled={!!busy}
         >
-          Create revisioned draft
+          {t("revision.create")}
         </button>
       </div>
 
       {notice && <Notice {...notice} />}
-      {busy && <Notice kind="success" message={`Loading · ${busy}`} />}
+      {busy && (
+        <Notice
+          kind="success"
+          message={t("common.loading", { operation: busy })}
+        />
+      )}
 
-      <div className="revision-ledger" aria-label="Active revision ledger">
+      <div className="revision-ledger" aria-label={t("revision.ledger_aria")}>
         <div>
-          <span>PROFILE</span>
-          <strong>REV {active?.profile_revision ?? "—"}</strong>
-          <small>Descriptive only</small>
+          <span>{t("revision.profile")}</span>
+          <strong>
+            {t("common.revision", {
+              revision: active?.profile_revision ?? "—",
+            })}
+          </strong>
+          <small>{t("revision.descriptive_only")}</small>
         </div>
         <div>
-          <span>MANDATE</span>
-          <strong>REV {active?.mandate_revision ?? "—"}</strong>
-          <small>Authority source</small>
+          <span>{t("revision.mandate")}</span>
+          <strong>
+            {t("common.revision", {
+              revision: active?.mandate_revision ?? "—",
+            })}
+          </strong>
+          <small>{t("revision.authority_source")}</small>
         </div>
         <div>
-          <span>POLICY</span>
-          <strong>REV {active?.policy_revision ?? "—"}</strong>
+          <span>{t("revision.policy")}</span>
+          <strong>
+            {t("common.revision", { revision: active?.policy_revision ?? "—" })}
+          </strong>
           <small>{active?.policy_status.replaceAll("_", " ")}</small>
         </div>
         <div>
-          <span>RUNTIME</span>
-          <strong>{p5.runtime_policy?.run_state || "LEGACY"}</strong>
-          <small>{p5.runtime_policy?.budget_count || 0} wakes in bucket</small>
+          <span>{t("revision.runtime")}</span>
+          <strong>
+            {p5.runtime_policy?.run_state || t("revision.legacy")}
+          </strong>
+          <small>
+            {t("revision.wakes_bucket", {
+              count: p5.runtime_policy?.budget_count || 0,
+            })}
+          </small>
         </div>
       </div>
 
       {active?.policy_status === "legacy_unconfirmed" && (
-        <Notice
-          kind="validation"
-          message="Legacy P4 working-hours text is display data only. P5 will not infer typed authority from it."
-        />
+        <Notice kind="validation" message={t("builder.legacy_hours")} />
       )}
 
-      <div className="draft-index" aria-label="Draft history">
+      <div className="draft-index" aria-label={t("revision.history_aria")}>
         <header>
-          <span>DRAFT HISTORY</span>
+          <span>{t("revision.history")}</span>
           <strong>{drafts.length.toString().padStart(2, "0")}</strong>
         </header>
         {drafts.length === 0 ? (
           <div className="empty-state">
-            <span>EMPTY</span>
-            <h2>No colleague revisions drafted.</h2>
-            <p>
-              Create a draft to review Profile, Mandate, and policy
-              independently.
-            </p>
+            <span>{t("common.empty")}</span>
+            <h2>{t("revision.none")}</h2>
+            <p>{t("revision.none_help")}</p>
           </div>
         ) : (
           <div
             className="draft-tabs"
             role="tablist"
-            aria-label="Colleague drafts"
+            aria-label={t("revision.tabs_aria")}
           >
             {drafts.map((item) => (
               <button
@@ -1170,11 +1216,15 @@ function RevisionedBuilder({
                 }}
               >
                 <span>{item.draft.state}</span>
-                <strong>Draft rev {item.draft.revision}</strong>
+                <strong>
+                  {t("revision.draft_rev", { revision: item.draft.revision })}
+                </strong>
                 <small>
-                  base {item.draft.base_profile_revision}/
-                  {item.draft.base_mandate_revision}/
-                  {item.draft.base_policy_revision}
+                  {t("revision.base", {
+                    profile: item.draft.base_profile_revision,
+                    mandate: item.draft.base_mandate_revision,
+                    policy: item.draft.base_policy_revision,
+                  })}
                 </small>
               </button>
             ))}
@@ -1185,10 +1235,12 @@ function RevisionedBuilder({
       {draft && edit && draft.state === "draft" && (
         <form className="revision-form" onSubmit={(event) => void save(event)}>
           <section>
-            <span className="review-type descriptive">DESCRIPTIVE PROFILE</span>
-            <h2>Presentation</h2>
+            <span className="review-type descriptive">
+              {t("revision.descriptive_profile")}
+            </span>
+            <h2>{t("revision.presentation")}</h2>
             <label>
-              Display name
+              {t("builder.display_name")}
               <input
                 value={edit.displayName}
                 onChange={(event) =>
@@ -1198,7 +1250,7 @@ function RevisionedBuilder({
               />
             </label>
             <label>
-              Description
+              {t("revision.description")}
               <textarea
                 value={edit.description}
                 onChange={(event) =>
@@ -1207,17 +1259,15 @@ function RevisionedBuilder({
                 required
               />
             </label>
-            <p className="section-note">
-              Profile never grants runtime permission.
-            </p>
+            <p className="section-note">{t("revision.profile_permission")}</p>
           </section>
           <section>
             <span className="review-type authoritative">
-              AUTHORITATIVE MANDATE
+              {t("revision.authoritative_mandate")}
             </span>
-            <h2>Responsibilities & capabilities</h2>
+            <h2>{t("revision.responsibilities_capabilities")}</h2>
             <label>
-              Mission
+              {t("builder.mission")}
               <textarea
                 value={edit.mission}
                 onChange={(event) =>
@@ -1227,7 +1277,7 @@ function RevisionedBuilder({
               />
             </label>
             <label>
-              Service relationship
+              {t("builder.service_relationship")}
               <textarea
                 value={edit.serviceRelationship}
                 onChange={(event) =>
@@ -1237,7 +1287,9 @@ function RevisionedBuilder({
               />
             </label>
             <label>
-              Responsibilities · one per line
+              {t("revision.one_per_line", {
+                label: t("builder.responsibilities"),
+              })}
               <textarea
                 value={edit.responsibilities}
                 onChange={(event) =>
@@ -1247,7 +1299,7 @@ function RevisionedBuilder({
               />
             </label>
             <label>
-              Capabilities · one per line
+              {t("revision.one_per_line", { label: t("builder.capabilities") })}
               <textarea
                 value={edit.capabilities}
                 onChange={(event) =>
@@ -1257,7 +1309,9 @@ function RevisionedBuilder({
               />
             </label>
             <label>
-              Constraints · one per line
+              {t("revision.one_per_line", {
+                label: t("builder.constraints_scope"),
+              })}
               <textarea
                 value={edit.constraints}
                 onChange={(event) =>
@@ -1268,11 +1322,13 @@ function RevisionedBuilder({
             </label>
           </section>
           <section className="policy-editor">
-            <span className="review-type authoritative">TYPED POLICY</span>
-            <h2>Wake & interruption controls</h2>
+            <span className="review-type authoritative">
+              {t("revision.typed_policy")}
+            </span>
+            <h2>{t("revision.wake_controls")}</h2>
             <div className="policy-fields">
               <label>
-                IANA timezone
+                {t("revision.iana_timezone")}
                 <input
                   value={edit.timezone}
                   onChange={(event) =>
@@ -1282,7 +1338,7 @@ function RevisionedBuilder({
                 />
               </label>
               <label>
-                Wake limit
+                {t("revision.wake_limit")}
                 <input
                   type="number"
                   min="1"
@@ -1295,19 +1351,27 @@ function RevisionedBuilder({
                 />
               </label>
               {[
-                ["Proactivity", "proactivity", ["bounded", "disabled"]],
-                ["Notification", "notification", ["enabled", "suppressed"]],
                 [
-                  "Interruption",
+                  t("revision.proactivity"),
+                  "proactivity",
+                  ["bounded", "disabled"],
+                ],
+                [
+                  t("revision.notification"),
+                  "notification",
+                  ["enabled", "suppressed"],
+                ],
+                [
+                  t("revision.interruption"),
                   "interruption",
                   ["allowed", "working_hours_only", "never"],
                 ],
                 [
-                  "Outside hours",
+                  t("revision.outside_hours"),
                   "outsideHours",
                   ["defer", "no_op", "stop", "escalate"],
                 ],
-                ["Run state", "runState", ["active", "stopped"]],
+                [t("revision.run_state"), "runState", ["active", "stopped"]],
               ].map(([label, key, values]) => (
                 <label key={key as string}>
                   {label as string}
@@ -1325,10 +1389,10 @@ function RevisionedBuilder({
               ))}
             </div>
             <fieldset>
-              <legend>Allowed durable triggers</legend>
+              <legend>{t("revision.allowed_triggers")}</legend>
               {[
-                ["event", "Event"],
-                ["timer", "Timer"],
+                ["event", t("revision.event")],
+                ["timer", t("revision.timer")],
               ].map(([value, label]) => (
                 <label key={value}>
                   <input
@@ -1349,8 +1413,7 @@ function RevisionedBuilder({
                     setEdit({ ...edit, explicitResume: event.target.checked })
                   }
                 />
-                Explicitly resume this stopped runtime with the reviewed
-                applicable policy revision
+                {t("revision.explicit_resume")}
               </label>
             )}
           </section>
@@ -1361,10 +1424,10 @@ function RevisionedBuilder({
               onClick={() => void transition("cancel")}
               disabled={!!busy}
             >
-              Cancel draft
+              {t("revision.cancel")}
             </button>
             <button type="submit" className="quiet-action" disabled={!!busy}>
-              Save as next draft revision
+              {t("revision.save")}
             </button>
             <button
               type="button"
@@ -1372,45 +1435,46 @@ function RevisionedBuilder({
               onClick={() => void transition("review")}
               disabled={!!busy}
             >
-              Review exact revision
+              {t("builder.review_exact")}
             </button>
           </footer>
         </form>
       )}
 
       {draft && draft.state !== "draft" && (
-        <section className="exact-review" aria-label="Exact draft review">
+        <section
+          className="exact-review"
+          aria-label={t("revision.review_aria")}
+        >
           <header>
             <div>
               <span className={`state-label state-${draft.state}`}>
                 {draft.state}
               </span>
-              <h2>Draft revision {draft.revision}</h2>
+              <h2>
+                {t("revision.draft_revision", { revision: draft.revision })}
+              </h2>
               <p>
-                Base Profile {draft.base_profile_revision} · Mandate{" "}
-                {draft.base_mandate_revision} · Policy{" "}
-                {draft.base_policy_revision}
+                {t("revision.base_revisions", {
+                  profile: draft.base_profile_revision,
+                  mandate: draft.base_mandate_revision,
+                  policy: draft.base_policy_revision,
+                })}
               </p>
             </div>
             <code>{draft.canonical_digest}</code>
           </header>
           {draft.state === "reviewable" && (
-            <Notice
-              kind="validation"
-              message="Confirm binds to this exact draft revision, all three base revisions, and this digest."
-            />
+            <Notice kind="validation" message={t("revision.confirm_binding")} />
           )}
           {draft.state === "cancelled" && (
             <Notice
               kind="cancelled"
-              message="Cancelled draft is terminal and remains inert."
+              message={t("revision.cancelled_terminal")}
             />
           )}
           {draft.state === "stale" && (
-            <Notice
-              kind="stale"
-              message="A base revision changed. This draft cannot be rebased, retried, or confirmed."
-            />
+            <Notice kind="stale" message={t("revision.stale_terminal")} />
           )}
           <div className="diff-list">
             {(changed || []).map((item) => (
@@ -1431,7 +1495,7 @@ function RevisionedBuilder({
           </div>
           {draft.explicit_defaults.length > 0 && (
             <div className="default-list">
-              <span>EXPLICIT DEFAULTS · CONFIRMED ONLY WITH THIS DRAFT</span>
+              <span>{t("revision.defaults")}</span>
               {draft.explicit_defaults.map((item) => (
                 <div key={item.path}>
                   <strong>{item.path}</strong>
@@ -1448,14 +1512,14 @@ function RevisionedBuilder({
                 onClick={() => void transition("cancel")}
                 disabled={!!busy}
               >
-                Cancel draft
+                {t("revision.cancel")}
               </button>
               <button
                 className="primary-action"
                 onClick={() => void confirm()}
                 disabled={!!busy}
               >
-                Confirm exact revision & digest
+                {t("revision.confirm_digest")}
               </button>
             </div>
           )}
@@ -1463,16 +1527,16 @@ function RevisionedBuilder({
       )}
 
       {!!p5.runtime_policy?.escalations.length && (
-        <section className="escalation-ledger" aria-label="Policy escalations">
-          <span>SAFE ESCALATION RECORDS</span>
+        <section
+          className="escalation-ledger"
+          aria-label={t("revision.escalations_aria")}
+        >
+          <span>{t("revision.escalations")}</span>
           {p5.runtime_policy.escalations.map((item) => (
             <div key={item.escalation_id}>
               <strong>{item.condition}</strong>
               <p>{item.safe_summary}</p>
-              <small>
-                No approval, authority change, or external notification was
-                created.
-              </small>
+              <small>{t("revision.escalation_boundary")}</small>
             </div>
           ))}
         </section>
@@ -1541,14 +1605,16 @@ function Workspace({
       await action();
       setNotice({
         kind: "success",
-        message: `${label} completed and durable state refreshed.`,
+        message: t("common.completed_refresh", { operation: label }),
       });
     } catch (cause) {
       const error =
-        cause instanceof Error ? cause : new Error(`${label} failed`);
+        cause instanceof Error
+          ? cause
+          : new Error(t("common.operation_failed"));
       setNotice({
         kind: error.name === "ConflictError" ? "stale" : "rejection",
-        message: error.message,
+        message: t("common.operation_failed"),
       });
     } finally {
       setBusy("");
@@ -1558,7 +1624,7 @@ function Workspace({
   async function assign(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    await mutate("Work assignment", async () => {
+    await mutate(t("operation.work_assign"), async () => {
       await api(
         "/work",
         {
@@ -1584,7 +1650,9 @@ function Workspace({
   ) {
     if (!work[0]) return;
     await mutate(
-      `${triggerClass === "timer" ? "Timer" : "Event"} wake`,
+      triggerClass === "timer"
+        ? t("operation.timer_wake")
+        : t("operation.event_wake"),
       async () => {
         await api(
           "/runtime/triggers",
@@ -1615,7 +1683,7 @@ function Workspace({
 
   async function decide(proposal: Proposal, choice: "approve" | "reject") {
     await mutate(
-      `${choice === "approve" ? "Approval" : "Rejection"} of exact revision`,
+      choice === "approve" ? t("operation.approval") : t("operation.rejection"),
       async () => {
         await api(
           `/proposals/${proposal.proposal_id}/decision`,
@@ -1651,15 +1719,14 @@ function Workspace({
   }
 
   async function inspectAudit(correlationId: string) {
-    setBusy("Audit inspection");
+    setBusy(t("operation.audit_inspect"));
     try {
       setAudit(await api(`/audit/${correlationId}`));
       setView("audit");
-    } catch (cause) {
+    } catch {
       setNotice({
         kind: "error",
-        message:
-          cause instanceof Error ? cause.message : "Audit inspection failed",
+        message: t("common.operation_failed"),
       });
     } finally {
       setBusy("");
@@ -1668,24 +1735,29 @@ function Workspace({
 
   async function authorizeScopedEnrollment(role: "colleague_user" | "auditor") {
     if (!session.namespace?.scope_id) return;
-    await mutate(`Authorize ${role} enrollment`, async () => {
-      await api(
-        `/governance/enrollments/${role === "auditor" ? "auditors" : "users"}`,
-        {
-          method: "POST",
-          body: JSON.stringify({
-            colleague_ids: [session.namespace?.scope_id],
-            idempotency_key: randomKey(`enroll-${role}`),
-          }),
-        },
-        csrf,
-      );
-      await refreshGovernance();
-    });
+    await mutate(
+      role === "auditor"
+        ? t("governance.enroll_auditor")
+        : t("governance.enroll_user"),
+      async () => {
+        await api(
+          `/governance/enrollments/${role === "auditor" ? "auditors" : "users"}`,
+          {
+            method: "POST",
+            body: JSON.stringify({
+              colleague_ids: [session.namespace?.scope_id],
+              idempotency_key: randomKey(`enroll-${role}`),
+            }),
+          },
+          csrf,
+        );
+        await refreshGovernance();
+      },
+    );
   }
 
   async function authorizeRecovery() {
-    await mutate("Authorize recovery", async () => {
+    await mutate(t("operation.recovery_authorize"), async () => {
       await api(
         "/governance/recovery",
         {
@@ -1706,28 +1778,33 @@ function Workspace({
     choice: "approve" | "reject",
   ) {
     const scope = proposal.change_kind === "draft" ? "colleague" : "tenant";
-    await mutate(`${choice} exact governance change`, async () => {
-      await api(
-        `/governance/changes/${scope}/${proposal.proposal_id}/decision`,
-        {
-          method: "POST",
-          body: JSON.stringify({
-            proposal_revision: proposal.revision,
-            proposal_digest: proposal.canonical_digest,
-            choice,
-            idempotency_key: randomKey(`change-${choice}`),
-          }),
-        },
-        csrf,
-      );
-      await refreshGovernance();
-    });
+    await mutate(
+      choice === "approve"
+        ? t("governance.approve_change")
+        : t("governance.reject_change"),
+      async () => {
+        await api(
+          `/governance/changes/${scope}/${proposal.proposal_id}/decision`,
+          {
+            method: "POST",
+            body: JSON.stringify({
+              proposal_revision: proposal.revision,
+              proposal_digest: proposal.canonical_digest,
+              choice,
+              idempotency_key: randomKey(`change-${choice}`),
+            }),
+          },
+          csrf,
+        );
+        await refreshGovernance();
+      },
+    );
   }
 
   async function exportAudit() {
     const end = new Date();
     const start = new Date(end.getTime() - 24 * 60 * 60 * 1000);
-    await mutate("Bounded audit export", async () => {
+    await mutate(t("operation.audit_export"), async () => {
       const result = await api<{ records: ExportRecord[] }>(
         "/governance/audit/export",
         {
@@ -1756,26 +1833,26 @@ function Workspace({
     <div className="workspace-shell">
       <header className="workspace-header">
         <div className="brand-lockup">
-          <span className="brand-mark">DC</span>
+          <span className="brand-mark">{t("common.dc")}</span>
           <div>
-            <strong>Digital Colleagues</strong>
-            <span>Local reference · P6 governance</span>
+            <strong>{t("product.name")}</strong>
+            <span>{t("runtime.subtitle")}</span>
           </div>
         </div>
         <div className="runtime-status">
           <span className="status-dot" aria-hidden="true" />
           <div>
-            <strong>Durable runtime</strong>
+            <strong>{t("runtime.durable")}</strong>
             <span>{session.namespace?.scope_id}</span>
           </div>
         </div>
         <div className="principal-chip">
-          <span>HUMAN</span>
+          <span>{t("common.human")}</span>
           <strong>{roles.join(" · ")}</strong>
         </div>
       </header>
-      <aside className="workspace-nav" aria-label="Golden Path navigation">
-        <p className="nav-label">Golden Path</p>
+      <aside className="workspace-nav" aria-label={t("nav.aria")}>
+        <p className="nav-label">{t("nav.label")}</p>
         {visibleNavigation.map((item) => (
           <button
             key={item.id}
@@ -1783,15 +1860,15 @@ function Workspace({
             onClick={() => setView(item.id)}
           >
             <span>{item.index}</span>
-            {item.label}
+            {t(item.label)}
             {item.id === "proposals" && pending.length > 0 && (
               <em>{pending.length}</em>
             )}
           </button>
         ))}
         <div className="nav-boundary">
-          <span>SYNTHETIC / OFFLINE</span>
-          <p>No live model or provider effect.</p>
+          <span>{t("runtime.synthetic")}</span>
+          <p>{t("runtime.no_live")}</p>
         </div>
       </aside>
       <main className="workspace-main" key={view}>
@@ -1800,48 +1877,50 @@ function Workspace({
           <section className="workspace-view" aria-labelledby="identity-title">
             <div className="view-heading">
               <div>
-                <p className="section-kicker">Identity & authority</p>
+                <p className="section-kicker">{t("identity.kicker")}</p>
                 <h1 id="identity-title">{profile?.display_name}</h1>
                 <p>{profile?.description}</p>
               </div>
               <span className="revision-stamp">
-                MANDATE · REV {state.identity.exact_revision}
+                {t("identity.mandate_stamp", {
+                  revision: state.identity.exact_revision,
+                })}
               </span>
             </div>
             <div className="identity-ledger">
               <article>
                 <span className="review-type descriptive">
-                  DESCRIPTIVE PROFILE
+                  {t("revision.descriptive_profile")}
                 </span>
-                <h2>Presentation</h2>
+                <h2>{t("identity.presentation")}</h2>
                 <dl>
-                  <dt>Working style</dt>
+                  <dt>{t("builder.working_style")}</dt>
                   <dd>{profile?.presentation.working_style}</dd>
-                  <dt>Authority source</dt>
-                  <dd>No — Profile preferences do not grant permission.</dd>
+                  <dt>{t("identity.authority_source")}</dt>
+                  <dd>{t("identity.profile_not_authority")}</dd>
                 </dl>
               </article>
               <article>
                 <span className="review-type authoritative">
-                  AUTHORITATIVE MANDATE
+                  {t("revision.authoritative_mandate")}
                 </span>
                 <h2>{mandate?.mission}</h2>
                 <dl>
-                  <dt>Serves</dt>
+                  <dt>{t("builder.serves")}</dt>
                   <dd>{mandate?.service_relationship}</dd>
-                  <dt>Responsibilities</dt>
+                  <dt>{t("builder.responsibilities")}</dt>
                   <dd>
                     {mandate?.responsibilities
                       .map((item) => item.description)
                       .join(", ")}
                   </dd>
-                  <dt>Capabilities</dt>
+                  <dt>{t("builder.capabilities")}</dt>
                   <dd>
                     {mandate?.capabilities
                       .map((item) => item.description)
                       .join(", ")}
                   </dd>
-                  <dt>Constraints</dt>
+                  <dt>{t("builder.constraints_scope")}</dt>
                   <dd>
                     {mandate?.constraints
                       .map((item) => item.description)
@@ -1851,13 +1930,13 @@ function Workspace({
               </article>
             </div>
             <div className="effect-line">
-              <span>EXACT EFFECT BOUNDARY</span>
+              <span>{t("identity.exact_effect")}</span>
               <strong>{mandate?.effect_boundaries[0]?.effect_kind}</strong>
               <span>
                 {mandate?.effect_boundaries[0]?.allowed_destination_kinds[0]} →{" "}
                 {mandate?.effect_boundaries[0]?.allowed_actions[0]}
               </span>
-              <em>Human approval required</em>
+              <em>{t("identity.human_approval")}</em>
             </div>
           </section>
         )}
@@ -1874,28 +1953,25 @@ function Workspace({
           <section className="workspace-view" aria-labelledby="work-title">
             <div className="view-heading">
               <div>
-                <p className="section-kicker">Finite work</p>
-                <h1 id="work-title">Durable assignment</h1>
-                <p>
-                  Work binds to this namespace, responsibility, assignee, and
-                  exact Mandate revision.
-                </p>
+                <p className="section-kicker">{t("work.kicker")}</p>
+                <h1 id="work-title">{t("work.title")}</h1>
+                <p>{t("work.explanation")}</p>
               </div>
               <button
                 className="quiet-action"
                 onClick={() =>
-                  void mutate("Restart recovery inspection", refresh)
+                  void mutate(t("operation.recovery_inspect"), refresh)
                 }
                 disabled={!!busy}
               >
-                Inspect recovered state
+                {t("work.inspect")}
               </button>
             </div>
             {work.length === 0 ? (
               <div className="empty-state">
-                <span>EMPTY</span>
-                <h2>No finite work assigned.</h2>
-                <p>Create the one bounded item used by the reference path.</p>
+                <span>{t("common.empty")}</span>
+                <h2>{t("work.none")}</h2>
+                <p>{t("work.none_help")}</p>
               </div>
             ) : (
               <ol className="work-list">
@@ -1907,11 +1983,11 @@ function Workspace({
                       <p>{item.description}</p>
                     </div>
                     <dl>
-                      <dt>Mandate</dt>
+                      <dt>{t("work.mandate")}</dt>
                       <dd>
                         {item.mandate_id} · rev {item.mandate_revision}
                       </dd>
-                      <dt>Correlation</dt>
+                      <dt>{t("work.correlation")}</dt>
                       <dd>{item.correlation_id}</dd>
                     </dl>
                   </li>
@@ -1924,7 +2000,7 @@ function Workspace({
                 onSubmit={(event) => void assign(event)}
               >
                 <label>
-                  Work title
+                  {t("work.title_label")}
                   <input
                     name="title"
                     defaultValue="Prepare one deterministic work update"
@@ -1932,7 +2008,7 @@ function Workspace({
                   />
                 </label>
                 <label>
-                  Definition of done
+                  {t("work.done")}
                   <textarea
                     name="description"
                     defaultValue="Produce one exact reference ActionResult after human review."
@@ -1940,7 +2016,7 @@ function Workspace({
                   />
                 </label>
                 <button className="primary-action" disabled={!!busy}>
-                  {busy || "Assign finite work"}
+                  {busy || t("work.assign")}
                 </button>
               </form>
             )}
@@ -1950,39 +2026,36 @@ function Workspace({
           <section className="workspace-view" aria-labelledby="wake-title">
             <div className="view-heading">
               <div>
-                <p className="section-kicker">Wake-cycle inspector</p>
-                <h1 id="wake-title">Why did it wake?</h1>
-                <p>
-                  Event and Timer remain semantically distinct. Internal no-op
-                  cycles never become proposals.
-                </p>
+                <p className="section-kicker">{t("wake.kicker")}</p>
+                <h1 id="wake-title">{t("wake.title")}</h1>
+                <p>{t("wake.explanation")}</p>
               </div>
               <div className="button-cluster">
                 <button
                   onClick={() => void trigger("event")}
                   disabled={!work.length || !!busy}
                 >
-                  Trigger Event
+                  {t("wake.trigger_event")}
                 </button>
                 <button
                   onClick={() => void trigger("timer")}
                   disabled={!work.length || !!busy}
                 >
-                  Trigger Timer
+                  {t("wake.trigger_timer")}
                 </button>
                 <button
                   onClick={() => void trigger("event", true)}
                   disabled={!work.length || !!busy}
                 >
-                  Test no-op
+                  {t("wake.test_noop")}
                 </button>
               </div>
             </div>
             {!state.wakes?.length ? (
               <div className="empty-state">
-                <span>EMPTY</span>
-                <h2>No wake cycles yet.</h2>
-                <p>Assign work, then trigger an Event or Timer.</p>
+                <span>{t("common.empty")}</span>
+                <h2>{t("wake.none")}</h2>
+                <p>{t("wake.none_help")}</p>
               </div>
             ) : (
               <ol className="wake-timeline">
@@ -1998,12 +2071,19 @@ function Workspace({
                       </p>
                       <h2>{wake.wake_reason}</h2>
                       <p>
-                        {wake.decision?.rationale ||
-                          "Pending deterministic decision"}
+                        {wake.decision?.rationale || t("wake.pending_decision")}
                       </p>
                       <div className="generation-line">
-                        <span>Agenda {wake.agenda_generation}</span>
-                        <span>Handled {wake.handled_generation}</span>
+                        <span>
+                          {t("wake.agenda", {
+                            generation: wake.agenda_generation,
+                          })}
+                        </span>
+                        <span>
+                          {t("wake.handled", {
+                            generation: wake.handled_generation,
+                          })}
+                        </span>
                         <span>{wake.decision?.kind || "pending"}</span>
                       </div>
                     </div>
@@ -2011,7 +2091,7 @@ function Workspace({
                       className="text-action"
                       onClick={() => void inspectAudit(wake.correlation_id)}
                     >
-                      Trace causality →
+                      {t("wake.trace")}
                     </button>
                   </li>
                 ))}
@@ -2023,22 +2103,21 @@ function Workspace({
           <section className="workspace-view" aria-labelledby="proposal-title">
             <div className="view-heading">
               <div>
-                <p className="section-kicker">Proposal inbox</p>
-                <h1 id="proposal-title">Exact effects awaiting a human.</h1>
-                <p>
-                  A proposal is not authorization. Decisions bind to every
-                  immutable field shown here.
-                </p>
+                <p className="section-kicker">{t("proposal.kicker")}</p>
+                <h1 id="proposal-title">{t("proposal.title")}</h1>
+                <p>{t("proposal.explanation")}</p>
               </div>
               <span className="inbox-count">
-                {pending.length.toString().padStart(2, "0")} PENDING
+                {t("proposal.pending_count", {
+                  count: pending.length.toString().padStart(2, "0"),
+                })}
               </span>
             </div>
             {proposals.length === 0 ? (
               <div className="empty-state">
-                <span>EMPTY</span>
-                <h2>No effect proposals.</h2>
-                <p>A deterministic no-op stays here: absent by design.</p>
+                <span>{t("common.empty")}</span>
+                <h2>{t("proposal.none")}</h2>
+                <p>{t("proposal.none_help")}</p>
               </div>
             ) : (
               <div className="proposal-list">
@@ -2055,41 +2134,43 @@ function Workspace({
                           {proposal.destination.target}
                         </p>
                       </div>
-                      <strong>REV {proposal.revision}</strong>
+                      <strong>
+                        {t("common.revision", { revision: proposal.revision })}
+                      </strong>
                     </header>
                     <div className="effect-projection">
-                      <span>SAFE EFFECT PROJECTION</span>
+                      <span>{t("proposal.safe_projection")}</span>
                       <code>{JSON.stringify(proposal.safe_projection)}</code>
                     </div>
                     <dl className="proposal-bindings">
-                      <dt>Proposal digest</dt>
+                      <dt>{t("proposal.digest")}</dt>
                       <dd>{proposal.proposal_digest}</dd>
-                      <dt>Payload integrity</dt>
+                      <dt>{t("proposal.payload")}</dt>
                       <dd>{proposal.payload_digest}</dd>
-                      <dt>Effect boundary</dt>
+                      <dt>{t("builder.effect_boundary")}</dt>
                       <dd>{proposal.effect_boundary}</dd>
-                      <dt>Mandate</dt>
+                      <dt>{t("work.mandate")}</dt>
                       <dd>
                         {proposal.mandate_id} · rev {proposal.mandate_revision}
                       </dd>
-                      <dt>Policy</dt>
+                      <dt>{t("proposal.policy")}</dt>
                       <dd>
                         {proposal.policy_id
                           ? `${proposal.policy_id} · rev ${proposal.policy_revision}`
-                          : "legacy unconfirmed"}
+                          : t("proposal.legacy_policy")}
                       </dd>
-                      <dt>Actor</dt>
+                      <dt>{t("proposal.actor")}</dt>
                       <dd>
                         {proposal.actor.kind} / {proposal.actor.principal_id}
                       </dd>
-                      <dt>Namespace</dt>
+                      <dt>{t("proposal.namespace")}</dt>
                       <dd>
                         {proposal.namespace.tenant_id} /{" "}
                         {proposal.namespace.scope_id}
                       </dd>
-                      <dt>Expiry</dt>
+                      <dt>{t("proposal.expiry")}</dt>
                       <dd>{proposal.expires_at}</dd>
-                      <dt>Causal source</dt>
+                      <dt>{t("proposal.causal_source")}</dt>
                       <dd>{proposal.causation_id}</dd>
                     </dl>
                     {proposal.approval_status === "pending" && (
@@ -2099,14 +2180,14 @@ function Workspace({
                           onClick={() => void decide(proposal, "reject")}
                           disabled={!!busy}
                         >
-                          Reject exact revision
+                          {t("proposal.reject")}
                         </button>
                         <button
                           className="primary-action"
                           onClick={() => void decide(proposal, "approve")}
                           disabled={!!busy}
                         >
-                          Approve exact revision
+                          {t("proposal.approve")}
                         </button>
                       </footer>
                     )}
@@ -2120,23 +2201,20 @@ function Workspace({
           <section className="workspace-view" aria-labelledby="audit-title">
             <div className="view-heading">
               <div>
-                <p className="section-kicker">Causal audit</p>
-                <h1 id="audit-title">From input to result.</h1>
-                <p>
-                  Only safe projections and digests cross this inspection
-                  boundary.
-                </p>
+                <p className="section-kicker">{t("audit.kicker")}</p>
+                <h1 id="audit-title">{t("audit.title")}</h1>
+                <p>{t("audit.explanation")}</p>
               </div>
               {state.results && state.results.length > 0 && (
                 <span className="result-stamp">
-                  ACTIONRESULT · {state.results.length}
+                  {t("audit.result_stamp", { count: state.results.length })}
                 </span>
               )}
             </div>
             {!audit ? (
               <div className="empty-state">
-                <span>SELECT A TRACE</span>
-                <h2>Choose a wake cycle or work correlation.</h2>
+                <span>{t("audit.select")}</span>
+                <h2>{t("audit.choose")}</h2>
                 <div className="trace-links">
                   {state.wakes?.map((wake) => (
                     <button
@@ -2151,7 +2229,7 @@ function Workspace({
             ) : (
               <div className="audit-chain">
                 <div className="audit-correlation">
-                  <span>CORRELATION</span>
+                  <span>{t("audit.correlation")}</span>
                   <strong>{audit.correlation_id}</strong>
                 </div>
                 <ol>
@@ -2164,17 +2242,17 @@ function Workspace({
                         <span>{record.occurred_at}</span>
                       </div>
                       <dl>
-                        <dt>Revision</dt>
+                        <dt>{t("audit.revision")}</dt>
                         <dd>{record.record_revision}</dd>
-                        <dt>Actor</dt>
+                        <dt>{t("audit.actor")}</dt>
                         <dd>{record.actor_principal_id}</dd>
-                        <dt>Causation</dt>
-                        <dd>{record.causation_id || "root"}</dd>
-                        <dt>Safe projection</dt>
+                        <dt>{t("audit.causation")}</dt>
+                        <dd>{record.causation_id || t("common.root")}</dd>
+                        <dt>{t("audit.safe_projection")}</dt>
                         <dd>
                           <code>{JSON.stringify(record.safe_projection)}</code>
                         </dd>
-                        <dt>Digest</dt>
+                        <dt>{t("audit.digest")}</dt>
                         <dd>{record.payload_digest}</dd>
                       </dl>
                     </li>
@@ -2191,54 +2269,51 @@ function Workspace({
           >
             <div className="view-heading">
               <div>
-                <p className="section-kicker">Governance & access</p>
-                <h1 id="governance-title">Current authority, never cached.</h1>
-                <p>
-                  Server-side RBAC binds every action to a durable HUMAN,
-                  namespace, role revision, and membership revision.
-                </p>
+                <p className="section-kicker">{t("governance.kicker")}</p>
+                <h1 id="governance-title">{t("governance.title")}</h1>
+                <p>{t("governance.explanation")}</p>
               </div>
               <span className="revision-stamp">
-                SESSION · REV {governance.session.revision}
+                {t("governance.session_stamp", {
+                  revision: governance.session.revision,
+                })}
               </span>
             </div>
 
             <div className="identity-ledger governance-ledger">
               <article>
                 <span className="review-type authoritative">
-                  SESSION BINDING
+                  {t("governance.session_binding")}
                 </span>
                 <h2>{governance.membership.status}</h2>
                 <dl>
-                  <dt>Principal</dt>
+                  <dt>{t("governance.principal")}</dt>
                   <dd>{governance.membership.principal_id}</dd>
-                  <dt>Role revision</dt>
+                  <dt>{t("governance.role_revision")}</dt>
                   <dd>{governance.session.role_revision}</dd>
-                  <dt>Membership revision</dt>
+                  <dt>{t("governance.membership_revision")}</dt>
                   <dd>{governance.session.membership_revision}</dd>
-                  <dt>Session expiry</dt>
+                  <dt>{t("governance.session_expiry")}</dt>
                   <dd>{governance.session.expires_at}</dd>
-                  <dt>Colleague scope</dt>
+                  <dt>{t("governance.colleague_scope")}</dt>
                   <dd>{governance.membership.colleague_ids.join(", ")}</dd>
                 </dl>
               </article>
               <article>
                 <span className="review-type descriptive">
-                  CREDENTIAL LIFECYCLE
+                  {t("governance.credentials")}
                 </span>
                 <h2>
                   {isAdmin && governance.bootstrap_transition_state
-                    ? `Second Admin transition: ${governance.bootstrap_transition_state}`
-                    : "Credential status in exact colleague scope"}
+                    ? t("governance.second_admin", {
+                        state: governance.bootstrap_transition_state,
+                      })
+                    : t("governance.credential_scope")}
                 </h2>
-                <p>
-                  Enrollment and recovery plaintext is retrieved once at the
-                  local operator boundary. Studio receives status only.
-                </p>
+                <p>{t("governance.credential_boundary")}</p>
                 {governance.credentials.length === 0 ? (
                   <p className="read-only-note">
-                    No credential lifecycle records are visible in this role and
-                    namespace.
+                    {t("governance.no_credentials")}
                   </p>
                 ) : (
                   <ol className="credential-status-list">
@@ -2247,14 +2322,18 @@ function Workspace({
                         <span>{credential.kind}</span>
                         <strong>{credential.state}</strong>
                         <small>
-                          rev {credential.revision} · expires{" "}
-                          {credential.expires_at}
+                          {t("governance.credential_detail", {
+                            revision: credential.revision,
+                            expires: credential.expires_at,
+                          })}
                         </small>
                         {credential.kind === "recovery" && (
                           <small>
-                            target authority rev{" "}
-                            {credential.target_role_revision}/
-                            {credential.target_membership_revision}
+                            {t("governance.target_authority", {
+                              role: credential.target_role_revision ?? "—",
+                              membership:
+                                credential.target_membership_revision ?? "—",
+                            })}
                           </small>
                         )}
                       </li>
@@ -2270,21 +2349,21 @@ function Workspace({
                       }
                       disabled={!!busy}
                     >
-                      Authorize scoped User enrollment
+                      {t("governance.enroll_user")}
                     </button>
                     <button
                       type="button"
                       onClick={() => void authorizeScopedEnrollment("auditor")}
                       disabled={!!busy}
                     >
-                      Authorize scoped Auditor enrollment
+                      {t("governance.enroll_auditor")}
                     </button>
                     <button
                       type="button"
                       onClick={() => void authorizeRecovery()}
                       disabled={!!busy}
                     >
-                      Authorize recovery credential
+                      {t("governance.authorize_recovery")}
                     </button>
                   </div>
                 )}
@@ -2293,10 +2372,10 @@ function Workspace({
 
             <section className="governance-section">
               <span className="review-type authoritative">
-                PENDING CHANGE APPROVALS
+                {t("governance.pending_changes")}
               </span>
               {governance.change_proposals.length === 0 ? (
-                <p>No change proposals are visible in this authorized scope.</p>
+                <p>{t("governance.no_changes")}</p>
               ) : (
                 <div className="proposal-list">
                   {governance.change_proposals.map((proposal) => {
@@ -2321,32 +2400,38 @@ function Workspace({
                             </span>
                             <h2>{proposal.change_kind.replaceAll("_", " ")}</h2>
                           </div>
-                          <strong>EXACT REV {proposal.target_revision}</strong>
+                          <strong>
+                            {t("governance.exact_revision", {
+                              revision: proposal.target_revision,
+                            })}
+                          </strong>
                         </header>
                         <dl className="proposal-bindings">
-                          <dt>Canonical digest</dt>
+                          <dt>{t("governance.canonical_digest")}</dt>
                           <dd>{proposal.canonical_digest}</dd>
-                          <dt>Proposer</dt>
+                          <dt>{t("governance.proposer")}</dt>
                           <dd>{proposal.proposer_principal_id}</dd>
-                          <dt>Approver</dt>
+                          <dt>{t("governance.approver")}</dt>
                           <dd>
                             {decision?.approver_principal_id ||
-                              "separate Admin required"}
+                              t("governance.separate_admin")}
                           </dd>
-                          <dt>Expiry</dt>
+                          <dt>{t("proposal.expiry")}</dt>
                           <dd>{proposal.expires_at}</dd>
-                          <dt>Refused / stale reason</dt>
+                          <dt>{t("governance.refused_reason")}</dt>
                           <dd>
                             {proposal.state === "stale" ||
                             proposal.state === "expired"
-                              ? `Exact ${proposal.state} binding cannot apply.`
-                              : "none"}
+                              ? t("governance.cannot_apply", {
+                                  state: proposal.state,
+                                })
+                              : t("common.none")}
                           </dd>
                         </dl>
                         {!!reviewedDiff?.length && (
                           <div
                             className="diff-list"
-                            aria-label="Reviewed exact diff"
+                            aria-label={t("governance.reviewed_diff_aria")}
                           >
                             {reviewedDiff.map((item) => (
                               <div
@@ -2369,7 +2454,7 @@ function Workspace({
                                 void decideChange(proposal, "reject")
                               }
                             >
-                              Reject exact change
+                              {t("governance.reject_change")}
                             </button>
                             <button
                               type="button"
@@ -2378,7 +2463,7 @@ function Workspace({
                                 void decideChange(proposal, "approve")
                               }
                             >
-                              Approve exact change
+                              {t("governance.approve_change")}
                             </button>
                           </footer>
                         )}
@@ -2390,12 +2475,10 @@ function Workspace({
             </section>
 
             <section className="governance-section">
-              <span className="review-type descriptive">SAFE AUDIT EXPORT</span>
-              <p>
-                Deterministically ordered, redacted safe projections; bounded to
-                100 records in the active colleague namespace. Private payload
-                content remains absent.
-              </p>
+              <span className="review-type descriptive">
+                {t("governance.safe_export")}
+              </span>
+              <p>{t("governance.export_boundary")}</p>
               {canExport && (
                 <button
                   type="button"
@@ -2403,7 +2486,7 @@ function Workspace({
                   onClick={() => void exportAudit()}
                   disabled={!!busy}
                 >
-                  Export bounded safe audit
+                  {t("governance.export")}
                 </button>
               )}
               {exported.length > 0 && (
@@ -2418,9 +2501,9 @@ function Workspace({
                         <p>{record.safe_digest}</p>
                       </div>
                       <dl>
-                        <dt>Actor</dt>
+                        <dt>{t("audit.actor")}</dt>
                         <dd>{record.actor_principal_id}</dd>
-                        <dt>Causation</dt>
+                        <dt>{t("audit.causation")}</dt>
                         <dd>{record.causation_id}</dd>
                       </dl>
                     </li>
@@ -2434,16 +2517,21 @@ function Workspace({
       <footer className="workspace-footer">
         <span>
           {busy
-            ? `WORKING · ${busy.toUpperCase()}`
-            : "READY · KEYBOARD OPERABLE"}
+            ? t("footer.working", { operation: busy.toUpperCase() })
+            : t("footer.ready")}
         </span>
-        <span>P6 under verification · independent acceptance required</span>
+        <span>{t("footer.boundary")}</span>
       </footer>
     </div>
   );
 }
 
 export function App() {
+  const [locale, updateLocale] = useState<Locale>(() => {
+    const selected = initialLocale();
+    setLocale(selected);
+    return selected;
+  });
   const [phase, setPhase] = useState<Phase>("checking");
   const [session, setSession] = useState<Session | null>(null);
   const [state, setState] = useState<State>({ state: "empty" });
@@ -2491,9 +2579,7 @@ export function App() {
             cause instanceof Error &&
             !cause.message.toLowerCase().includes("authentication required")
           ) {
-            setSessionNotice(
-              "Existing session expired, was revoked, or its role/membership binding changed. Use an Admin-authorized local recovery session.",
-            );
+            setSessionNotice(t("session.changed"));
           }
           setPhase("bootstrap");
         }
@@ -2503,55 +2589,79 @@ export function App() {
     };
   }, [establish]);
 
+  const language = (
+    <LanguagePicker
+      locale={locale}
+      change={(selected) => {
+        setLocale(selected);
+        updateLocale(selected);
+      }}
+    />
+  );
   if (fatal)
     return (
-      <main className="fatal-state">
-        <span>ERROR STATE</span>
-        <h1>The local control plane is unavailable.</h1>
-        <p>{fatal}</p>
-        <button onClick={() => window.location.reload()}>
-          Retry connection
-        </button>
-      </main>
+      <>
+        {language}
+        <main className="fatal-state">
+          <span>{t("error.state")}</span>
+          <h1>{t("error.unavailable")}</h1>
+          <p>{t("common.operation_failed")}</p>
+          <button onClick={() => window.location.reload()}>
+            {t("error.retry")}
+          </button>
+        </main>
+      </>
     );
   if (phase === "checking")
     return (
-      <main className="loading-state" aria-live="polite">
-        <span className="loading-mark">DC</span>
-        <p>Loading durable state…</p>
-      </main>
+      <>
+        {language}
+        <main className="loading-state" aria-live="polite">
+          <span className="loading-mark">{t("common.dc")}</span>
+          <p>{t("loading.state")}</p>
+        </main>
+      </>
     );
   if (phase === "bootstrap")
     return (
-      <Bootstrap
-        sessionNotice={sessionNotice}
-        onReady={(resolved) => {
-          void establish(resolved).catch((cause) => setFatal(String(cause)));
-        }}
-      />
+      <>
+        {language}
+        <Bootstrap
+          sessionNotice={sessionNotice}
+          onReady={(resolved) => {
+            void establish(resolved).catch((cause) => setFatal(String(cause)));
+          }}
+        />
+      </>
     );
   if (!session || !governance) return null;
   if (phase === "builder")
     return (
-      <Builder
-        csrf={session.csrf_token}
-        onCreated={async () => {
-          const resolved = await api<Session>("/auth/session");
-          setSession(resolved);
-          await loadState();
-        }}
-      />
+      <>
+        {language}
+        <Builder
+          csrf={session.csrf_token}
+          onCreated={async () => {
+            const resolved = await api<Session>("/auth/session");
+            setSession(resolved);
+            await loadState();
+          }}
+        />
+      </>
     );
   return (
-    <Workspace
-      session={session}
-      state={state}
-      p5={p5}
-      governance={governance}
-      csrf={session.csrf_token}
-      refresh={loadState}
-      refreshP5={loadP5State}
-      refreshGovernance={loadGovernance}
-    />
+    <>
+      {language}
+      <Workspace
+        session={session}
+        state={state}
+        p5={p5}
+        governance={governance}
+        csrf={session.csrf_token}
+        refresh={loadState}
+        refreshP5={loadP5State}
+        refreshGovernance={loadGovernance}
+      />
+    </>
   );
 }

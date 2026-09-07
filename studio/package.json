@@ -1,6 +1,6 @@
 {
   "name": "digital-colleagues-studio",
-  "version": "0.1.0",
+  "version": "0.2.0-dev.0",
   "private": true,
   "type": "module",
   "packageManager": "npm@11.12.1+sha224.8b8077c959144afd9fbfc0f0a36ecf5b5375c7b1a202f32c0c06cdcb",

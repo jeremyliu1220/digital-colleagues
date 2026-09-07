@@ -1,0 +1,587 @@
+#!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
+
+set -eu
+umask 077
+
+SCHEMA_VERSION=1
+PRODUCT_NAME='Digital Colleagues'
+PYTHON_VERSION='0.2.0.dev0'
+DISPLAY_VERSION='0.2.0-dev.0'
+MATURITY='Public Pilot development candidate'
+PROJECT_ID='digital-colleagues-p10'
+MANAGED_ID='digital-colleagues-p10-managed-root-v1'
+DEFAULT_API_PORT=8000
+DEFAULT_STUDIO_PORT=4173
+HEALTH_DEADLINE_SECONDS=120
+EXIT_USAGE=2
+EXIT_PRECONDITION=3
+EXIT_VERIFICATION=4
+EXIT_BUSY=5
+EXIT_RUNTIME=6
+EXIT_CONFIRMATION=7
+EXIT_AUTHORIZATION=8
+
+SELF_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
+if [ -f "$SELF_DIR/manifest.json" ]; then
+  BUNDLE_DIR=$SELF_DIR
+  MANIFEST=$SELF_DIR/manifest.json
+else
+  BUNDLE_DIR=$SELF_DIR
+  MANIFEST=$SELF_DIR/distribution/p10/release-manifest.template.json
+fi
+POLICY=$BUNDLE_DIR/verification-policy.json
+if [ ! -f "$POLICY" ]; then
+  POLICY=$BUNDLE_DIR/distribution/p10/verification-policy.json
+fi
+SUMS=$BUNDLE_DIR/SHA256SUMS
+
+LOCALE=en-US
+JSON_OUTPUT=0
+MANAGED_ROOT=${DC_MANAGED_ROOT:-"${HOME:?}/Library/Application Support/Digital Colleagues"}
+API_PORT=${DC_API_PORT:-$DEFAULT_API_PORT}
+STUDIO_PORT=${DC_STUDIO_PORT:-$DEFAULT_STUDIO_PORT}
+PURGE_DATA=0
+CONFIRMATION=''
+BACKUP_NAME=''
+VERIFIED_BACKUP=''
+COMMAND=''
+LOCK_PATH=''
+LOCK_HELD=0
+
+message() {
+  key=$1
+  case "$LOCALE:$key" in
+    zh-TW:doctor_ok) printf '%s\n' '系統檢查通過；決定性參考模式可用。' ;;
+    zh-TW:quickstart_ok) printf '%s\n' 'Digital Colleagues 已就緒。' ;;
+    zh-TW:up_ok) printf '%s\n' '服務已啟動。' ;;
+    zh-TW:down_ok) printf '%s\n' '服務已停止；狀態與備份已保留。' ;;
+    zh-TW:ready) printf '%s\n' '服務狀態：就緒。' ;;
+    zh-TW:not_ready) printf '%s\n' '服務狀態：尚未就緒。' ;;
+    zh-TW:backup_ok) printf '%s\n' '已建立並驗證私密備份。' ;;
+    zh-TW:restore_ok) printf '%s\n' '已從已驗證備份還原。' ;;
+    zh-TW:uninstall_ok) printf '%s\n' '已移除受管理的服務；私密資料已保留。' ;;
+    zh-TW:purge_ok) printf '%s\n' '已移除受管理的私密資料。' ;;
+    zh-TW:filevault_ready) printf '%s\n' 'FileVault：加密儲存已就緒。' ;;
+    zh-TW:filevault_blocked) printf '%s\n' 'FileVault：live readiness 未通過；決定性參考模式仍可使用。' ;;
+    zh-TW:error) printf '%s\n' '操作遭拒；請使用 --json 查看穩定錯誤分類。' ;;
+    *:doctor_ok) printf '%s\n' 'System checks passed; deterministic reference mode is available.' ;;
+    *:quickstart_ok) printf '%s\n' 'Digital Colleagues is ready.' ;;
+    *:up_ok) printf '%s\n' 'Services started.' ;;
+    *:down_ok) printf '%s\n' 'Services stopped; state and backups were preserved.' ;;
+    *:ready) printf '%s\n' 'Service status: ready.' ;;
+    *:not_ready) printf '%s\n' 'Service status: not ready.' ;;
+    *:backup_ok) printf '%s\n' 'Private backup created and verified.' ;;
+    *:restore_ok) printf '%s\n' 'Verified backup restored.' ;;
+    *:uninstall_ok) printf '%s\n' 'Managed services removed; private data was preserved.' ;;
+    *:purge_ok) printf '%s\n' 'Managed private data removed.' ;;
+    *:filevault_ready) printf '%s\n' 'FileVault: encrypted storage ready.' ;;
+    *:filevault_blocked) printf '%s\n' 'FileVault: live readiness blocked; deterministic reference mode remains available.' ;;
+    *:error) printf '%s\n' 'Operation refused; use --json for the stable error category.' ;;
+  esac
+}
+
+emit_error() {
+  category=$1
+  code=$2
+  if [ "$JSON_OUTPUT" -eq 1 ]; then
+    printf '{"schema_version":1,"status":"error","category":"%s","exit_code":%s}\n' "$category" "$code"
+  else
+    message error >&2
+    printf 'category: %s\n' "$category" >&2
+  fi
+  exit "$code"
+}
+
+emit_ok() {
+  category=$1
+  extra=${2:-}
+  if [ "$JSON_OUTPUT" -eq 1 ]; then
+    if [ -n "$extra" ]; then
+      printf '{"schema_version":1,"status":"ok","category":"%s",%s}\n' "$category" "$extra"
+    else
+      printf '{"schema_version":1,"status":"ok","category":"%s"}\n' "$category"
+    fi
+  else
+    message "$category"
+  fi
+}
+
+usage() {
+  printf '%s\n' 'usage: ./dc [--locale zh-TW|en-US] [--json] [--managed-root PATH] [--api-port PORT] [--studio-port PORT] COMMAND'
+  printf '%s\n' 'commands: doctor quickstart up down status backup restore update uninstall'
+}
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    doctor|quickstart|up|down|status|backup|restore|update|uninstall)
+      [ -z "$COMMAND" ] || emit_error invalid_arguments "$EXIT_USAGE"
+      COMMAND=$1
+      shift
+      ;;
+    --json)
+      JSON_OUTPUT=1
+      shift
+      ;;
+    --locale)
+      [ "$#" -ge 2 ] || emit_error invalid_locale "$EXIT_USAGE"
+      case "$2" in zh-TW|en-US) LOCALE=$2 ;; *) LOCALE=en-US ;; esac
+      shift 2
+      ;;
+    --managed-root)
+      [ "$#" -ge 2 ] || emit_error invalid_managed_root "$EXIT_USAGE"
+      MANAGED_ROOT=$2
+      shift 2
+      ;;
+    --api-port)
+      [ "$#" -ge 2 ] || emit_error invalid_port "$EXIT_USAGE"
+      API_PORT=$2
+      shift 2
+      ;;
+    --studio-port)
+      [ "$#" -ge 2 ] || emit_error invalid_port "$EXIT_USAGE"
+      STUDIO_PORT=$2
+      shift 2
+      ;;
+    --purge-data)
+      PURGE_DATA=1
+      shift
+      ;;
+    --confirm)
+      [ "$#" -ge 2 ] || emit_error confirmation_required "$EXIT_USAGE"
+      CONFIRMATION=$2
+      shift 2
+      ;;
+    --backup)
+      [ "$#" -ge 2 ] || emit_error backup_name_invalid "$EXIT_USAGE"
+      BACKUP_NAME=$2
+      shift 2
+      ;;
+    --verified-backup)
+      [ "$#" -ge 2 ] || emit_error backup_name_invalid "$EXIT_USAGE"
+      VERIFIED_BACKUP=$2
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *) emit_error invalid_arguments "$EXIT_USAGE" ;;
+  esac
+done
+
+[ -n "$COMMAND" ] || { usage >&2; exit "$EXIT_USAGE"; }
+
+valid_port() {
+  case "$1" in ''|*[!0-9]*) return 1 ;; esac
+  [ "$1" -ge 1024 ] 2>/dev/null && [ "$1" -le 65535 ] 2>/dev/null
+}
+
+valid_port "$API_PORT" || emit_error invalid_port "$EXIT_USAGE"
+valid_port "$STUDIO_PORT" || emit_error invalid_port "$EXIT_USAGE"
+[ "$API_PORT" != "$STUDIO_PORT" ] || emit_error port_conflict "$EXIT_PRECONDITION"
+
+validate_root_shape() {
+  case "$MANAGED_ROOT" in
+    /*'/Digital Colleagues') ;;
+    *) return 1 ;;
+  esac
+  case "/$MANAGED_ROOT/" in *'/../'*|*'/./'*) return 1 ;; esac
+  [ "$MANAGED_ROOT" != / ] || return 1
+  [ "$MANAGED_ROOT" != "${HOME:-}" ] || return 1
+  [ "$MANAGED_ROOT" != "$SELF_DIR" ] || return 1
+  [ ! -L "$MANAGED_ROOT" ] || return 1
+  root_parent=${MANAGED_ROOT%/*}
+  [ -d "$root_parent" ] && [ ! -L "$root_parent" ] || return 1
+  physical_parent=$(CDPATH= cd -- "$root_parent" 2>/dev/null && pwd -P) || return 1
+  [ "$physical_parent" = "$root_parent" ] || return 1
+  return 0
+}
+
+validate_root_shape || emit_error invalid_managed_root "$EXIT_PRECONDITION"
+
+manifest_get() {
+  /usr/bin/plutil -extract "$1" raw -o - "$MANIFEST" 2>/dev/null
+}
+
+valid_digest_ref() {
+  value=$1
+  printf '%s\n' "$value" | /usr/bin/awk '
+    BEGIN { ok=0 }
+    /^[A-Za-z0-9._:-]+\/[A-Za-z0-9._\/-]+@sha256:[0-9a-f]{64}$/ {
+      if ($0 !~ /:latest@/ && $0 !~ /latest$/) ok=1
+    }
+    END { exit(ok ? 0 : 1) }
+  '
+}
+
+verify_bundle() {
+  [ -x /usr/bin/plutil ] || return 1
+  [ "$(/usr/bin/find "$BUNDLE_DIR" -mindepth 1 -maxdepth 1 -type f | /usr/bin/wc -l | /usr/bin/tr -d ' ')" = 6 ] || return 1
+  [ -z "$(/usr/bin/find "$BUNDLE_DIR" -mindepth 1 -maxdepth 1 ! -type f -print -quit)" ] || return 1
+  [ -f "$MANIFEST" ] && [ ! -L "$MANIFEST" ] || return 1
+  [ -f "$POLICY" ] && [ ! -L "$POLICY" ] || return 1
+  [ -f "$BUNDLE_DIR/compose.p10.yaml" ] && [ ! -L "$BUNDLE_DIR/compose.p10.yaml" ] || return 1
+  [ -f "$BUNDLE_DIR/operations-source-binding.json" ] && [ ! -L "$BUNDLE_DIR/operations-source-binding.json" ] || return 1
+  [ -f "$SUMS" ] && [ ! -L "$SUMS" ] || return 1
+  [ "$(manifest_get template)" = false ] || return 1
+  [ "$(manifest_get product_name)" = "$PRODUCT_NAME" ] || return 1
+  [ "$(manifest_get python_version)" = "$PYTHON_VERSION" ] || return 1
+  [ "$(manifest_get display_version)" = "$DISPLAY_VERSION" ] || return 1
+  [ "$(manifest_get maturity)" = "$MATURITY" ] || return 1
+  [ "$(manifest_get compose_project)" = "$PROJECT_ID" ] || return 1
+  [ "$(manifest_get platforms.0)" = linux/amd64 ] || return 1
+  [ "$(manifest_get platforms.1)" = linux/arm64 ] || return 1
+  [ "$(manifest_get migration_008)" = absent ] || return 1
+  [ "$(manifest_get ghcr_publication)" = not_evaluated ] || return 1
+  [ "$(manifest_get registry_image_signature)" = not_evaluated ] || return 1
+  [ "$(manifest_get registry_attestation)" = not_evaluated ] || return 1
+  [ "$(manifest_get remote_distribution_gate)" = authorization_required ] || return 1
+  manifest_get source_revision | /usr/bin/grep -Eq '^[0-9a-f]{40}$' || return 1
+  runtime_ref=$(manifest_get runtime_image) || return 1
+  studio_ref=$(manifest_get studio_image) || return 1
+  valid_digest_ref "$runtime_ref" || return 1
+  valid_digest_ref "$studio_ref" || return 1
+  /usr/bin/awk '
+    BEGIN { count=0 }
+    /^[0-9a-f]{64}  (compose\.p10\.yaml|dc|manifest\.json|operations-source-binding\.json|verification-policy\.json)$/ { count++; seen[$2]++ ; next }
+    { exit 1 }
+    END { if (count != 5) exit 1; for (name in seen) if (seen[name] != 1) exit 1 }
+  ' "$SUMS" || return 1
+  [ "$(/usr/bin/stat -f '%Lp' "$BUNDLE_DIR/dc" 2>/dev/null)" = 755 ] || return 1
+  for public_file in "$BUNDLE_DIR/compose.p10.yaml" "$MANIFEST" "$BUNDLE_DIR/operations-source-binding.json" "$POLICY" "$SUMS"; do
+    [ "$(/usr/bin/stat -f '%Lp' "$public_file" 2>/dev/null)" = 644 ] || return 1
+  done
+  (cd "$BUNDLE_DIR" && /usr/bin/shasum -a 256 -c SHA256SUMS >/dev/null 2>&1) || return 1
+}
+
+release_identity() {
+  /usr/bin/shasum -a 256 "$MANIFEST" | /usr/bin/awk '{print $1}'
+}
+
+check_existing_modes() {
+  for directory in "$MANAGED_ROOT" "$MANAGED_ROOT/state" "$MANAGED_ROOT/secrets" "$MANAGED_ROOT/backups" "$MANAGED_ROOT/diagnostics" "$MANAGED_ROOT/releases" "$MANAGED_ROOT/config" "$MANAGED_ROOT/cache"; do
+    if [ -e "$directory" ]; then
+      [ -d "$directory" ] && [ ! -L "$directory" ] || return 1
+      [ "$(/usr/bin/stat -f '%Lp' "$directory" 2>/dev/null)" = 700 ] || return 1
+    fi
+  done
+  for private_file in "$MANAGED_ROOT/config/managed-root-id" "$MANAGED_ROOT/config/release-identity" "$MANAGED_ROOT/config/release-lock.json" "$MANAGED_ROOT/releases/operations-source-binding.json"; do
+    if [ -e "$private_file" ]; then
+      [ -f "$private_file" ] && [ ! -L "$private_file" ] || return 1
+      [ "$(/usr/bin/stat -f '%Lp' "$private_file" 2>/dev/null)" = 600 ] || return 1
+    fi
+  done
+  for private_file in "$MANAGED_ROOT/state/state.sqlite" "$MANAGED_ROOT"/secrets/* "$MANAGED_ROOT"/backups/*; do
+    [ -e "$private_file" ] || continue
+    [ -f "$private_file" ] && [ ! -L "$private_file" ] || return 1
+    [ "$(/usr/bin/stat -f '%Lp' "$private_file" 2>/dev/null)" = 600 ] || return 1
+  done
+}
+
+prepare_layout() {
+  parent=${MANAGED_ROOT%/*}
+  [ -d "$parent" ] && [ ! -L "$parent" ] || emit_error managed_parent_unavailable "$EXIT_PRECONDITION"
+  if [ -e "$MANAGED_ROOT" ] && [ ! -f "$MANAGED_ROOT/config/managed-root-id" ]; then
+    [ -z "$(/bin/ls -A "$MANAGED_ROOT" 2>/dev/null)" ] || emit_error managed_identity_invalid "$EXIT_VERIFICATION"
+  fi
+  /bin/mkdir -p "$MANAGED_ROOT" "$MANAGED_ROOT/state" "$MANAGED_ROOT/secrets" "$MANAGED_ROOT/backups" "$MANAGED_ROOT/diagnostics" "$MANAGED_ROOT/releases" "$MANAGED_ROOT/config" "$MANAGED_ROOT/cache"
+  /bin/chmod 700 "$MANAGED_ROOT" "$MANAGED_ROOT/state" "$MANAGED_ROOT/secrets" "$MANAGED_ROOT/backups" "$MANAGED_ROOT/diagnostics" "$MANAGED_ROOT/releases" "$MANAGED_ROOT/config" "$MANAGED_ROOT/cache"
+  if [ ! -f "$MANAGED_ROOT/config/managed-root-id" ]; then
+    printf '%s\n' "$MANAGED_ID" > "$MANAGED_ROOT/config/managed-root-id"
+  fi
+  /bin/chmod 600 "$MANAGED_ROOT/config/managed-root-id"
+  [ "$(/bin/cat "$MANAGED_ROOT/config/managed-root-id")" = "$MANAGED_ID" ] || emit_error managed_identity_invalid "$EXIT_VERIFICATION"
+  check_existing_modes || emit_error filesystem_mode_invalid "$EXIT_VERIFICATION"
+}
+
+acquire_lock() {
+  LOCK_PATH=$MANAGED_ROOT.lock
+  if ! /bin/mkdir -m 700 "$LOCK_PATH" 2>/dev/null; then
+    emit_error concurrent_invocation "$EXIT_BUSY"
+  fi
+  LOCK_HELD=1
+  trap 'release_lock' EXIT HUP INT TERM
+}
+
+release_lock() {
+  if [ "$LOCK_HELD" -eq 1 ] && [ -d "$LOCK_PATH" ] && [ ! -L "$LOCK_PATH" ]; then
+    /bin/rmdir "$LOCK_PATH" 2>/dev/null || true
+  fi
+  LOCK_HELD=0
+}
+
+install_release_lock() {
+  expected=$(release_identity)
+  if [ -f "$MANAGED_ROOT/config/release-identity" ]; then
+    [ "$(/bin/cat "$MANAGED_ROOT/config/release-identity")" = "$expected" ] || emit_error release_identity_mismatch "$EXIT_VERIFICATION"
+  else
+    printf '%s\n' "$expected" > "$MANAGED_ROOT/config/release-identity"
+    /bin/cp "$MANIFEST" "$MANAGED_ROOT/config/release-lock.json"
+    /bin/cp "$BUNDLE_DIR/operations-source-binding.json" "$MANAGED_ROOT/releases/operations-source-binding.json"
+    /bin/chmod 600 "$MANAGED_ROOT/config/release-identity" "$MANAGED_ROOT/config/release-lock.json" "$MANAGED_ROOT/releases/operations-source-binding.json"
+  fi
+  [ "$(release_identity)" = "$(/bin/cat "$MANAGED_ROOT/config/release-identity")" ] || emit_error release_identity_mismatch "$EXIT_VERIFICATION"
+  /usr/bin/cmp -s "$MANIFEST" "$MANAGED_ROOT/config/release-lock.json" || emit_error release_lock_mismatch "$EXIT_VERIFICATION"
+}
+
+filevault_classification() {
+  result=unknown
+  if [ "${DC_TEST_MODE:-0}" = 1 ] && [ -n "${DC_TEST_FILEVAULT_STATUS:-}" ]; then
+    result=$DC_TEST_FILEVAULT_STATUS
+  elif [ "$(/usr/bin/uname -s 2>/dev/null)" = Darwin ] && [ -x /usr/bin/fdesetup ]; then
+    status=$(/usr/bin/fdesetup status 2>/dev/null || true)
+    case "$status" in *'FileVault is On'*) result=enabled ;; *'FileVault is Off'*) result=off ;; *) result=unknown ;; esac
+  fi
+  case "$result" in enabled) printf '%s\n' encrypted_storage_ready ;; off) printf '%s\n' blocked ;; *) printf '%s\n' not_evaluated ;; esac
+}
+
+port_available() {
+  if /usr/sbin/lsof -nP -iTCP:"$1" -sTCP:LISTEN >/dev/null 2>&1; then
+    return 1
+  fi
+  return 0
+}
+
+docker_checks() {
+  [ "$(/usr/bin/uname -s 2>/dev/null)" = Darwin ] || return 1
+  case "$(/usr/bin/uname -m 2>/dev/null)" in arm64|x86_64) ;; *) return 1 ;; esac
+  command -v docker >/dev/null 2>&1 || return 1
+  docker compose version >/dev/null 2>&1 || return 1
+  docker info >/dev/null 2>&1 || return 1
+  docker_major=$(docker version --format '{{.Client.Version}}' 2>/dev/null | /usr/bin/awk -F. '{print $1}')
+  compose_major=$(docker compose version --short 2>/dev/null | /usr/bin/awk -F. '{print $1}')
+  case "$docker_major:$compose_major" in *[!0-9:]*|:*) return 1 ;; esac
+  [ "$docker_major" -ge 24 ] && [ "$compose_major" -ge 2 ] || return 1
+  command -v perl >/dev/null 2>&1 || return 1
+  command -v curl >/dev/null 2>&1 || return 1
+  [ -x /usr/sbin/lsof ] || return 1
+}
+
+managed_stack_running() {
+  [ -f "$MANAGED_ROOT/config/release-lock.json" ] || return 1
+  configure_compose
+  services=$(compose ps --status running --services 2>/dev/null || true)
+  printf '%s\n' "$services" | /usr/bin/grep -qx api \
+    && printf '%s\n' "$services" | /usr/bin/grep -qx worker \
+    && printf '%s\n' "$services" | /usr/bin/grep -qx studio
+}
+
+doctor_checks() {
+  docker_checks || emit_error docker_precondition_failed "$EXIT_PRECONDITION"
+  verify_bundle || emit_error distribution_verification_failed "$EXIT_VERIFICATION"
+  parent=${MANAGED_ROOT%/*}
+  [ -d "$parent" ] && [ ! -L "$parent" ] && [ -w "$parent" ] || emit_error managed_parent_unavailable "$EXIT_PRECONDITION"
+  check_existing_modes || emit_error filesystem_mode_invalid "$EXIT_VERIFICATION"
+  if ! managed_stack_running; then
+    port_available "$API_PORT" || emit_error port_conflict "$EXIT_PRECONDITION"
+    port_available "$STUDIO_PORT" || emit_error port_conflict "$EXIT_PRECONDITION"
+  fi
+}
+
+configure_compose() {
+  DC_COMPOSE_PROJECT_NAME=$PROJECT_ID
+  DC_RUNTIME_IMAGE=$(manifest_get runtime_image)
+  DC_STUDIO_IMAGE=$(manifest_get studio_image)
+  DC_RUNTIME_UID=$(/usr/bin/id -u)
+  DC_RUNTIME_GID=$(/usr/bin/id -g)
+  DC_STATE_DIR=$MANAGED_ROOT/state
+  DC_BACKUPS_DIR=$MANAGED_ROOT/backups
+  DC_RELEASE_DIR=$MANAGED_ROOT/releases
+  DC_API_PORT=$API_PORT
+  DC_STUDIO_PORT=$STUDIO_PORT
+  export DC_COMPOSE_PROJECT_NAME DC_RUNTIME_IMAGE DC_STUDIO_IMAGE DC_RUNTIME_UID DC_RUNTIME_GID
+  export DC_STATE_DIR DC_BACKUPS_DIR DC_RELEASE_DIR DC_API_PORT DC_STUDIO_PORT
+}
+
+compose() {
+  docker compose --project-directory "$BUNDLE_DIR" -f "$BUNDLE_DIR/compose.p10.yaml" "$@"
+}
+
+container_healthy() {
+  service=$1
+  container=$(compose ps -q "$service" 2>/dev/null || true)
+  [ -n "$container" ] || return 1
+  [ "$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container" 2>/dev/null)" = healthy ]
+}
+
+status_ready() {
+  configure_compose
+  container_healthy api && container_healthy worker && container_healthy studio \
+    && curl --fail --silent --show-error --max-time 2 "http://127.0.0.1:$API_PORT/health" >/dev/null 2>&1 \
+    && curl --fail --silent --show-error --max-time 2 "http://127.0.0.1:$STUDIO_PORT/" >/dev/null 2>&1
+}
+
+monotonic_now() {
+  perl -MTime::HiRes=clock_gettime,CLOCK_MONOTONIC -e 'printf "%.6f\n", clock_gettime(CLOCK_MONOTONIC)'
+}
+
+duration_between() {
+  perl -e '$a=shift; $b=shift; printf "%.3f", $b-$a' "$1" "$2"
+}
+
+wait_ready() {
+  started=$1
+  while :; do
+    if status_ready; then
+      return 0
+    fi
+    now=$(monotonic_now)
+    expired=$(perl -e '$a=shift; $b=shift; print(($b-$a)>=120 ? 1 : 0)' "$started" "$now")
+    [ "$expired" -eq 0 ] || return 1
+    /bin/sleep 1
+  done
+}
+
+verify_managed_identity() {
+  validate_root_shape || emit_error invalid_managed_root "$EXIT_PRECONDITION"
+  [ -f "$MANAGED_ROOT/config/managed-root-id" ] && [ ! -L "$MANAGED_ROOT/config/managed-root-id" ] || emit_error managed_identity_invalid "$EXIT_VERIFICATION"
+  [ "$(/bin/cat "$MANAGED_ROOT/config/managed-root-id")" = "$MANAGED_ID" ] || emit_error managed_identity_invalid "$EXIT_VERIFICATION"
+  install_release_lock
+  check_existing_modes || emit_error filesystem_mode_invalid "$EXIT_VERIFICATION"
+}
+
+operations_python() {
+  compose --profile operator run --rm --no-deps --entrypoint python operator -c \
+    'import sys; import digital_colleagues.operations.metadata as m; m.RELEASE_VERSION="0.2.0.dev0"; from digital_colleagues.operations.__main__ import main; raise SystemExit(main(sys.argv[1:]))' "$@"
+}
+
+valid_backup_name() {
+  case "$1" in ''|*/*|*'..'*|*[!A-Za-z0-9._-]*) return 1 ;; esac
+  case "$1" in *.tar.gz) return 0 ;; *) return 1 ;; esac
+}
+
+do_up() {
+  doctor_checks
+  acquire_lock
+  prepare_layout
+  install_release_lock
+  configure_compose
+  if ! compose up -d --no-build --pull never api worker studio >/dev/null 2>&1; then
+    emit_error runtime_start_failed "$EXIT_RUNTIME"
+  fi
+}
+
+case "$COMMAND" in
+  doctor)
+    doctor_checks
+    fv=$(filevault_classification)
+    if [ "$JSON_OUTPUT" -eq 1 ]; then
+      emit_ok doctor_ok "\"platform\":\"macos\",\"architecture\":\"$(/usr/bin/uname -m)\",\"filevault_readiness\":\"$fv\",\"reference_mode\":\"ready\",\"live_readiness\":\"$([ "$fv" = encrypted_storage_ready ] && printf ready || printf blocked)\""
+    else
+      message doctor_ok
+      [ "$fv" = encrypted_storage_ready ] && message filevault_ready || message filevault_blocked
+    fi
+    ;;
+  quickstart)
+    start=$(monotonic_now)
+    doctor_checks
+    acquire_lock
+    already_running=0
+    managed_stack_running && already_running=1
+    prepare_layout
+    install_release_lock
+    configure_compose
+    if ! compose up -d --no-build --pull never api worker studio >/dev/null 2>&1; then
+      [ "$already_running" -eq 1 ] || compose down --remove-orphans >/dev/null 2>&1 || true
+      emit_error runtime_start_failed "$EXIT_RUNTIME"
+    fi
+    if ! wait_ready "$start"; then
+      [ "$already_running" -eq 1 ] || compose down --remove-orphans >/dev/null 2>&1 || true
+      emit_error health_deadline_exceeded "$EXIT_RUNTIME"
+    fi
+    status_result=$("$BUNDLE_DIR/dc" --json --managed-root "$MANAGED_ROOT" --api-port "$API_PORT" --studio-port "$STUDIO_PORT" status 2>/dev/null || true)
+    printf '%s\n' "$status_result" | /usr/bin/grep -q '"ready":true' || {
+      [ "$already_running" -eq 1 ] || compose down --remove-orphans >/dev/null 2>&1 || true
+      emit_error status_verification_failed "$EXIT_RUNTIME"
+    }
+    finish=$(monotonic_now)
+    duration=$(duration_between "$start" "$finish")
+    fv=$(filevault_classification)
+    emit_ok quickstart_ok "\"ready\":true,\"duration_seconds\":$duration,\"version\":\"$DISPLAY_VERSION\",\"maturity\":\"$MATURITY\",\"schema_version_current\":7,\"filevault_readiness\":\"$fv\""
+    ;;
+  up)
+    do_up
+    emit_ok up_ok
+    ;;
+  down)
+    verify_bundle || emit_error distribution_verification_failed "$EXIT_VERIFICATION"
+    acquire_lock
+    verify_managed_identity
+    configure_compose
+    compose down --remove-orphans >/dev/null 2>&1 || emit_error runtime_stop_failed "$EXIT_RUNTIME"
+    emit_ok down_ok
+    ;;
+  status)
+    verify_bundle || emit_error distribution_verification_failed "$EXIT_VERIFICATION"
+    if [ -f "$MANAGED_ROOT/config/managed-root-id" ] && status_ready; then
+      fv=$(filevault_classification)
+      emit_ok ready "\"ready\":true,\"services\":{\"api\":\"healthy\",\"worker\":\"ready\",\"studio\":\"healthy\"},\"version\":\"$DISPLAY_VERSION\",\"python_version\":\"$PYTHON_VERSION\",\"maturity\":\"$MATURITY\",\"schema_version_current\":7,\"filevault_readiness\":\"$fv\",\"live_readiness\":\"$([ "$fv" = encrypted_storage_ready ] && printf ready || printf blocked)\""
+    else
+      if [ "$JSON_OUTPUT" -eq 1 ]; then
+        printf '{"schema_version":1,"status":"ok","category":"not_ready","ready":false,"services":{"api":"not_ready","worker":"not_ready","studio":"not_ready"},"version":"%s","maturity":"%s","schema_version_current":7}\n' "$DISPLAY_VERSION" "$MATURITY"
+      else
+        message not_ready
+      fi
+    fi
+    ;;
+  backup)
+    verify_bundle || emit_error distribution_verification_failed "$EXIT_VERIFICATION"
+    acquire_lock
+    verify_managed_identity
+    [ -f "$MANAGED_ROOT/state/state.sqlite" ] || emit_error state_not_initialized "$EXIT_PRECONDITION"
+    if [ -z "$BACKUP_NAME" ]; then
+      BACKUP_NAME=backup-$(/bin/date -u +%Y%m%dT%H%M%SZ).tar.gz
+    fi
+    valid_backup_name "$BACKUP_NAME" || emit_error backup_name_invalid "$EXIT_USAGE"
+    configure_compose
+    operations_python backup --database /state/state.sqlite --backup "/backups/$BACKUP_NAME" --source-binding /release/operations-source-binding.json --migrations /app/migrations >/dev/null 2>&1 \
+      || emit_error backup_failed "$EXIT_RUNTIME"
+    operations_python verify-backup --backup "/backups/$BACKUP_NAME" --source-binding /release/operations-source-binding.json --migrations /app/migrations >/dev/null 2>&1 \
+      || emit_error backup_verification_failed "$EXIT_RUNTIME"
+    /bin/chmod 600 "$MANAGED_ROOT/backups/$BACKUP_NAME"
+    emit_ok backup_ok "\"verified\":true"
+    ;;
+  restore)
+    verify_bundle || emit_error distribution_verification_failed "$EXIT_VERIFICATION"
+    [ "$CONFIRMATION" = RESTORE-P10-STATE ] || emit_error confirmation_required "$EXIT_CONFIRMATION"
+    valid_backup_name "$BACKUP_NAME" || emit_error backup_name_invalid "$EXIT_USAGE"
+    acquire_lock
+    verify_managed_identity
+    configure_compose
+    managed_stack_running && emit_error services_must_be_stopped "$EXIT_PRECONDITION"
+    [ -f "$MANAGED_ROOT/backups/$BACKUP_NAME" ] && [ ! -L "$MANAGED_ROOT/backups/$BACKUP_NAME" ] || emit_error backup_not_found "$EXIT_PRECONDITION"
+    rollback=pre-restore-$(/bin/date -u +%Y%m%dT%H%M%SZ).tar.gz
+    operations_python restore --backup "/backups/$BACKUP_NAME" --database /state/state.sqlite --backup-source-binding /release/operations-source-binding.json --current-source-binding /release/operations-source-binding.json --migrations /app/migrations --replace --offline-confirmed --rollback-backup "/backups/$rollback" >/dev/null 2>&1 \
+      || emit_error restore_failed "$EXIT_RUNTIME"
+    /bin/chmod 600 "$MANAGED_ROOT/state/state.sqlite" "$MANAGED_ROOT/backups/$rollback"
+    emit_ok restore_ok "\"rollback_backup_verified\":true"
+    ;;
+  update)
+    verify_bundle || emit_error distribution_verification_failed "$EXIT_VERIFICATION"
+    [ "$(manifest_get remote_distribution_gate)" = passed ] || emit_error remote_distribution_authorization_required "$EXIT_AUTHORIZATION"
+    emit_error remote_distribution_authorization_required "$EXIT_AUTHORIZATION"
+    ;;
+  uninstall)
+    verify_bundle || emit_error distribution_verification_failed "$EXIT_VERIFICATION"
+    acquire_lock
+    verify_managed_identity
+    configure_compose
+    compose down --remove-orphans >/dev/null 2>&1 || emit_error runtime_stop_failed "$EXIT_RUNTIME"
+    if [ "$PURGE_DATA" -eq 0 ]; then
+      [ -d "$MANAGED_ROOT/cache" ] && /usr/bin/find "$MANAGED_ROOT/cache" -mindepth 1 -depth -delete 2>/dev/null || true
+      emit_ok uninstall_ok
+      exit 0
+    fi
+    [ "$CONFIRMATION" = DELETE-P10-DATA ] || emit_error confirmation_required "$EXIT_CONFIRMATION"
+    valid_backup_name "$VERIFIED_BACKUP" || emit_error backup_name_invalid "$EXIT_USAGE"
+    [ -f "$MANAGED_ROOT/backups/$VERIFIED_BACKUP" ] && [ ! -L "$MANAGED_ROOT/backups/$VERIFIED_BACKUP" ] || emit_error verified_backup_required "$EXIT_CONFIRMATION"
+    operations_python verify-backup --backup "/backups/$VERIFIED_BACKUP" --source-binding /release/operations-source-binding.json --migrations /app/migrations >/dev/null 2>&1 \
+      || emit_error verified_backup_required "$EXIT_CONFIRMATION"
+    validate_root_shape || emit_error invalid_managed_root "$EXIT_PRECONDITION"
+    [ "$(/bin/cat "$MANAGED_ROOT/config/managed-root-id")" = "$MANAGED_ID" ] || emit_error managed_identity_invalid "$EXIT_VERIFICATION"
+    /usr/bin/find "$MANAGED_ROOT" -mindepth 1 -depth -delete 2>/dev/null || emit_error purge_failed "$EXIT_RUNTIME"
+    /bin/rmdir "$MANAGED_ROOT" 2>/dev/null || emit_error purge_failed "$EXIT_RUNTIME"
+    emit_ok purge_ok
+    ;;
+esac
