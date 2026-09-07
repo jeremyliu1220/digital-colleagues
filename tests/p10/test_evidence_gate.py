@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import copy
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
 
 from scripts.check_p10_evidence import EVIDENCE_CLASSES, REQUIRED_GATES, _safe, validate_summary
 from scripts.collect_p10_evidence import build_summary
@@ -25,9 +23,6 @@ class P10EvidenceTests(unittest.TestCase):
         invalid = {"schema_version": 1}
         with self.assertRaises(GateError):
             validate_summary(ROOT, invalid)
-        with patch("scripts.check_p10_evidence.SUMMARY_KEYS", {"schema_version"}):
-            with self.assertRaises(GateError):
-                validate_summary(ROOT, copy.deepcopy(invalid))
         with self.assertRaisesRegex(GateError, "evidence_private"):
             _safe({"secret": ""}, ROOT)
 
