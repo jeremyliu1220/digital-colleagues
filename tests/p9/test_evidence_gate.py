@@ -103,6 +103,27 @@ def _implementation_candidate(directory: Path) -> Path:
     return root
 
 
+def _local_main_exists(root: Path) -> bool:
+    completed = subprocess.run(
+        ["git", "show-ref", "--verify", "--quiet", "refs/heads/main"],
+        cwd=root,
+        check=False,
+    )
+    if completed.returncode not in (0, 1):
+        raise subprocess.CalledProcessError(completed.returncode, completed.args)
+    return completed.returncode == 0
+
+
+def _switch_fixture_to_main(root: Path) -> None:
+    current_branch = subprocess.check_output(
+        ["git", "branch", "--show-current"], cwd=root, text=True
+    ).strip()
+    if current_branch == "main":
+        return
+    subprocess.run(["git", "branch", "--force", "main", "HEAD"], cwd=root, check=True)
+    subprocess.run(["git", "switch", "--quiet", "main"], cwd=root, check=True)
+
+
 def _commit_final_summary(root: Path) -> str:
     repository = check_repository(root)
     self_contained_repository = dict(repository)
@@ -217,15 +238,64 @@ class P9EvidenceTests(unittest.TestCase):
         self,
     ) -> None:
         with tempfile.TemporaryDirectory(prefix="digital-colleagues-p9-final-healthy-") as name:
-            root = _implementation_candidate(Path(name))
-            self.assertFalse((root / "artifacts/p9/summary.json").exists())
-            self.assertEqual(check_repository(root)["candidate_phase"], "implementation")
-            _commit_final_summary(root)
-            self.assertEqual(check_repository(root)["candidate_phase"], "final_evidence")
-            subprocess.run(["git", "switch", "--quiet", "-c", "main"], cwd=root, check=True)
-            merged = check_repository(root)
-            self.assertEqual(merged["candidate_phase"], "final_evidence")
-            self.assertEqual(merged["branch"], "main")
+            temporary = Path(name)
+            for scenario in (
+                "local_main_absent",
+                "local_main_exists",
+                "already_on_local_main",
+            ):
+                with self.subTest(scenario=scenario):
+                    root = _implementation_candidate(temporary / scenario)
+                    self.assertFalse((root / "artifacts/p9/summary.json").exists())
+                    self.assertEqual(check_repository(root)["candidate_phase"], "implementation")
+                    _commit_final_summary(root)
+                    self.assertEqual(check_repository(root)["candidate_phase"], "final_evidence")
+                    subprocess.run(
+                        ["git", "switch", "--quiet", "--detach", "HEAD"],
+                        cwd=root,
+                        check=True,
+                    )
+
+                    if scenario == "local_main_absent":
+                        if _local_main_exists(root):
+                            subprocess.run(
+                                ["git", "branch", "--delete", "--force", "main"],
+                                cwd=root,
+                                check=True,
+                            )
+                        self.assertFalse(_local_main_exists(root))
+                    elif scenario == "local_main_exists":
+                        subprocess.run(
+                            ["git", "branch", "--force", "main", "HEAD^"],
+                            cwd=root,
+                            check=True,
+                        )
+                        self.assertTrue(_local_main_exists(root))
+                    else:
+                        subprocess.run(
+                            ["git", "branch", "--force", "main", "HEAD"],
+                            cwd=root,
+                            check=True,
+                        )
+                        subprocess.run(
+                            ["git", "switch", "--quiet", "main"],
+                            cwd=root,
+                            check=True,
+                        )
+
+                    final_commit = subprocess.check_output(
+                        ["git", "rev-parse", "HEAD"], cwd=root, text=True
+                    ).strip()
+                    _switch_fixture_to_main(root)
+                    self.assertEqual(
+                        subprocess.check_output(
+                            ["git", "rev-parse", "main"], cwd=root, text=True
+                        ).strip(),
+                        final_commit,
+                    )
+                    merged = check_repository(root)
+                    self.assertEqual(merged["candidate_phase"], "final_evidence")
+                    self.assertEqual(merged["branch"], "main")
 
     def test_final_gate_rejects_claim_status_and_live_promotion(self) -> None:
         cases: list[tuple[str, Callable[[dict[str, Any]], None]]] = [
