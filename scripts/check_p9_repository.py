@@ -5,14 +5,17 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
+import re
 import stat
 import subprocess
 import sys
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
-from typing import cast
+from typing import Any, cast
 
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -23,6 +26,95 @@ ACCEPTANCE_COMMIT = "597403bc151da75499acea5bb00ee298e7e5a005"
 BRANCH = "codex/p9-productization-rebaseline"
 ACCEPTANCE_PATH = "docs/p9/acceptance.md"
 SUMMARY_PATH = "artifacts/p9/summary.json"
+
+SUMMARY_KEYS = frozenset(
+    {
+        "schema_version",
+        "milestone",
+        "status",
+        "claim",
+        "fixed_base",
+        "merge_base",
+        "acceptance_commit",
+        "development_branch",
+        "implementation_commit",
+        "tree_digest",
+        "generated_at",
+        "verified_gates",
+        "unittest",
+        "repository",
+        "provenance",
+        "rebaseline",
+        "evidence_classes",
+        "claim_exclusions",
+        "migrations",
+    }
+)
+CLAIM_EXCLUSIONS = [
+    "product_or_runtime_implementation",
+    "agent_package_or_multi_agent_runtime",
+    "openai_or_microsoft_365_compatibility",
+    "live_provider_acceptance",
+    "human_evaluation",
+    "formal_release_or_publication",
+    "production_readiness",
+    "production_security_or_privacy",
+    "high_availability",
+    "enterprise_iam_or_tenancy",
+    "compliance_certification",
+    "p10_through_p15_development",
+]
+EVIDENCE_CLASSES = {
+    "documentation_and_governance": "static",
+    "mechanical_regression": "synthetic_offline",
+    "openai_live": "not_evaluated",
+    "microsoft_365_live": "not_evaluated",
+    "human_evaluation": "not_evaluated",
+}
+VERIFIED_GATES = [
+    "git_diff_check",
+    "p9_provenance",
+    "p9_rebaseline",
+    "p9_repository",
+    "p9_unittest",
+    "public_boundary",
+    "python_lock_install",
+    "retained_p8_toolchain",
+]
+UNITTEST_KEYS = frozenset(
+    {
+        "tests_run",
+        "failures",
+        "errors",
+        "skipped",
+        "expected_failures",
+        "unexpected_successes",
+        "gate_passed",
+        "test_ids",
+        "fault_boundaries",
+    }
+)
+REQUIRED_FINAL_EVIDENCE_TESTS = frozenset(
+    {
+        "tests.p9.test_evidence_gate.P9EvidenceTests.test_final_gate_accepts_healthy_evidence_and_implementation_without_summary",
+        "tests.p9.test_evidence_gate.P9EvidenceTests.test_final_gate_rejects_claim_status_and_live_promotion",
+        "tests.p9.test_evidence_gate.P9EvidenceTests.test_final_gate_rejects_wrong_commit_digest_and_identity_metadata",
+        "tests.p9.test_evidence_gate.P9EvidenceTests.test_final_gate_rejects_unknown_fields_and_unsafe_material",
+        "tests.p9.test_evidence_gate.P9EvidenceTests.test_final_gate_rejects_mixed_or_nonfinal_evidence_commit",
+        "tests.p9.test_evidence_gate.P9EvidenceTests.test_final_gate_rejects_embedded_gate_and_unittest_mutation",
+    }
+)
+EXPECTED_FAULT_BOUNDARIES = [
+    "p9_capability_confusion_refusal",
+    "p9_evidence_fail_closed",
+    "p9_exact_candidate",
+    "p9_live_prerequisites",
+    "p9_product_runtime_refusal",
+    "p9_repository_bypass_refusal",
+]
+COMMIT_PATTERN = re.compile(r"^[0-9a-f]{40}$")
+DIGEST_PATTERN = re.compile(r"^sha256:[0-9a-f]{64}$")
+UTC_TIMESTAMP_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$")
 
 P9_ALLOWED_PATHS = frozenset(
     {
@@ -363,6 +455,264 @@ def _residue(root: Path) -> tuple[str, ...]:
     return tuple(sorted(set(found)))
 
 
+def _unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    value: dict[str, Any] = {}
+    for key, child in pairs:
+        if key in value:
+            raise RepositoryError("P9 evidence summary contains a duplicate field")
+        value[key] = child
+    return value
+
+
+def _reject_json_constant(_value: str) -> None:
+    raise RepositoryError("P9 evidence summary contains a non-finite number")
+
+
+def _strict_equal(actual: object, expected: object) -> bool:
+    if type(actual) is not type(expected):
+        return False
+    if isinstance(expected, dict):
+        assert isinstance(actual, dict)
+        return set(actual) == set(expected) and all(
+            _strict_equal(actual[key], child) for key, child in expected.items()
+        )
+    if isinstance(expected, list):
+        assert isinstance(actual, list)
+        return len(actual) == len(expected) and all(
+            _strict_equal(actual_child, expected_child)
+            for actual_child, expected_child in zip(actual, expected, strict=True)
+        )
+    return actual == expected
+
+
+def _require_exact(actual: object, expected: object, label: str) -> None:
+    if not _strict_equal(actual, expected):
+        raise RepositoryError(f"P9 evidence summary {label} is invalid")
+
+
+def _assert_summary_safe(value: object, *, root: Path) -> None:
+    if isinstance(value, dict):
+        forbidden_keys = {
+            "account_id",
+            "api_key",
+            "client_secret",
+            "cookie",
+            "credential",
+            "live_receipt",
+            "password",
+            "private_payload",
+            "provider_id",
+            "refresh_token",
+            "session_credential",
+            "tenant_id",
+            "token",
+        }
+        for key, child in value.items():
+            if key.lower() in forbidden_keys:
+                raise RepositoryError("P9 evidence summary contains a private field")
+            _assert_summary_safe(child, root=root)
+        return
+    if isinstance(value, list):
+        for child in value:
+            _assert_summary_safe(child, root=root)
+        return
+    if not isinstance(value, str):
+        return
+
+    forbidden_literals = (
+        str(root),
+        str(Path.home()),
+        "/.codex/attachments/",
+        "PRIVATE_LIVE_RECEIPT",
+    )
+    if any(marker and marker.lower() in value.lower() for marker in forbidden_literals):
+        raise RepositoryError("P9 evidence summary contains local or private material")
+    if re.search(r"/(?:Users|home)/[^\s`]+", value):
+        raise RepositoryError("P9 evidence summary contains a local absolute path")
+    if re.search(r"[A-Za-z]:\\(?:Users|Documents and Settings)\\[^\s`]+", value, re.I):
+        raise RepositoryError("P9 evidence summary contains a local absolute path")
+    if re.search(
+        r"(?:sk-[A-Za-z0-9_-]{12,}|Bearer\s+[A-Za-z0-9._=-]{12,}|"
+        r"(?:tenant|client|account|provider)[_-]?id\s*[:=]\s*[A-Za-z0-9._=-]{8,}|"
+        r"(?:token|secret|password|credential)\s*[:=]\s*\S{8,})",
+        value,
+        re.I,
+    ):
+        raise RepositoryError("P9 evidence summary contains credential or live-identifier material")
+
+
+def _public_tree_digest(root: Path, excluded: Path) -> str:
+    aggregate = hashlib.sha256()
+    documents = sorted(
+        path
+        for path in root.rglob("*")
+        if path.is_file()
+        and path != excluded
+        and ".git" not in path.relative_to(root).parts
+        and not any(part in FORBIDDEN_RESIDUE_PARTS for part in path.relative_to(root).parts)
+    )
+    for document in documents:
+        relative = document.relative_to(root).as_posix().encode()
+        digest = hashlib.sha256(document.read_bytes()).digest()
+        for value in (relative, digest):
+            aggregate.update(len(value).to_bytes(8, "big"))
+            aggregate.update(value)
+    return "sha256:" + aggregate.hexdigest()
+
+
+def _read_summary(root: Path, head: str) -> dict[str, Any]:
+    path = root / SUMMARY_PATH
+    try:
+        if path.stat().st_size > 1_000_000:
+            raise RepositoryError("P9 evidence summary is unbounded")
+        summary_bytes = path.read_bytes()
+        committed = _run_git(root, "show", f"{head}:{SUMMARY_PATH}", text=False)
+        assert isinstance(committed, bytes)
+        if summary_bytes != committed:
+            raise RepositoryError("P9 evidence summary differs from the committed artifact")
+        decoded = summary_bytes.decode("utf-8")
+        value = json.loads(
+            decoded,
+            object_pairs_hook=_unique_json_object,
+            parse_constant=_reject_json_constant,
+        )
+    except RepositoryError:
+        raise
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise RepositoryError("P9 evidence summary is unreadable") from exc
+    if type(value) is not dict:
+        raise RepositoryError("P9 evidence summary must be a JSON object")
+    return value
+
+
+def _verify_unittest_summary(value: object) -> None:
+    if type(value) is not dict or set(value) != UNITTEST_KEYS:
+        raise RepositoryError("P9 evidence unittest result shape is invalid")
+    assert isinstance(value, dict)
+    count_fields = (
+        "tests_run",
+        "failures",
+        "errors",
+        "skipped",
+        "expected_failures",
+        "unexpected_successes",
+    )
+    if any(type(value[key]) is not int for key in count_fields):
+        raise RepositoryError("P9 evidence unittest counts have invalid types")
+    if (
+        value["tests_run"] < 1
+        or value["gate_passed"] is not True
+        or any(value[key] != 0 for key in count_fields[1:])
+    ):
+        raise RepositoryError("P9 evidence unittest result is not a clean positive run")
+    test_ids = value["test_ids"]
+    if (
+        type(test_ids) is not list
+        or len(test_ids) != value["tests_run"]
+        or any(
+            type(test_id) is not str or not test_id.startswith("tests.p9.") for test_id in test_ids
+        )
+        or len(set(test_ids)) != len(test_ids)
+        or test_ids != sorted(test_ids)
+        or not REQUIRED_FINAL_EVIDENCE_TESTS.issubset(test_ids)
+    ):
+        raise RepositoryError("P9 evidence unittest identities are invalid")
+    _require_exact(value["fault_boundaries"], EXPECTED_FAULT_BOUNDARIES, "fault boundaries")
+
+
+def _verify_final_evidence(root: Path, repository_result: dict[str, object]) -> None:
+    head = repository_result["head_commit"]
+    assert isinstance(head, str)
+    summary = _read_summary(root, head)
+    _assert_summary_safe(summary, root=root)
+    if set(summary) != SUMMARY_KEYS:
+        raise RepositoryError("P9 evidence summary has missing or extra fields")
+
+    fixed_values: dict[str, object] = {
+        "schema_version": 1,
+        "milestone": "P9",
+        "status": "development_complete_awaiting_independent_acceptance",
+        "claim": "p9_productization_rebaseline_candidate",
+        "fixed_base": BASE_COMMIT,
+        "merge_base": BASE_COMMIT,
+        "acceptance_commit": ACCEPTANCE_COMMIT,
+        "development_branch": BRANCH,
+        "verified_gates": VERIFIED_GATES,
+        "evidence_classes": EVIDENCE_CLASSES,
+        "claim_exclusions": CLAIM_EXCLUSIONS,
+        "migrations": {
+            "immutable_versions": [1, 2, 3, 4, 5, 6, 7],
+            "migration_008": "absent",
+        },
+    }
+    for key, expected in fixed_values.items():
+        _require_exact(summary[key], expected, key)
+
+    generated_at = summary["generated_at"]
+    if type(generated_at) is not str or not UTC_TIMESTAMP_PATTERN.fullmatch(generated_at):
+        raise RepositoryError("P9 evidence summary generated_at is invalid")
+    try:
+        if datetime.fromisoformat(generated_at.removesuffix("Z") + "+00:00").tzinfo != UTC:
+            raise ValueError
+    except ValueError as exc:
+        raise RepositoryError("P9 evidence summary generated_at is invalid") from exc
+
+    implementation_commit = summary["implementation_commit"]
+    parents = str(_run_git(root, "rev-list", "--parents", "-n", "1", head)).split()
+    if (
+        type(implementation_commit) is not str
+        or not COMMIT_PATTERN.fullmatch(implementation_commit)
+        or len(parents) != 2
+        or parents[0] != head
+        or parents[1] != implementation_commit
+        or implementation_commit in {BASE_COMMIT, ACCEPTANCE_COMMIT}
+        or not _is_ancestor(root, BASE_COMMIT, implementation_commit)
+        or not _is_ancestor(root, ACCEPTANCE_COMMIT, implementation_commit)
+    ):
+        raise RepositoryError("P9 implementation commit is not the evidence commit's direct parent")
+    evidence_delta = _diff(root, implementation_commit, head)
+    if (
+        len(evidence_delta) != 1
+        or evidence_delta[0].status != "A"
+        or evidence_delta[0].paths != (SUMMARY_PATH,)
+    ):
+        raise RepositoryError("the last P9 evidence commit must add only the summary")
+
+    tree_digest = summary["tree_digest"]
+    if type(tree_digest) is not str or not DIGEST_PATTERN.fullmatch(tree_digest):
+        raise RepositoryError("P9 evidence summary tree_digest is invalid")
+    recomputed_digest = _public_tree_digest(root, root / SUMMARY_PATH)
+    if tree_digest != recomputed_digest:
+        raise RepositoryError("P9 evidence summary tree_digest does not match the public tree")
+
+    expected_repository = dict(repository_result)
+    expected_repository.update(
+        {
+            "candidate_phase": "implementation",
+            "branch": BRANCH,
+            "head_commit": implementation_commit,
+            "changed_path_count": len(IMPLEMENTATION_PATHS),
+            "allowed_path_count": len(IMPLEMENTATION_PATHS),
+            "staged_change_path_count": 0,
+            "unstaged_change_path_count": 0,
+            "untracked_path_count": 0,
+        }
+    )
+    _require_exact(summary["repository"], expected_repository, "repository result")
+
+    from scripts.check_p9_provenance import ProvenanceError, check_provenance
+    from scripts.check_p9_rebaseline import RebaselineError, check_rebaseline
+
+    try:
+        expected_provenance = check_provenance(root)
+        expected_rebaseline = check_rebaseline(root)
+    except (ProvenanceError, RebaselineError) as exc:
+        raise RepositoryError("a fixed P9 gate failed during evidence validation") from exc
+    _require_exact(summary["provenance"], expected_provenance, "provenance result")
+    _require_exact(summary["rebaseline"], expected_rebaseline, "rebaseline result")
+    _verify_unittest_summary(summary["unittest"])
+
+
 def check_repository(root: Path, *, require_clean: bool = True) -> dict[str, object]:
     root = root.resolve()
     top = _run_git(root, "rev-parse", "--show-toplevel")
@@ -422,7 +772,7 @@ def check_repository(root: Path, *, require_clean: bool = True) -> dict[str, obj
     if residue:
         raise RepositoryError("repository contains runtime, credential, cache, or build residue")
 
-    return {
+    result: dict[str, object] = {
         "schema_version": 1,
         "gate": "p9_repository_clean",
         "candidate_phase": candidate_phase,
@@ -446,6 +796,9 @@ def check_repository(root: Path, *, require_clean: bool = True) -> dict[str, obj
         "untracked_path_count": len(untracked),
         "cleanup_residue_count": 0,
     }
+    if candidate_phase == "final_evidence":
+        _verify_final_evidence(root, result)
+    return result
 
 
 def main(argv: list[str] | None = None) -> int:
