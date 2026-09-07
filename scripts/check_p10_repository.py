@@ -193,6 +193,10 @@ def check_repository(root: Path) -> dict[str, object]:
         if any(part in FORBIDDEN_RESIDUE for part in relative_dir.parts):
             raise GateError("cleanup_residue_present")
         for name in files:
+            candidate = Path(directory) / name
+            candidate_mode = os.lstat(candidate).st_mode
+            if not stat.S_ISREG(candidate_mode) or os.lstat(candidate).st_nlink != 1:
+                raise GateError("special_symlink_or_hardlink_present")
             if name.endswith(FORBIDDEN_SUFFIXES):
                 raise GateError("cleanup_residue_present")
     product_diff = str(
