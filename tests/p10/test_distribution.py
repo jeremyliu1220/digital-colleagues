@@ -200,9 +200,7 @@ class P10DistributionTests(unittest.TestCase):
             text=True,
             check=True,
         ).stdout
-        validate_activation_workflow(
-            historical, "05e73ea23ac650edfae59fa409a770fdf967af3a"
-        )
+        validate_activation_workflow(historical, "05e73ea23ac650edfae59fa409a770fdf967af3a")
         with self.assertRaises(GateError):
             validate_activation_workflow(
                 historical.replace("packages: write", "packages: read"),

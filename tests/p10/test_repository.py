@@ -80,9 +80,7 @@ class P10RepositoryTests(unittest.TestCase):
                 encoding="utf-8",
             )
             commit_all(root, "negative non-contract path drift")
-            with self.assertRaisesRegex(
-                GateError, "changed_path_set_invalid_missing_1_extra_1"
-            ):
+            with self.assertRaisesRegex(GateError, "changed_path_set_invalid_missing_1_extra_1"):
                 check_repository(root)
 
     def test_acceptance_history_migration_allowlist_and_p11_drift_fail(self) -> None:
