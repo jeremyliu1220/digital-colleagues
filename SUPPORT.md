@@ -14,4 +14,6 @@ live-provider evidence. Security concerns follow `SECURITY.md`.
 For a downloaded Mac candidate, start with `./dc doctor --json`. Share only its finite
 category/version/readiness fields. Never share Application Support content, a database,
 backup, release lock, Docker inspection output, credential, local path, user/host name, or
-container identifier. There is no authorized GHCR download or update channel at P10.
+container identifier. Only exact-digest GHCR references recorded by the P10 verification
+policy are eligible for the separately gated quickstart; no mutable or update channel is
+supported.

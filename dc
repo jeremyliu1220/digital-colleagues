@@ -275,10 +275,14 @@ verify_bundle() {
   [ "$(manifest_get platforms.0)" = linux/amd64 ] || return 1
   [ "$(manifest_get platforms.1)" = linux/arm64 ] || return 1
   [ "$(manifest_get migration_008)" = absent ] || return 1
-  [ "$(manifest_get ghcr_publication)" = not_evaluated ] || return 1
-  [ "$(manifest_get registry_image_signature)" = not_evaluated ] || return 1
-  [ "$(manifest_get registry_attestation)" = not_evaluated ] || return 1
-  [ "$(manifest_get remote_distribution_gate)" = authorization_required ] || return 1
+  remote_lifecycle=$(manifest_get remote_distribution_gate) || return 1
+  case "$remote_lifecycle" in
+    authorized_pending|published_pending_verification|passed) ;;
+    *) return 1 ;;
+  esac
+  for remote_result in ghcr_publication registry_image_signature registry_attestation; do
+    [ "$(manifest_get "$remote_result")" = "$remote_lifecycle" ] || return 1
+  done
   manifest_get source_revision | /usr/bin/grep -Eq '^[0-9a-f]{40}$' || return 1
   runtime_ref=$(manifest_get runtime_image) || return 1
   studio_ref=$(manifest_get studio_image) || return 1

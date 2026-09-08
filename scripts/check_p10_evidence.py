@@ -36,13 +36,13 @@ from scripts.p10_gate_support import (
 EVIDENCE_CLASSES = [
     "local_mac_runtime",
     "local_oci",
-    "not_evaluated",
+    "remote_registry",
     "static",
     "synthetic_offline",
 ]
 CLAIM = "p10_mac_quickstart_distribution_candidate"
-STATUS = "implementation_candidate_complete_authorized_remote_distribution_gate_pending_independent_acceptance"
-REQUIRED_GATES = {
+STATUS = "remote_distribution_candidate_ready_for_independent_acceptance"
+LOCAL_REQUIRED_GATES = {
     "retained_p9_toolchain",
     "p10_repository",
     "p10_provenance",
@@ -67,6 +67,7 @@ REQUIRED_GATES = {
     "public_boundary",
     "git_diff_check",
 }
+REQUIRED_GATES = LOCAL_REQUIRED_GATES | {"p10_remote_distribution"}
 SUMMARY_KEYS = {
     "schema_version",
     "milestone",
@@ -77,6 +78,7 @@ SUMMARY_KEYS = {
     "acceptance_commit",
     "development_branch",
     "implementation_commit",
+    "published_source_revision",
     "tree_digest",
     "generated_at",
     "product",
@@ -96,6 +98,8 @@ SUMMARY_KEYS = {
     "reproducibility",
     "compose_runtime",
     "quickstart",
+    "remote_distribution",
+    "remote_quickstart",
     "evidence",
     "aggregate",
     "evidence_classes",
@@ -152,6 +156,7 @@ def validate_summary(root: Path, summary: dict[str, Any]) -> dict[str, object]:
         "acceptance_commit": ACCEPTANCE_COMMIT,
         "development_branch": BRANCH,
         "implementation_commit": implementation,
+        "published_source_revision": summary["distribution"]["published_source_revision"],
         "tree_digest": tree_digest(root, IMPLEMENTATION_PATHS),
         "changed_path_count": len(P10_ALLOWED_PATHS),
         "historical_drift_count": 0,
@@ -201,6 +206,25 @@ def validate_summary(root: Path, summary: dict[str, Any]) -> dict[str, object]:
         "median_seconds"
     ) != statistics.median(durations):
         raise GateError("evidence_quickstart_statistics_invalid")
+    remote_quickstart = summary["remote_quickstart"]
+    remote_durations = (
+        remote_quickstart.get("durations_seconds") if isinstance(remote_quickstart, dict) else None
+    )
+    if (
+        not isinstance(remote_durations, list)
+        or len(remote_durations) != 3
+        or any(
+            type(value) not in {int, float} or value <= 0 or value >= 60
+            for value in remote_durations
+        )
+        or remote_quickstart.get("maximum_seconds") != max(remote_durations)
+        or remote_quickstart.get("median_seconds") != statistics.median(remote_durations)
+        or remote_quickstart.get("all_below_60_seconds") is not True
+        or remote_quickstart.get("remote_ghcr_pull_path") != "passed"
+        or remote_quickstart.get("docker_residue_check_count") != 6
+        or remote_quickstart.get("port_availability_check_count") != 12
+    ):
+        raise GateError("evidence_remote_quickstart_invalid")
     compose_runtime = summary["compose_runtime"]
     if (
         quickstart.get("external_egress_probe_count") != 3
@@ -218,6 +242,16 @@ def validate_summary(root: Path, summary: dict[str, Any]) -> dict[str, object]:
         summary[key] != value for key, value in REMOTE_STATES.items()
     ):
         raise GateError("evidence_remote_boundary_invalid")
+    remote_distribution = summary["remote_distribution"]
+    if (
+        not isinstance(remote_distribution, dict)
+        or remote_distribution.get("remote_distribution_gate") != "passed"
+        or remote_distribution.get("published_source_revision")
+        != summary["published_source_revision"]
+        or remote_distribution.get("anonymous_pull") != "passed"
+        or remote_distribution.get("public_visibility") != "passed"
+    ):
+        raise GateError("evidence_remote_distribution_invalid")
     aggregate = summary["aggregate"]
     if (
         not isinstance(aggregate, dict)
@@ -245,7 +279,7 @@ def validate_summary(root: Path, summary: dict[str, Any]) -> dict[str, object]:
         "implementation_commit": implementation,
         "trial_count": 3,
         "private_material_count": 0,
-        "remote_distribution_gate": "authorization_required",
+        "remote_distribution_gate": "passed",
     }
 
 

@@ -64,9 +64,10 @@ be revalidated through existing governance controls.
 
 ## Update and uninstall
 
-`./dc update` currently returns `remote_distribution_authorization_required`. It does not
-download, switch, or apply a release because no authorized GHCR subject/signature/
-attestation policy exists.
+`./dc update` still returns `remote_distribution_authorization_required`. The remote gate
+authorizes one publication and verification cycle, not an update protocol or mutable
+channel. A locked `passed` policy therefore permits verified quickstart consumption but
+does not silently authorize download/switch/database-update behavior.
 
 `./dc uninstall` stops only the managed project and clears rebuildable cache, preserving
 state, secrets, backups, and release identity. Private data deletion requires all of:

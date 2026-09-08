@@ -156,6 +156,13 @@ def build_bundle(
     _require_output(output)
     timestamp = _source_timestamp(root, revision)
     migration_digest = "sha256:" + _sha256(root / "migrations/manifest.json")
+    policy = json.loads(
+        (root / "distribution/p10/verification-policy.json").read_text(encoding="utf-8")
+    )
+    from scripts.check_p10_distribution import validate_remote_policy
+    from scripts.p10_gate_support import REMOTE_RESULT_KEYS
+
+    lifecycle = validate_remote_policy(policy)
     manifest = {
         "schema_version": 1,
         "distribution_format": "digital-colleagues-p10-bundle-v1",
@@ -171,10 +178,7 @@ def build_bundle(
         "platforms": list(PLATFORMS),
         "schema_versions": list(range(1, 8)),
         "migration_008": "absent",
-        "ghcr_publication": "not_evaluated",
-        "registry_image_signature": "not_evaluated",
-        "registry_attestation": "not_evaluated",
-        "remote_distribution_gate": "authorization_required",
+        **{key: lifecycle for key in REMOTE_RESULT_KEYS},
     }
     operation_binding = {
         "schema_version": 1,
@@ -184,7 +188,11 @@ def build_bundle(
         "migration_manifest_digest": migration_digest,
         "artifacts": {},
         "build_inputs": {"runtime_image": runtime_image, "studio_image": studio_image},
-        "evidence_classes": ["local_oci", "synthetic_offline"],
+        "evidence_classes": [
+            "local_oci",
+            "synthetic_offline",
+            *(["remote_registry"] if lifecycle == "passed" else []),
+        ],
         "claim_exclusions": [
             "remote_distribution",
             "registry_signature_or_attestation",

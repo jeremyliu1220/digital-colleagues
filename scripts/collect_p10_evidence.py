@@ -36,8 +36,7 @@ from scripts.p10_gate_support import (
 )
 
 CLAIM_EXCLUSIONS = [
-    "public_release_or_download",
-    "remote_registry_signature_or_attestation",
+    "formal_release",
     "openai_or_microsoft_365_live_compatibility",
     "first_agent_timing",
     "human_acceptance",
@@ -78,6 +77,8 @@ def build_summary(
         raise GateError("evidence_unittest_incomplete")
     quickstart = results["quickstart"]
     compose_runtime = results["compose_runtime"]
+    remote_distribution = results["remote_distribution"]
+    remote_quickstart = results["remote_quickstart"]
     if (
         quickstart.get("trial_count") != 3
         or quickstart.get("all_below_300_seconds") is not True
@@ -89,8 +90,19 @@ def build_summary(
         or compose_runtime.get("external_egress_control_count") != 1
         or compose_runtime.get("internal_network_verified") is not True
         or compose_runtime.get("unexpected_external_egress_count") != 0
+        or remote_distribution.get("remote_distribution_gate") != "passed"
+        or remote_distribution.get("anonymous_pull") != "passed"
+        or remote_distribution.get("public_visibility") != "passed"
+        or remote_quickstart.get("trial_count") != 3
+        or remote_quickstart.get("all_below_60_seconds") is not True
+        or remote_quickstart.get("remote_ghcr_pull_path") != "passed"
+        or remote_quickstart.get("docker_residue_check_count") != 6
+        or remote_quickstart.get("port_availability_check_count") != 12
     ):
         raise GateError("evidence_quickstart_incomplete")
+    published_source_revision = remote_distribution.get("published_source_revision")
+    if not isinstance(published_source_revision, str):
+        raise GateError("evidence_published_source_revision_missing")
     summary: dict[str, Any] = {
         "schema_version": 1,
         "milestone": "P10",
@@ -101,6 +113,7 @@ def build_summary(
         "acceptance_commit": ACCEPTANCE_COMMIT,
         "development_branch": BRANCH,
         "implementation_commit": implementation,
+        "published_source_revision": published_source_revision,
         "tree_digest": tree_digest(root, IMPLEMENTATION_PATHS),
         "generated_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         "product": {
@@ -130,6 +143,8 @@ def build_summary(
         "reproducibility": results["reproducibility"],
         "compose_runtime": results["compose_runtime"],
         "quickstart": quickstart,
+        "remote_distribution": remote_distribution,
+        "remote_quickstart": remote_quickstart,
         "evidence": results["evidence"],
         "aggregate": {
             "gate": "p10_aggregate_clean",

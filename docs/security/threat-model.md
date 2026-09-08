@@ -143,6 +143,15 @@ output, and synthetic attestation promotion. The launcher uses exact release/roo
 identities, digest-only images, a bounded lock, finite output/errors, and no `eval` or
 manifest sourcing. FileVault is read-only readiness evidence, not encryption enforcement.
 
-The local OCI and Mac runtime gates do not prove registry integrity, signature,
-attestation, distribution availability, production supply-chain security, host security,
-or production readiness. Those remote results remain not evaluated.
+The separately authorized remote gate adds exact repository/ref/SHA dispatch guards,
+publish-job-only package/OIDC/attestation writes, immutable action pins, digest-only image
+selection, exact two-platform indexes, keyless signer/issuer/annotation verification,
+GitHub provenance verification, public visibility, anonymous pulls, and final workflow
+deactivation. Wrong identity, ref, revision, digest, visibility, signer, issuer,
+annotation, permission, trigger, synthetic evidence, or mixed lifecycle state fails
+closed.
+
+These checks establish only the recorded public registry objects and repeatable remote Mac
+quickstart path. They do not prove registry availability over time, dependency safety,
+host security, production supply-chain security, formal release readiness, or production
+readiness.

@@ -10,17 +10,28 @@ import tarfile
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Any
 
 from scripts.check_p10_compose_runtime import validate_external_egress_probe
 from scripts.check_p10_distribution import (
     check_distribution,
     inspect_oci_layout,
+    validate_activation_workflow,
+    validate_remote_policy,
     verify_compose_network_boundary,
     verify_manifest,
     verify_remote_fixture,
 )
-from scripts.p10_gate_support import GateError, load_json
-from tests.p10.fixtures import ROOT, copy_paths
+from scripts.p10_gate_support import (
+    REMOTE_REPOSITORY,
+    REMOTE_RESULT_KEYS,
+    REMOTE_WORKFLOW_PATH,
+    REMOTE_WORKFLOW_REF,
+    RUNTIME_SUBJECT,
+    GateError,
+    load_json,
+)
+from tests.p10.fixtures import ROOT
 
 
 class P10DistributionTests(unittest.TestCase):
@@ -83,7 +94,7 @@ class P10DistributionTests(unittest.TestCase):
         result = check_distribution(ROOT)
         self.assertEqual(result["compose_build_count"], 0)
         self.assertEqual(result["platforms"], ["linux/amd64", "linux/arm64"])
-        self.assertEqual(result["remote_distribution_gate"], "authorization_required")
+        self.assertEqual(result["remote_distribution_gate"], "authorized_pending")
 
     def test_mutable_missing_platform_and_remote_promotion_fail(self) -> None:
         template = load_json(ROOT / "distribution/p10/release-manifest.template.json")
@@ -97,23 +108,49 @@ class P10DistributionTests(unittest.TestCase):
         fixture["platforms"] = ["linux/arm64"]
         with self.assertRaises(GateError):
             verify_manifest(fixture, template=True)
-        for remote in (
+        invalid_remote = (
             {"policy": "remote", "evidence_class": "synthetic_offline"},
             {"policy": "remote", "evidence_class": "remote"},
-            {
-                "policy": "remote",
-                "evidence_class": "remote",
-                "repository": "fixed",
-                "workflow": "fixed",
-                "signer": "fixed",
-                "subject_name": "fixed",
-                "subject_digest": "sha256:" + "a" * 64,
-                "signature_verified": True,
-                "attestation_verified": True,
-            },
+        )
+        for invalid in invalid_remote:
+            with self.subTest(remote=invalid), self.assertRaises(GateError):
+                verify_remote_fixture(invalid)
+        remote: dict[str, Any] = {
+            "policy": "remote",
+            "evidence_class": "remote_registry",
+            "repository": REMOTE_REPOSITORY,
+            "workflow": REMOTE_WORKFLOW_PATH,
+            "workflow_ref": REMOTE_WORKFLOW_REF,
+            "signer": (
+                "https://github.com/jeremyliu1220/digital-colleagues/"
+                ".github/workflows/ci.yml@refs/heads/codex/p10-mac-quickstart"
+            ),
+            "issuer": "https://token.actions.githubusercontent.com",
+            "subject_name": RUNTIME_SUBJECT,
+            "subject_digest": "sha256:" + "a" * 64,
+            "source_revision": "b" * 40,
+            "source_revision_annotation": "b" * 40,
+            "platforms": ["linux/amd64", "linux/arm64"],
+            "visibility": "public",
+            "anonymous_pull": "passed",
+            "signature_verified": True,
+            "attestation_verified": True,
+        }
+        verify_remote_fixture(remote)
+        for key, value in (
+            ("repository", "wrong/repository"),
+            ("workflow_ref", "refs/heads/main"),
+            ("issuer", "https://issuer.invalid"),
+            ("subject_digest", "sha256:" + "c" * 64),
+            ("visibility", "private"),
+            ("source_revision_annotation", "c" * 40),
         ):
-            with self.subTest(remote=remote), self.assertRaises(GateError):
-                verify_remote_fixture(remote)
+            broken = copy.deepcopy(remote)
+            broken[key] = value
+            if key == "subject_digest":
+                broken[key] = "wrong"
+            with self.subTest(key=key), self.assertRaises(GateError):
+                verify_remote_fixture(broken)
 
     def test_oci_missing_platform_and_digest_mismatch_fail(self) -> None:
         with tempfile.TemporaryDirectory(prefix="dc-p10-oci-test-") as name:
@@ -128,25 +165,74 @@ class P10DistributionTests(unittest.TestCase):
                 inspect_oci_layout(corrupt)
 
     def test_publication_workflow_and_write_permissions_fail(self) -> None:
-        paths = (
-            ".github/workflows/ci.yml",
-            "Dockerfile.p10",
-            "studio/Dockerfile.p10",
-            "compose.p10.yaml",
-            "distribution/p10/release-manifest.template.json",
-            "distribution/p10/verification-policy.json",
+        workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+        validate_activation_workflow(workflow)
+        mutations = (
+            ("repository", "jeremyliu1220/digital-colleagues", "wrong/repository"),
+            ("trigger", "  pull_request:\n", "  pull_request_target:\n"),
+            (
+                "permission",
+                "      contents: read\n    env:\n      GH_TOKEN:",
+                "      id-token: write\n    env:\n      GH_TOKEN:",
+            ),
+            ("source", "source_revision=$GITHUB_SHA", "source_revision=wrong"),
+            ("tag", "DISPLAY_TAG: sha-${{ github.sha }}", "DISPLAY_TAG: latest"),
+            ("digest-input", "      runtime_digest:\n", "      missing_digest:\n"),
         )
-        with tempfile.TemporaryDirectory(prefix="dc-p10-workflow-") as name:
-            for label, marker in (
-                ("push", "\n# docker push forbidden\n"),
-                ("packages", "\n# packages: write\n"),
-                ("upload", "\n# uses: actions/upload-artifact@fixed\n"),
-            ):
-                root = copy_paths(Path(name) / label, *paths)
-                workflow = root / ".github/workflows/ci.yml"
-                workflow.write_text(workflow.read_text(encoding="utf-8") + marker, encoding="utf-8")
-                with self.subTest(label=label), self.assertRaisesRegex(GateError, "publication"):
-                    check_distribution(root)
+        for label, old, new in mutations:
+            self.assertIn(old, workflow)
+            with self.subTest(label=label), self.assertRaises(GateError):
+                validate_activation_workflow(workflow.replace(old, new, 1))
+
+    def test_remote_policy_lifecycle_and_failure_states_fail_closed(self) -> None:
+        policy = load_json(ROOT / "distribution/p10/verification-policy.json")
+        self.assertEqual(validate_remote_policy(policy), "authorized_pending")
+        revision = "a" * 40
+        publication_run = "1001"
+        verification_run = "1002"
+        published = copy.deepcopy(policy)
+        published.update(
+            {
+                "lifecycle_state": "published_pending_verification",
+                "published_source_revision": revision,
+                "publication_workflow_run_id": publication_run,
+                "publication_workflow_run_url": (
+                    f"https://github.com/{REMOTE_REPOSITORY}/actions/runs/{publication_run}"
+                ),
+                "runtime_digest": "sha256:" + "1" * 64,
+                "studio_digest": "sha256:" + "2" * 64,
+            }
+        )
+        for key in REMOTE_RESULT_KEYS:
+            published[key] = "published_pending_verification"
+        self.assertEqual(validate_remote_policy(published), "published_pending_verification")
+        passed = copy.deepcopy(published)
+        passed.update(
+            {
+                "lifecycle_state": "passed",
+                "verification_workflow_run_id": verification_run,
+                "verification_workflow_run_url": (
+                    f"https://github.com/{REMOTE_REPOSITORY}/actions/runs/{verification_run}"
+                ),
+                "runtime_visibility": "public",
+                "studio_visibility": "public",
+                "anonymous_pull": "passed",
+            }
+        )
+        for key in REMOTE_RESULT_KEYS:
+            passed[key] = "passed"
+        self.assertEqual(validate_remote_policy(passed), "passed")
+        for key, value in (
+            ("remote_repository", "wrong/repository"),
+            ("runtime_digest", "sha256:" + "3" * 63),
+            ("runtime_visibility", "private"),
+            ("published_source_revision", "wrong"),
+            ("remote_distribution_gate", "failed"),
+        ):
+            broken = copy.deepcopy(passed)
+            broken[key] = value
+            with self.subTest(key=key), self.assertRaises(GateError):
+                validate_remote_policy(broken)
 
     def test_external_network_and_missing_probe_fail_closed(self) -> None:
         compose = (ROOT / "compose.p10.yaml").read_text(encoding="utf-8")

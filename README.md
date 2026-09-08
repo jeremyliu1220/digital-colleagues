@@ -18,12 +18,13 @@ approvals, effects, persistence, and audit causality explicit and testable.
 > evidence, and the unmeasured five-minute target remain `not_evaluated`. Post-v0.1 S1–S4
 > and Self-initiated autonomy have not started and do not start automatically.
 
-> **P10 development status.** Mac Quickstart and Distribution work is isolated on its
+> **P10 candidate status.** Mac Quickstart and Distribution work is isolated on its
 > fixed [P10 acceptance contract](docs/p10/acceptance.md). The version is
 > `0.2.0.dev0`/`0.2.0-dev.0` with maturity **Public Pilot development candidate**. Local
-> digest-bound OCI and actual Mac quickstart evidence may be developed. GHCR publication,
-> registry signature, and registry attestation are unauthorized and `not_evaluated`; the
-> complete P10 exit and P11 remain blocked pending separate authorization and acceptance.
+> gates passed, and a later explicit operator authorization fixes a one-time public GHCR,
+> keyless signature, GitHub attestation, independent verification, and workflow-lock
+> lifecycle. Only locked `passed` evidence may be offered for independent acceptance.
+> This is not a formal Release or P10 acceptance; P11 remains unauthorized.
 
 ## What makes a digital colleague different?
 
@@ -154,6 +155,7 @@ make p9-test
 make p9-check
 make p10-compose-runtime
 make p10-quickstart
+make p10-remote-distribution
 make p10-check
 make p3-provenance
 make p3-architecture
@@ -242,9 +244,14 @@ FileVault without changing it, and accepts no provider credential. See the
 [operator guide](docs/p10/operations.md), [distribution contract](docs/p10/distribution.md),
 and [compatibility inventory](docs/p10/compatibility.md).
 
-This is a deterministic local implementation candidate only. There is no public GHCR
-download, verified registry signature/attestation, provider compatibility, always-on
-operation, production security/privacy, or production-readiness claim.
+The separately authorized distribution gate uses only the two public exact-digest GHCR
+subjects locked in `distribution/p10/verification-policy.json`. The display tag is never
+an execution selector. `make p10-remote-distribution` re-verifies the two-platform indexes,
+all referenced manifests/configs/layers, anonymous pulls, exact keyless identity/issuer/
+annotation, GitHub provenance, a digest-bound bundle, and three clean Mac quickstarts.
+This remains a candidate rather than a GitHub Release or P10 acceptance and makes no
+provider compatibility, always-on, production security/privacy, or production-readiness
+claim.
 OpenAI live, Microsoft 365 live, and human evaluation remain `not_evaluated`; mock, stub,
 or loopback evidence cannot establish live or named-provider compatibility.
 

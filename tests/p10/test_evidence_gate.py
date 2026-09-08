@@ -14,10 +14,10 @@ from tests.p10.fixtures import ROOT, clone_repository
 
 
 class P10EvidenceTests(unittest.TestCase):
-    def test_evidence_constants_keep_remote_and_p11_unaccepted(self) -> None:
+    def test_evidence_constants_record_remote_gate_without_accepting_p11(self) -> None:
         self.assertIn("local_mac_runtime", EVIDENCE_CLASSES)
-        self.assertIn("not_evaluated", EVIDENCE_CLASSES)
-        self.assertEqual(REMOTE_STATES["remote_distribution_gate"], "authorization_required")
+        self.assertIn("remote_registry", EVIDENCE_CLASSES)
+        self.assertEqual(REMOTE_STATES["remote_distribution_gate"], "passed")
 
     def test_wrong_identity_private_material_and_timing_fail_closed(self) -> None:
         invalid = {"schema_version": 1}

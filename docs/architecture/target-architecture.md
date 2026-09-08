@@ -455,6 +455,11 @@ provider-free. Studio translation resources change presentation only; route/payl
 and authority behavior remain identical. Existing milestone-named routes remain compatible
 while public metadata uses stable product terms.
 
-Remote GHCR publication, signature, and attestation are not evaluated or authorized. P10
-therefore supplies a local distribution implementation candidate, not a public release or
-complete P10 exit.
+A later operator authorization fixes one public GHCR repository identity, two image
+subjects, one branch workflow identity, and one publication source revision. The temporary
+publication job alone receives package/OIDC/attestation writes; the independent verifier
+uses anonymous exact-digest registry access and read-only GitHub access. Passing evidence
+is locked before those jobs are removed from the branch. The publication source revision
+and later evidence implementation revision remain distinct. This can establish a remote
+distribution candidate, not a formal Release, production supply-chain assurance, P10
+acceptance, or authorization for P11.

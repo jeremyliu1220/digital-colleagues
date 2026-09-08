@@ -197,6 +197,7 @@ make p10-compatibility
 make p10-reproducibility
 make p10-compose-runtime
 make p10-quickstart
+make p10-remote-distribution
 make p10-test
 make p10-check
 ```
@@ -208,16 +209,23 @@ native digest-only Compose restart, and three actual clean Mac quickstarts. Buil
 before the timing interval. Every trial must report API, worker, Studio, and JSON status
 ready in under 300 seconds, with cleanup complete and no provider credential.
 
+After the separately authorized remote policy reaches `passed`,
+`make p10-remote-distribution` verifies the locked public GHCR exact digests, signatures,
+attestations, anonymous pulls, two-platform manifests/blobs, a digest-bound bundle, and
+three clean Mac quickstarts below 60 seconds. GitHub CLI and Cosign are checksum-pinned in
+an OS-temporary tool directory; a host install and GHCR credentials are not required.
+
 The default private root is `~/Library/Application Support/Digital Colleagues`; see
 [P10 operations](p10/operations.md). FileVault off or unknown blocks live readiness but
 does not prevent the deterministic reference mode. Do not place a secret in environment,
 Compose interpolation, an argument, SQLite, logs, diagnostics, Studio state, or evidence.
 
-Only after a clean implementation commit and the complete aggregate passes may the
-developer run `make evidence-p10`. It writes only `artifacts/p10/summary.json`; commit that
-file alone and rerun `make check`. Remote GHCR publication, signing, and attestation remain
-`not_evaluated` and require separate authorization. Do not push, tag, publish, upload,
-create a Release, merge, or begin P11.
+Only after a clean implementation commit, locked `passed` remote policy, deactivated
+read-only workflow, and the complete local/remote aggregate pass may the developer run
+`make evidence-p10`. It writes only `artifacts/p10/summary.json`; commit that file alone
+and rerun `make check`. The summary records publication source and final evidence
+implementation revisions separately. Do not tag, create a Release, merge, push main, or
+begin P11.
 
 ## Authenticated Studio and HTTP boundaries
 

@@ -23,6 +23,27 @@ DISPLAY_VERSION = "0.2.0-dev.0"
 MATURITY = "Public Pilot development candidate"
 API_TITLE = "Digital Colleagues Local API"
 PLATFORMS = ("linux/amd64", "linux/arm64")
+REMOTE_REPOSITORY = "jeremyliu1220/digital-colleagues"
+REMOTE_WORKFLOW_PATH = ".github/workflows/ci.yml"
+REMOTE_WORKFLOW_REF = "refs/heads/codex/p10-mac-quickstart"
+REMOTE_SIGNER_IDENTITY = (
+    "https://github.com/jeremyliu1220/digital-colleagues/"
+    ".github/workflows/ci.yml@refs/heads/codex/p10-mac-quickstart"
+)
+REMOTE_OIDC_ISSUER = "https://token.actions.githubusercontent.com"
+RUNTIME_SUBJECT = "ghcr.io/jeremyliu1220/digital-colleagues-runtime"
+STUDIO_SUBJECT = "ghcr.io/jeremyliu1220/digital-colleagues-studio"
+REMOTE_RESULT_KEYS = (
+    "ghcr_publication",
+    "registry_image_signature",
+    "registry_attestation",
+    "remote_distribution_gate",
+)
+REMOTE_LIFECYCLE_STATES = (
+    "authorized_pending",
+    "published_pending_verification",
+    "passed",
+)
 MIGRATIONS = (
     "001_initial.sql",
     "002_runtime_indexes.sql",
@@ -33,18 +54,22 @@ MIGRATIONS = (
     "007_governance_hardening.sql",
     "manifest.json",
 )
-REMOTE_STATES = {
-    "ghcr_publication": "not_evaluated",
-    "registry_image_signature": "not_evaluated",
-    "registry_attestation": "not_evaluated",
-    "remote_distribution_gate": "authorization_required",
-}
+REMOTE_STATES = {key: "passed" for key in REMOTE_RESULT_KEYS}
 OFFICIAL_URLS = (
     "https://docs.docker.com/build/building/multi-platform/",
     "https://docs.github.com/en/actions/concepts/security/artifact-attestations",
     "https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations",
     "https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry",
     "https://docs.sigstore.dev/cosign/signing/signing_with_containers/",
+    "https://docs.sigstore.dev/cosign/verifying/verify/",
+    "https://cli.github.com/manual/gh_attestation_verify",
+    "https://github.com/actions/checkout/commit/d23441a48e516b6c34aea4fa41551a30e30af803",
+    "https://github.com/docker/setup-qemu-action/commit/1f40c72289eff860ee54a304f1438e3cff362e0a",
+    "https://github.com/docker/setup-buildx-action/commit/37fe631027851001ddb9b187196cc803df7f5f0e",
+    "https://github.com/docker/login-action/commit/dbcb813823bdd20940b903addbd779551569679f",
+    "https://github.com/docker/build-push-action/commit/53b7df96c91f9c12dcc8a07bcb9ccacbed38856a",
+    "https://github.com/sigstore/cosign-installer/commit/6f9f17788090df1f26f669e9d70d6ae9567deba6",
+    "https://github.com/actions/attest/commit/1e69f48acb82d1966a394da916b4c1698aa569d6",
     "https://developer.apple.com/documentation/foundation/url/applicationsupportdirectory",
     "https://support.apple.com/en-gb/guide/deployment/dep0a2cb7686/web",
 )

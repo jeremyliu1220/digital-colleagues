@@ -20,11 +20,11 @@ from scripts.check_p10_compose_runtime import (
     run_compose_runtime,
 )
 from scripts.check_p10_distribution import check_distribution
-from scripts.check_p10_evidence import REQUIRED_GATES, check_evidence
+from scripts.check_p10_evidence import LOCAL_REQUIRED_GATES, REQUIRED_GATES, check_evidence
 from scripts.check_p10_i18n import check_i18n
 from scripts.check_p10_operations import check_operations
 from scripts.check_p10_provenance import check_provenance
-from scripts.check_p10_quickstart import run_quickstart_trials
+from scripts.check_p10_quickstart import check_remote_distribution, run_quickstart_trials
 from scripts.check_p10_repository import check_repository
 from scripts.check_p10_reproducibility import check_reproducibility
 from scripts.check_p10_security import check_security
@@ -43,7 +43,7 @@ STATIC: dict[str, tuple[str, Callable[[Path], dict[str, object]]]] = {
     "compatibility": ("p10_compatibility", check_compatibility),
     "reproducibility": ("p10_reproducibility", check_reproducibility),
 }
-SCOPES = {"all", "test", "compose-runtime", "quickstart", *STATIC}
+SCOPES = {"all", "test", "compose-runtime", "quickstart", "remote-distribution", *STATIC}
 P10_TEST_BOUNDARIES = {
     "tests.p10.test_repository.P10RepositoryTests.test_dirty_staged_unstaged_untracked_wrong_branch_and_base_fail_closed": "repository_identity_and_dirty_refusal",
     "tests.p10.test_repository.P10RepositoryTests.test_acceptance_history_migration_allowlist_and_p11_drift_fail": "history_migration_scope_refusal",
@@ -51,6 +51,7 @@ P10_TEST_BOUNDARIES = {
     "tests.p10.test_distribution.P10DistributionTests.test_mutable_missing_platform_and_remote_promotion_fail": "mutable_and_remote_promotion_refusal",
     "tests.p10.test_distribution.P10DistributionTests.test_oci_missing_platform_and_digest_mismatch_fail": "oci_integrity_refusal",
     "tests.p10.test_distribution.P10DistributionTests.test_external_network_and_missing_probe_fail_closed": "runtime_egress_boundary_refusal",
+    "tests.p10.test_distribution.P10DistributionTests.test_remote_policy_lifecycle_and_failure_states_fail_closed": "remote_lifecycle_identity_digest_visibility_refusal",
     "tests.p10.test_security.P10SecurityTests.test_studio_secret_mount_and_credential_material_fail_closed": "secret_mount_refusal",
     "tests.p10.test_security.P10SecurityTests.test_shipped_filevault_ignores_environment_overrides": "filevault_injection_isolation",
     "tests.p10.test_operations.P10OperationsTests.test_update_restore_unsafe_root_locale_and_concurrency_refuse": "operator_abuse_refusal",
@@ -209,7 +210,21 @@ def run_all(
         cleanup_candidate(root, candidate)
     results["evidence"] = dict(check_evidence(root))
     verified.add("p10_evidence")
-    if verified != REQUIRED_GATES:
+    if results["distribution"].get("lifecycle_state") == "passed":
+        remote = check_remote_distribution(root)
+        remote_distribution = remote.get("distribution")
+        remote_quickstart = remote.get("quickstart")
+        if not isinstance(remote_distribution, dict) or not isinstance(remote_quickstart, dict):
+            raise GateError("remote_distribution_result_invalid")
+        results["remote_distribution"] = remote_distribution
+        results["remote_quickstart"] = remote_quickstart
+        verified.add("p10_remote_distribution")
+    expected_gates = (
+        REQUIRED_GATES
+        if results["distribution"].get("lifecycle_state") == "passed"
+        else LOCAL_REQUIRED_GATES
+    )
+    if verified != expected_gates:
         raise GateError("aggregate_gate_inventory_incomplete")
     return results, unittest, verified
 
@@ -244,6 +259,10 @@ def main(argv: list[str] | None = None) -> int:
             from scripts.check_p10_quickstart import check_quickstart
 
             result = check_quickstart(ROOT)
+            print(json.dumps(result, indent=2, sort_keys=True))
+            return 0
+        if arguments.scope == "remote-distribution":
+            result = check_remote_distribution(ROOT)
             print(json.dumps(result, indent=2, sort_keys=True))
             return 0
         if arguments.write_evidence and (ROOT / SUMMARY_PATH).exists():

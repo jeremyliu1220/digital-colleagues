@@ -228,12 +228,13 @@ contract. P10 adds no AgentPackage lifecycle, OpenAI gateway, or Microsoft 365 c
 Exit: signed/attested distribution and deterministic quickstart gates pass with secret and
 compatibility boundaries; no P11+ capability is present.
 
-Development checkpoint: P10 is authorized on `codex/p10-mac-quickstart` from exact
-accepted P9 base `11aa240af8db2ca515325dc059b1a77f7badc874`. Local implementation may
-produce digest-bound OCI and actual Mac quickstart evidence. Remote GHCR publication,
-signature, and attestation remain unauthorized and `not_evaluated`; without a later
-authorization and independent acceptance the complete P10 exit stays pending and P11 does
-not start.
+Development checkpoint: P10 is isolated on `codex/p10-mac-quickstart` from exact accepted
+P9 base `11aa240af8db2ca515325dc059b1a77f7badc874`. The local candidate passed its retained
+P9, digest-bound OCI, Compose, and Mac quickstart gates. A later explicit authorization
+fixes a one-time GHCR publication/signature/attestation workflow and independent read-only
+verification lifecycle. Only complete `passed` evidence followed by workflow deactivation
+may produce a remote distribution candidate for independent acceptance. This is not P10
+acceptance or a Release; P11 does not start.
 
 ## P11 — Agent Package and Multi-Agent Lifecycle
 

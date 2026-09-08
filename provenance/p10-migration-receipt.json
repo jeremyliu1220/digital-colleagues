@@ -32,6 +32,51 @@
       "observed_contract": "Cosign signing and signature attachment change registry state and require separately authorized identity and write access."
     },
     {
+      "url": "https://docs.sigstore.dev/cosign/verifying/verify/",
+      "checked_at": "2026-09-08T05:28:03Z",
+      "observed_contract": "Keyless image verification fixes an exact certificate identity and OIDC issuer; annotations may be required without disabling claim checks."
+    },
+    {
+      "url": "https://cli.github.com/manual/gh_attestation_verify",
+      "checked_at": "2026-09-08T05:28:03Z",
+      "observed_contract": "GitHub CLI verification can bind an OCI digest to an exact repository, signer workflow, signer digest, source ref, source digest, certificate identity, issuer, and GitHub-hosted runner."
+    },
+    {
+      "url": "https://github.com/actions/checkout/commit/d23441a48e516b6c34aea4fa41551a30e30af803",
+      "checked_at": "2026-09-08T05:28:03Z",
+      "observed_contract": "The authorized publication workflow pins checkout to this immutable commit."
+    },
+    {
+      "url": "https://github.com/docker/setup-qemu-action/commit/1f40c72289eff860ee54a304f1438e3cff362e0a",
+      "checked_at": "2026-09-08T05:28:03Z",
+      "observed_contract": "The authorized publication workflow pins QEMU setup to this immutable commit."
+    },
+    {
+      "url": "https://github.com/docker/setup-buildx-action/commit/37fe631027851001ddb9b187196cc803df7f5f0e",
+      "checked_at": "2026-09-08T05:28:03Z",
+      "observed_contract": "The authorized publication and verification workflows pin Buildx setup to this immutable commit."
+    },
+    {
+      "url": "https://github.com/docker/login-action/commit/dbcb813823bdd20940b903addbd779551569679f",
+      "checked_at": "2026-09-08T05:28:03Z",
+      "observed_contract": "The authorized publication job alone pins the GHCR login action to this immutable commit."
+    },
+    {
+      "url": "https://github.com/docker/build-push-action/commit/53b7df96c91f9c12dcc8a07bcb9ccacbed38856a",
+      "checked_at": "2026-09-08T05:28:03Z",
+      "observed_contract": "The authorized publication job pins multi-platform build and push to this immutable commit and disables automatic provenance and SBOM manifests."
+    },
+    {
+      "url": "https://github.com/sigstore/cosign-installer/commit/6f9f17788090df1f26f669e9d70d6ae9567deba6",
+      "checked_at": "2026-09-08T05:28:03Z",
+      "observed_contract": "The authorized jobs pin the installer and its checksum-verified Cosign v3.0.6 bootstrap to this immutable commit."
+    },
+    {
+      "url": "https://github.com/actions/attest/commit/1e69f48acb82d1966a394da916b4c1698aa569d6",
+      "checked_at": "2026-09-08T05:28:03Z",
+      "observed_contract": "The authorized publication job pins provenance attestation to this immutable commit with an untagged subject name, exact digest, and registry publication."
+    },
+    {
       "url": "https://developer.apple.com/documentation/foundation/url/applicationsupportdirectory",
       "checked_at": "2026-09-07T15:12:21Z",
       "observed_contract": "Application Support is the durable per-user location for application-managed support data."

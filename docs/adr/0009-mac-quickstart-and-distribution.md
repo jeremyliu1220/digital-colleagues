@@ -2,7 +2,7 @@
 
 # ADR 0009: Mac Quickstart and Digest-Bound Distribution
 
-- Status: Accepted for P10 development candidate
+- Status: Accepted for P10 development candidate; remote gate separately authorized
 - Decision date: 2026-09-07
 - Scope: P10 local distribution, operator interface, storage readiness, and i18n
 
@@ -11,7 +11,11 @@
 The accepted P9 baseline plans a Public Pilot but distributes no v0.2 runtime. P10 must
 make the deterministic reference stack usable from a downloaded bundle on an Apple silicon
 or Intel Mac with Docker Desktop, without requiring host Python, Node, npm, Make, Git, a
-provider credential, or a source build. Remote publication is not authorized.
+provider credential, or a source build. Remote publication was not authorized by the
+fixed development contract. On 2026-09-08, the operator separately authorized one exact
+public repository, branch workflow, pair of GHCR subjects, keyless signing/attestation
+run, read-only verification run, and final write-capability lock. That authorization does
+not alter the immutable acceptance file.
 
 ## Decision
 
@@ -38,22 +42,28 @@ it cannot change a route, payload, schema, role, authority, default, or validati
 FastAPI and package metadata use stable product terms and the development versions
 `0.2.0.dev0`/`0.2.0-dev.0`. Existing milestone-named routes remain compatibility surfaces.
 
-## Distribution authorization
+## Distribution authorization addendum
 
-Local OCI build, local layout verification, and isolated loopback runtime tests are
-authorized. Remote push, package upload, signing, attestation generation, artifact upload,
-tag, and Release creation are not. GHCR, registry signature, and registry attestation stay
-`not_evaluated`; the remote distribution gate stays `authorization_required`.
+The one-time remote gate is limited to `jeremyliu1220/digital-colleagues`, branch
+`codex/p10-mac-quickstart`, runtime/Studio subjects fixed in the verification policy, and
+one publication source revision. Only a guarded `workflow_dispatch` publication job may
+receive package/OIDC/attestation writes. Verification is read-only and anonymous at GHCR.
+The lifecycle is `authorized_pending`, `published_pending_verification`, then `passed`;
+unknown or failed states are terminal failures for evidence. The final branch workflow
+removes both remote jobs and every write permission.
+
+No artifact upload, Git tag, GitHub Release, main push, merge, history rewrite, personal
+Cosign key, provider credential, or P11 work is authorized.
 
 ## Consequences
 
 - A source checkout is not needed by a bundle user and no build occurs during quickstart.
 - Backup/restore reuse the accepted WAL-consistent P8 implementation through a strict P10
   source binding and an image-contained Python runtime.
-- `update` refuses before switching while the authorized remote verification identity and
-  evidence do not exist.
-- P10 can become a local implementation candidate, but its full exit and P11 remain
-  blocked on separately authorized, independently accepted remote distribution evidence.
+- `update` remains disabled; passing the distribution gate does not silently authorize an
+  update protocol or mutable release channel.
+- P10 may become a remotely evidenced candidate, but formal P10 acceptance and P11 remain
+  blocked on independent governance review.
 
 ## Scoped correction
 

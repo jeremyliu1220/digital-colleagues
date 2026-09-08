@@ -227,3 +227,12 @@ host names, container IDs, IPs, environment, SQLite bytes/content, credential va
 digests, logs, private backup metadata, and raw exceptions. Synthetic signature and
 attestation fixtures remain synthetic/offline and cannot be represented as remote or live
 evidence.
+
+The separately authorized GHCR gate records only public repository/workflow/run URLs,
+fixed subject names, exact digests, public platform labels, signer identity, issuer,
+source revision, visibility, and finite verification results. Workflow summaries and
+public evidence contain no token, actor email, cookie, Docker credential, local user/path,
+container ID, private log, or environment dump. Verification uses a task-owned empty
+Docker config; checksum-pinned acceptance tools and all managed roots exist only under OS
+temporary directories. Public remote evidence is distribution evidence, not provider or
+personal acceptance data.
