@@ -588,8 +588,8 @@ case "$COMMAND" in
     emit_ok backup_ok "\"verified\":true"
     ;;
   restore)
-    verify_bundle || emit_error distribution_verification_failed "$EXIT_VERIFICATION"
     [ "$CONFIRMATION" = RESTORE-P10-STATE ] || emit_error confirmation_required "$EXIT_CONFIRMATION"
+    verify_bundle || emit_error distribution_verification_failed "$EXIT_VERIFICATION"
     valid_backup_name "$BACKUP_NAME" || emit_error backup_name_invalid "$EXIT_USAGE"
     acquire_lock
     verify_managed_identity
