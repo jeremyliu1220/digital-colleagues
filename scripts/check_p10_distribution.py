@@ -692,6 +692,7 @@ def _remote_run(
     environment: dict[str, str],
     timeout: int = 1200,
 ) -> str:
+    category = _remote_command_failure_category(command)
     try:
         completed = subprocess.run(
             command,
@@ -704,10 +705,23 @@ def _remote_run(
             check=False,
         )
     except (OSError, subprocess.SubprocessError) as exc:
-        raise GateError("remote_verification_command_failed") from exc
+        raise GateError(category) from exc
     if completed.returncode != 0:
-        raise GateError("remote_verification_command_failed")
+        raise GateError(category)
     return completed.stdout
+
+
+def _remote_command_failure_category(command: list[str]) -> str:
+    if command[:3] == ["docker", "buildx", "imagetools"]:
+        return "remote_buildx_inspect_failed"
+    if command[:2] == ["docker", "pull"]:
+        return "anonymous_exact_digest_pull_failed"
+    executable = Path(command[0]).name if command else ""
+    if executable == "cosign":
+        return "cosign_verification_failed"
+    if executable == "gh":
+        return "github_attestation_verification_failed"
+    return "remote_verification_command_failed"
 
 
 def _bearer_challenge(headers: Any) -> tuple[str, str, str]:

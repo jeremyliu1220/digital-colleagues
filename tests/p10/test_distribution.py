@@ -15,6 +15,7 @@ from unittest.mock import patch
 
 from scripts.check_p10_compose_runtime import validate_external_egress_probe
 from scripts.check_p10_distribution import (
+    _remote_command_failure_category,
     _verify_attestation,
     check_distribution,
     inspect_oci_layout,
@@ -217,6 +218,24 @@ class P10DistributionTests(unittest.TestCase):
         self.assertIn("--source-digest", captured)
         self.assertNotIn("--signer-repo", captured)
         self.assertNotIn("--signer-workflow", captured)
+
+    def test_remote_command_failures_report_a_public_stage(self) -> None:
+        self.assertEqual(
+            _remote_command_failure_category(["docker", "buildx", "imagetools", "inspect"]),
+            "remote_buildx_inspect_failed",
+        )
+        self.assertEqual(
+            _remote_command_failure_category(["docker", "pull", "subject@sha256:digest"]),
+            "anonymous_exact_digest_pull_failed",
+        )
+        self.assertEqual(
+            _remote_command_failure_category(["/tmp/tools/cosign", "verify"]),
+            "cosign_verification_failed",
+        )
+        self.assertEqual(
+            _remote_command_failure_category(["/tmp/tools/gh", "attestation", "verify"]),
+            "github_attestation_verification_failed",
+        )
 
     def test_remote_policy_lifecycle_and_failure_states_fail_closed(self) -> None:
         policy = load_json(ROOT / "distribution/p10/verification-policy.json")
