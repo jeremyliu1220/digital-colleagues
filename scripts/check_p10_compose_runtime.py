@@ -150,11 +150,9 @@ def dc_command(
     extra: tuple[str, ...] = (),
     timeout: int = 180,
 ) -> tuple[int, dict[str, Any], str]:
-    environment = {
-        **os.environ,
-        "DC_TEST_MODE": "1",
-        "DC_TEST_FILEVAULT_STATUS": "unknown",
-    }
+    environment = os.environ.copy()
+    environment.pop("DC_TEST_MODE", None)
+    environment.pop("DC_TEST_FILEVAULT_STATUS", None)
     completed = subprocess.run(
         [
             str(candidate.bundle / "dc"),
@@ -191,6 +189,158 @@ def _assert_safe_output(output: str, managed_root: Path) -> None:
         raise GateError("runtime_output_private_or_unbounded")
 
 
+def _probe_process(command: list[str], *, cwd: Path, timeout: int = 20) -> int:
+    try:
+        completed = subprocess.run(
+            command,
+            cwd=cwd,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=timeout,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise GateError("external_egress_probe_command_failed") from exc
+    return completed.returncode
+
+
+def _service_container(root: Path, service: str) -> str:
+    identifiers = _run(
+        [
+            "docker",
+            "ps",
+            "-q",
+            "--filter",
+            "label=com.docker.compose.project=digital-colleagues-p10",
+            "--filter",
+            f"label=com.docker.compose.service={service}",
+        ],
+        cwd=root,
+        timeout=30,
+    ).splitlines()
+    if len(identifiers) != 1:
+        raise GateError("external_egress_probe_service_identity_invalid")
+    return identifiers[0]
+
+
+def _runtime_internal_network_verified(root: Path) -> bool:
+    common_network: str | None = None
+    for service in ("api", "worker", "studio"):
+        identifier = _service_container(root, service)
+        raw = _run(
+            ["docker", "inspect", "--format", "{{json .NetworkSettings.Networks}}", identifier],
+            cwd=root,
+            timeout=30,
+        )
+        try:
+            networks = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise GateError("external_egress_probe_network_inspection_invalid") from exc
+        if not isinstance(networks, dict) or len(networks) != 1:
+            raise GateError("external_egress_probe_network_membership_invalid")
+        network = next(iter(networks))
+        if common_network is None:
+            common_network = network
+        elif network != common_network:
+            raise GateError("external_egress_probe_network_membership_invalid")
+    if common_network is None:
+        raise GateError("external_egress_probe_network_membership_invalid")
+    internal = _run(
+        ["docker", "network", "inspect", "--format", "{{.Internal}}", common_network],
+        cwd=root,
+        timeout=30,
+    )
+    return internal == "true"
+
+
+def validate_external_egress_probe(probe: object) -> int:
+    if (
+        not isinstance(probe, dict)
+        or probe.get("performed") is not True
+        or probe.get("control_reachable") is not True
+        or probe.get("internal_network_verified") is not True
+        or probe.get("service_network_count") != 3
+        or type(probe.get("unexpected_connection_count")) is not int
+        or not 0 <= probe["unexpected_connection_count"] <= 3
+    ):
+        raise GateError("external_egress_probe_incomplete")
+    count = int(probe["unexpected_connection_count"])
+    if count:
+        raise GateError("unexpected_external_egress")
+    return count
+
+
+def probe_external_egress(root: Path, candidate: LocalCandidate) -> dict[str, object]:
+    internal = _runtime_internal_network_verified(root)
+    if not internal:
+        raise GateError("external_egress_internal_network_not_verified")
+    with socket.socket() as listener:
+        listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        listener.bind(("127.0.0.1", 0))
+        listener.listen(4)
+        port = int(listener.getsockname()[1])
+        program = (
+            "import socket; "
+            f"connection=socket.create_connection(('host.docker.internal',{port}),2); "
+            "connection.close()"
+        )
+        control = _probe_process(
+            [
+                "docker",
+                "run",
+                "--rm",
+                "--network",
+                "bridge",
+                "--add-host",
+                "host.docker.internal:host-gateway",
+                "--entrypoint",
+                "python",
+                candidate.runtime_tag,
+                "-c",
+                program,
+            ],
+            cwd=root,
+        )
+        if control != 0:
+            raise GateError("external_egress_probe_control_unreachable")
+        unexpected = 0
+        for service in ("api", "worker"):
+            identifier = _service_container(root, service)
+            if (
+                _probe_process(["docker", "exec", identifier, "python", "-c", program], cwd=root)
+                == 0
+            ):
+                unexpected += 1
+        studio = _service_container(root, "studio")
+        if (
+            _probe_process(
+                [
+                    "docker",
+                    "exec",
+                    studio,
+                    "wget",
+                    "-q",
+                    "-T",
+                    "2",
+                    "-O",
+                    "/dev/null",
+                    f"http://host.docker.internal:{port}/",
+                ],
+                cwd=root,
+            )
+            == 0
+        ):
+            unexpected += 1
+    return {
+        "performed": True,
+        "control_reachable": True,
+        "internal_network_verified": True,
+        "service_network_count": 3,
+        "unexpected_connection_count": unexpected,
+    }
+
+
 def run_compose_runtime(root: Path, candidate: LocalCandidate, work: Path) -> dict[str, object]:
     managed_root = (work / "managed" / "Digital Colleagues").resolve()
     managed_root.parent.mkdir(mode=0o700, parents=True)
@@ -198,6 +348,8 @@ def run_compose_runtime(root: Path, candidate: LocalCandidate, work: Path) -> di
     while studio_port == api_port:
         studio_port = free_port()
     cleanup_residue = 0
+    external_egress_probe_count = 0
+    unexpected_external_egress_count = 0
     try:
         code, started, output = dc_command(
             candidate, managed_root, api_port, studio_port, "quickstart"
@@ -274,6 +426,11 @@ def run_compose_runtime(root: Path, candidate: LocalCandidate, work: Path) -> di
             or status.get("schema_version_current") != 7
         ):
             raise GateError("compose_restart_health_failed")
+        probe = probe_external_egress(root, candidate)
+        external_egress_probe_count += 1
+        unexpected_external_egress_count += validate_external_egress_probe(probe)
+        if unexpected_external_egress_count:
+            raise GateError("compose_unexpected_external_egress")
     finally:
         try:
             dc_command(candidate, managed_root, api_port, studio_port, "down", timeout=120)
@@ -300,7 +457,10 @@ def run_compose_runtime(root: Path, candidate: LocalCandidate, work: Path) -> di
         "restart_state_preserved": True,
         "wal_consistent_backup_restore": True,
         "secret_canary_leak_count": 0,
-        "unexpected_external_egress_count": 0,
+        "external_egress_probe_count": external_egress_probe_count,
+        "external_egress_control_count": external_egress_probe_count,
+        "internal_network_verified": True,
+        "unexpected_external_egress_count": unexpected_external_egress_count,
         "cleanup_residue_count": 0,
     }
 

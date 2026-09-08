@@ -71,14 +71,26 @@ def build_summary(
     }
     if changed != set(IMPLEMENTATION_PATHS) or implementation in {BASE_COMMIT, ACCEPTANCE_COMMIT}:
         raise GateError("evidence_implementation_commit_invalid")
-    quickstart = results["quickstart"]
-    if quickstart.get("trial_count") != 3 or quickstart.get("all_below_300_seconds") is not True:
-        raise GateError("evidence_quickstart_incomplete")
     if unittest.get("gate_passed") is not True or any(
         unittest.get(key) != 0
         for key in ("failures", "errors", "skipped", "expected_failures", "unexpected_successes")
     ):
         raise GateError("evidence_unittest_incomplete")
+    quickstart = results["quickstart"]
+    compose_runtime = results["compose_runtime"]
+    if (
+        quickstart.get("trial_count") != 3
+        or quickstart.get("all_below_300_seconds") is not True
+        or quickstart.get("external_egress_probe_count") != 3
+        or quickstart.get("external_egress_control_count") != 3
+        or quickstart.get("internal_network_verified") is not True
+        or quickstart.get("unexpected_external_egress_count") != 0
+        or compose_runtime.get("external_egress_probe_count") != 1
+        or compose_runtime.get("external_egress_control_count") != 1
+        or compose_runtime.get("internal_network_verified") is not True
+        or compose_runtime.get("unexpected_external_egress_count") != 0
+    ):
+        raise GateError("evidence_quickstart_incomplete")
     summary: dict[str, Any] = {
         "schema_version": 1,
         "milestone": "P10",

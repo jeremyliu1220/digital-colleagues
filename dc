@@ -204,6 +204,45 @@ manifest_get() {
   /usr/bin/plutil -extract "$1" raw -o - "$MANIFEST" 2>/dev/null
 }
 
+manifest_type() {
+  /usr/bin/plutil -type "$1" "$MANIFEST" 2>/dev/null
+}
+
+manifest_schema_valid() {
+  xml=$(/usr/bin/plutil -convert xml1 -o - "$MANIFEST" 2>/dev/null) || return 1
+  [ "$(printf '%s\n' "$xml" | /usr/bin/grep -c '<key>')" = 18 ] || return 1
+  actual_keys=$(
+    /usr/bin/grep -Eo '"[A-Za-z0-9_]+"[[:space:]]*:' "$MANIFEST" \
+      | /usr/bin/sed -E 's/^"([A-Za-z0-9_]+)"[[:space:]]*:/\1/' \
+      | LC_ALL=C /usr/bin/sort
+  ) || return 1
+  expected_keys=$(printf '%s\n' \
+    compose_project display_version distribution_format ghcr_publication maturity \
+    migration_008 platforms product_name python_version registry_attestation \
+    registry_image_signature remote_distribution_gate runtime_image schema_version \
+    schema_versions source_revision studio_image template \
+    | LC_ALL=C /usr/bin/sort)
+  [ "$actual_keys" = "$expected_keys" ] || return 1
+  [ "$(manifest_type schema_version)" = integer ] || return 1
+  [ "$(manifest_type template)" = bool ] || return 1
+  [ "$(manifest_type platforms)" = array ] || return 1
+  [ "$(manifest_type schema_versions)" = array ] || return 1
+  for field in distribution_format product_name python_version display_version maturity source_revision compose_project runtime_image studio_image migration_008 ghcr_publication registry_image_signature registry_attestation remote_distribution_gate; do
+    [ "$(manifest_type "$field")" = string ] || return 1
+  done
+  [ "$(manifest_type platforms.0)" = string ] || return 1
+  [ "$(manifest_type platforms.1)" = string ] || return 1
+  manifest_type platforms.2 >/dev/null 2>&1 && return 1
+  index=0
+  for version in 1 2 3 4 5 6 7; do
+    [ "$(manifest_type "schema_versions.$index")" = integer ] || return 1
+    [ "$(manifest_get "schema_versions.$index")" = "$version" ] || return 1
+    index=$((index + 1))
+  done
+  manifest_type schema_versions.7 >/dev/null 2>&1 && return 1
+  return 0
+}
+
 valid_digest_ref() {
   value=$1
   printf '%s\n' "$value" | /usr/bin/awk '
@@ -224,6 +263,9 @@ verify_bundle() {
   [ -f "$BUNDLE_DIR/compose.p10.yaml" ] && [ ! -L "$BUNDLE_DIR/compose.p10.yaml" ] || return 1
   [ -f "$BUNDLE_DIR/operations-source-binding.json" ] && [ ! -L "$BUNDLE_DIR/operations-source-binding.json" ] || return 1
   [ -f "$SUMS" ] && [ ! -L "$SUMS" ] || return 1
+  manifest_schema_valid || return 1
+  [ "$(manifest_get schema_version)" = 1 ] || return 1
+  [ "$(manifest_get distribution_format)" = digital-colleagues-p10-bundle-v1 ] || return 1
   [ "$(manifest_get template)" = false ] || return 1
   [ "$(manifest_get product_name)" = "$PRODUCT_NAME" ] || return 1
   [ "$(manifest_get python_version)" = "$PYTHON_VERSION" ] || return 1
@@ -327,9 +369,7 @@ install_release_lock() {
 
 filevault_classification() {
   result=unknown
-  if [ "${DC_TEST_MODE:-0}" = 1 ] && [ -n "${DC_TEST_FILEVAULT_STATUS:-}" ]; then
-    result=$DC_TEST_FILEVAULT_STATUS
-  elif [ "$(/usr/bin/uname -s 2>/dev/null)" = Darwin ] && [ -x /usr/bin/fdesetup ]; then
+  if [ "$(/usr/bin/uname -s 2>/dev/null)" = Darwin ] && [ -x /usr/bin/fdesetup ]; then
     status=$(/usr/bin/fdesetup status 2>/dev/null || true)
     case "$status" in *'FileVault is On'*) result=enabled ;; *'FileVault is Off'*) result=off ;; *) result=unknown ;; esac
   fi
@@ -364,7 +404,8 @@ managed_stack_running() {
   services=$(compose ps --status running --services 2>/dev/null || true)
   printf '%s\n' "$services" | /usr/bin/grep -qx api \
     && printf '%s\n' "$services" | /usr/bin/grep -qx worker \
-    && printf '%s\n' "$services" | /usr/bin/grep -qx studio
+    && printf '%s\n' "$services" | /usr/bin/grep -qx studio \
+    && printf '%s\n' "$services" | /usr/bin/grep -qx gateway
 }
 
 doctor_checks() {
@@ -407,7 +448,7 @@ container_healthy() {
 
 status_ready() {
   configure_compose
-  container_healthy api && container_healthy worker && container_healthy studio \
+  container_healthy api && container_healthy worker && container_healthy studio && container_healthy gateway \
     && curl --fail --silent --show-error --max-time 2 "http://127.0.0.1:$API_PORT/health" >/dev/null 2>&1 \
     && curl --fail --silent --show-error --max-time 2 "http://127.0.0.1:$STUDIO_PORT/" >/dev/null 2>&1
 }
@@ -457,7 +498,7 @@ do_up() {
   prepare_layout
   install_release_lock
   configure_compose
-  if ! compose up -d --no-build --pull never api worker studio >/dev/null 2>&1; then
+  if ! compose up -d --no-build --pull never api worker studio gateway >/dev/null 2>&1; then
     emit_error runtime_start_failed "$EXIT_RUNTIME"
   fi
 }
@@ -482,7 +523,7 @@ case "$COMMAND" in
     prepare_layout
     install_release_lock
     configure_compose
-    if ! compose up -d --no-build --pull never api worker studio >/dev/null 2>&1; then
+    if ! compose up -d --no-build --pull never api worker studio gateway >/dev/null 2>&1; then
       [ "$already_running" -eq 1 ] || compose down --remove-orphans >/dev/null 2>&1 || true
       emit_error runtime_start_failed "$EXIT_RUNTIME"
     fi

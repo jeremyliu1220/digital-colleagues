@@ -11,9 +11,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from scripts.check_p10_compose_runtime import validate_external_egress_probe
 from scripts.check_p10_distribution import (
     check_distribution,
     inspect_oci_layout,
+    verify_compose_network_boundary,
     verify_manifest,
     verify_remote_fixture,
 )
@@ -145,6 +147,45 @@ class P10DistributionTests(unittest.TestCase):
                 workflow.write_text(workflow.read_text(encoding="utf-8") + marker, encoding="utf-8")
                 with self.subTest(label=label), self.assertRaisesRegex(GateError, "publication"):
                     check_distribution(root)
+
+    def test_external_network_and_missing_probe_fail_closed(self) -> None:
+        compose = (ROOT / "compose.p10.yaml").read_text(encoding="utf-8")
+        verify_compose_network_boundary(compose)
+        without_internal = compose.replace("    internal: true\n", "", 1)
+        with self.assertRaisesRegex(GateError, "internal_network_definition"):
+            verify_compose_network_boundary(without_internal)
+        default_routed = compose.replace("    networks:\n      - p10-internal\n", "", 3).replace(
+            "networks:\n  p10-internal:\n    internal: true\n", "networks:\n  default:\n"
+        )
+        with self.assertRaisesRegex(GateError, "internal_network_membership"):
+            verify_compose_network_boundary(default_routed)
+        externally_attached = compose.replace(
+            "    networks:\n      - p10-internal\n",
+            "    networks:\n      - p10-internal\n      - p10-loopback\n",
+            1,
+        )
+        with self.assertRaisesRegex(GateError, "internal_network_membership"):
+            verify_compose_network_boundary(externally_attached)
+        with self.assertRaisesRegex(GateError, "probe_incomplete"):
+            validate_external_egress_probe(
+                {
+                    "performed": False,
+                    "control_reachable": True,
+                    "internal_network_verified": True,
+                    "service_network_count": 3,
+                    "unexpected_connection_count": 0,
+                }
+            )
+        with self.assertRaisesRegex(GateError, "unexpected_external_egress"):
+            validate_external_egress_probe(
+                {
+                    "performed": True,
+                    "control_reachable": True,
+                    "internal_network_verified": True,
+                    "service_network_count": 3,
+                    "unexpected_connection_count": 1,
+                }
+            )
 
 
 if __name__ == "__main__":

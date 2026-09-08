@@ -50,8 +50,11 @@ P10_TEST_BOUNDARIES = {
     "tests.p10.test_repository.P10RepositoryTests.test_rename_copy_symlink_and_special_file_fail": "path_type_bypass_refusal",
     "tests.p10.test_distribution.P10DistributionTests.test_mutable_missing_platform_and_remote_promotion_fail": "mutable_and_remote_promotion_refusal",
     "tests.p10.test_distribution.P10DistributionTests.test_oci_missing_platform_and_digest_mismatch_fail": "oci_integrity_refusal",
+    "tests.p10.test_distribution.P10DistributionTests.test_external_network_and_missing_probe_fail_closed": "runtime_egress_boundary_refusal",
     "tests.p10.test_security.P10SecurityTests.test_studio_secret_mount_and_credential_material_fail_closed": "secret_mount_refusal",
+    "tests.p10.test_security.P10SecurityTests.test_shipped_filevault_ignores_environment_overrides": "filevault_injection_isolation",
     "tests.p10.test_operations.P10OperationsTests.test_update_restore_unsafe_root_locale_and_concurrency_refuse": "operator_abuse_refusal",
+    "tests.p10.test_operations.P10OperationsTests.test_generated_manifest_round_trip_and_schema_refusals": "release_manifest_schema_refusal",
     "tests.p10.test_i18n.P10I18nTests.test_missing_extra_wrong_type_and_placeholder_mismatch_fail": "translation_integrity_refusal",
     "tests.p10.test_evidence_gate.P10EvidenceTests.test_writer_rejects_dirty_and_skipped_inputs_without_writing": "evidence_fail_closed",
 }

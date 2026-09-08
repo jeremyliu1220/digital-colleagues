@@ -29,14 +29,15 @@ def check_security(root: Path) -> dict[str, object]:
         "set -x",
         "docker compose build",
         "docker pull",
+        "DC_TEST_MODE",
+        "DC_TEST_FILEVAULT_STATUS",
     )
     if any(marker in text for marker in forbidden):
         raise GateError("unsafe_launcher_primitive")
     required = (
         "umask 077",
         "Library/Application Support/Digital Colleagues",
-        "fdesetup status",
-        "DC_TEST_MODE",
+        "/usr/bin/fdesetup status",
         "chmod 700",
         "chmod 600",
         "managed-root-id",
@@ -47,6 +48,8 @@ def check_security(root: Path) -> dict[str, object]:
     )
     if any(marker not in text for marker in required):
         raise GateError("security_control_missing")
+    if text.count("/usr/bin/fdesetup status") != 1:
+        raise GateError("filevault_probe_boundary_invalid")
     if re.search(r"docker compose[^\n]*(?:\$\*|eval)", text):
         raise GateError("unbounded_compose_execution")
     compose = (root / "compose.p10.yaml").read_text(encoding="utf-8")

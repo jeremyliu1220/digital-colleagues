@@ -24,12 +24,16 @@ from scripts.check_p10_compose_runtime import (
     cleanup_candidate,
     dc_command,
     free_port,
+    probe_external_egress,
+    validate_external_egress_probe,
 )
 from scripts.p10_gate_support import GateError, redact
 
 
 def run_quickstart_trials(root: Path, candidate: LocalCandidate, work: Path) -> dict[str, object]:
     durations: list[float] = []
+    external_egress_probe_count = 0
+    unexpected_external_egress_count = 0
     for trial in range(1, 4):
         parent = work / f"trial-{trial}"
         parent.mkdir(mode=0o700, parents=True)
@@ -60,6 +64,11 @@ def run_quickstart_trials(root: Path, candidate: LocalCandidate, work: Path) -> 
             _assert_safe_output(status_output, managed_root)
             if code != 0 or status.get("ready") is not True:
                 raise GateError("quickstart_status_not_ready")
+            probe = probe_external_egress(root, candidate)
+            external_egress_probe_count += 1
+            unexpected_external_egress_count += validate_external_egress_probe(probe)
+            if unexpected_external_egress_count:
+                raise GateError("quickstart_unexpected_external_egress")
             durations.append(measured)
         finally:
             try:
@@ -102,7 +111,10 @@ def run_quickstart_trials(root: Path, candidate: LocalCandidate, work: Path) -> 
         "all_below_300_seconds": True,
         "build_inside_timed_interval_count": 0,
         "provider_credential_count": 0,
-        "unexpected_external_egress_count": 0,
+        "external_egress_probe_count": external_egress_probe_count,
+        "external_egress_control_count": external_egress_probe_count,
+        "internal_network_verified": True,
+        "unexpected_external_egress_count": unexpected_external_egress_count,
         "cleanup_residue_count": 0,
         "filevault_readiness": "not_evaluated_test_boundary",
         "remote_ghcr_pull_path": "not_evaluated",

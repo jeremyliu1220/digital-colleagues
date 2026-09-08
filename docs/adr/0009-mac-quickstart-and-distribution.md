@@ -55,6 +55,23 @@ tag, and Release creation are not. GHCR, registry signature, and registry attest
 - P10 can become a local implementation candidate, but its full exit and P11 remain
   blocked on separately authorized, independently accepted remote distribution evidence.
 
+## Scoped correction
+
+The shipped launcher has no FileVault injection switch: only read-only
+`/usr/bin/fdesetup status` can determine the production classification. Tests create any
+probe substitute only inside an OS-temporary harness. API, worker, and Studio share one
+explicit `internal: true` Compose network, while the operator remains `network_mode: none`.
+A fixed ingress-only Nginx gateway, with no state, secrets, environment, or variable
+destination, bridges that network to a separate loopback-published network. The runtime
+Gate verifies the actual Docker network and compares a reachable gate-owned local control
+endpoint with refused API, worker, and Studio connections; evidence derives the
+external-egress count from those probes.
+
+The release manifest has one rigid 18-field schema across the template, builder, Python
+verifier, and shipped launcher. `source_timestamp` remains part of the private operations
+source binding but is not a release-manifest field. Missing, extra, duplicate, unknown, or
+wrong-type manifest fields fail closed.
+
 ## Rejected alternatives
 
 - Mutable tags or `latest`: they do not bind executed bytes.

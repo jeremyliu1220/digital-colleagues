@@ -201,6 +201,19 @@ def validate_summary(root: Path, summary: dict[str, Any]) -> dict[str, object]:
         "median_seconds"
     ) != statistics.median(durations):
         raise GateError("evidence_quickstart_statistics_invalid")
+    compose_runtime = summary["compose_runtime"]
+    if (
+        quickstart.get("external_egress_probe_count") != 3
+        or quickstart.get("external_egress_control_count") != 3
+        or quickstart.get("internal_network_verified") is not True
+        or quickstart.get("unexpected_external_egress_count") != 0
+        or not isinstance(compose_runtime, dict)
+        or compose_runtime.get("external_egress_probe_count") != 1
+        or compose_runtime.get("external_egress_control_count") != 1
+        or compose_runtime.get("internal_network_verified") is not True
+        or compose_runtime.get("unexpected_external_egress_count") != 0
+    ):
+        raise GateError("evidence_external_egress_probe_invalid")
     if summary["evidence_classes"] != EVIDENCE_CLASSES or any(
         summary[key] != value for key, value in REMOTE_STATES.items()
     ):

@@ -24,7 +24,10 @@ state, databases, backups, logs, diagnostics, release locks, or credentials.
 
 `doctor` is read-only. FileVault `enabled` produces `encrypted_storage_ready`; off or
 unknown blocks live readiness but does not block deterministic reference mode. P10 neither
-changes FileVault nor accepts provider credentials.
+changes FileVault nor accepts provider credentials. The shipped launcher accepts no
+environment or command-line override for this classification; only read-only
+`/usr/bin/fdesetup status` is authoritative. Probe substitution exists only in temporary
+test harnesses.
 
 ## Lifecycle
 

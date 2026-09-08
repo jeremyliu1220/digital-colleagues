@@ -165,7 +165,6 @@ def build_bundle(
         "display_version": DISPLAY_VERSION,
         "maturity": MATURITY,
         "source_revision": revision,
-        "source_timestamp": timestamp,
         "compose_project": PROJECT_ID,
         "runtime_image": runtime_image,
         "studio_image": studio_image,
@@ -192,6 +191,9 @@ def build_bundle(
             "production_readiness",
         ],
     }
+    from scripts.check_p10_distribution import load_manifest, verify_manifest
+
+    verify_manifest(manifest, template=False)
     members = {
         "dc": root / "dc",
         "compose.p10.yaml": root / "compose.p10.yaml",
@@ -202,6 +204,7 @@ def build_bundle(
             raise CandidateError("bundle_source_invalid")
         shutil.copyfile(source, output / name)
     (output / "manifest.json").write_bytes(_json_bytes(manifest))
+    verify_manifest(load_manifest(output / "manifest.json"), template=False)
     (output / "operations-source-binding.json").write_bytes(_json_bytes(operation_binding))
     os.chmod(output / "dc", 0o755)
     for name in (

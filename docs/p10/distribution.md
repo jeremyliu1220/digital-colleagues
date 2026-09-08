@@ -28,7 +28,16 @@ verification-policy.json
 1-7, exact runtime/Studio image references, Compose identity, and remote authorization
 states. `SHA256SUMS` covers the manifest and every other bundle member except the checksum
 file itself. A bundle is rejected on an unexpected member, mode, checksum, identity,
-mutable image, or unresolved template field.
+mutable image, unresolved template field, or any missing, extra, duplicate, unknown, or
+wrong-type manifest field. `source_timestamp` belongs only to the operations source binding
+and is not part of this fixed release-manifest schema.
+
+API, worker, and Studio use one explicit internal Compose network. The operator retains
+`network_mode: none`. A fixed ingress-only Nginx gateway with no private mount, environment,
+or variable destination provides loopback API and Studio forwarding. The actual runtime
+and quickstart Gates verify the Docker network and use a bounded gate-owned host-loopback
+endpoint with a reachable external-route control before requiring API, worker, and Studio
+probes to fail. They do not contact the public Internet.
 
 ## Official references checked
 

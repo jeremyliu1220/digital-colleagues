@@ -18,8 +18,6 @@ services:
       DC_STATE_DIR: /state
       PYTHONDONTWRITEBYTECODE: "1"
     user: ${DC_RUNTIME_UID:?non-root runtime uid required}:${DC_RUNTIME_GID:?non-root runtime gid required}
-    ports:
-      - 127.0.0.1:${DC_API_PORT:?verified API port required}:8000
     volumes:
       - type: bind
         source: ${DC_STATE_DIR:?verified state directory required}
@@ -36,6 +34,8 @@ services:
       interval: 1s
       timeout: 3s
       retries: 60
+    networks:
+      - p10-internal
     restart: on-failure:3
 
   worker:
@@ -68,6 +68,8 @@ services:
       interval: 1s
       timeout: 3s
       retries: 60
+    networks:
+      - p10-internal
     restart: on-failure:3
 
   studio:
@@ -77,8 +79,6 @@ services:
         condition: service_healthy
       worker:
         condition: service_healthy
-    ports:
-      - 127.0.0.1:${DC_STUDIO_PORT:?verified Studio port required}:8080
     read_only: true
     tmpfs:
       - /var/cache/nginx:mode=0700
@@ -94,6 +94,48 @@ services:
       interval: 1s
       timeout: 3s
       retries: 60
+    networks:
+      - p10-internal
+    restart: on-failure:3
+
+  gateway:
+    image: ${DC_STUDIO_IMAGE:?verified Studio image digest required}
+    entrypoint:
+      - /bin/sh
+      - -c
+    command:
+      - >-
+        printf '%s\n'
+        'pid /tmp/nginx.pid; events {} http {
+        server { listen 8000; location / { proxy_pass http://api:8000; } }
+        server { listen 8080; location / { proxy_pass http://studio:8080; } }
+        }' > /tmp/nginx.conf;
+        exec nginx -c /tmp/nginx.conf -g 'daemon off;'
+    depends_on:
+      api:
+        condition: service_healthy
+      worker:
+        condition: service_healthy
+      studio:
+        condition: service_healthy
+    ports:
+      - 127.0.0.1:${DC_API_PORT:?verified API port required}:8000
+      - 127.0.0.1:${DC_STUDIO_PORT:?verified Studio port required}:8080
+    read_only: true
+    tmpfs:
+      - /tmp:mode=0700
+      - /var/cache/nginx:mode=0700
+      - /var/run:mode=0700
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - wget -q -T 2 -O /dev/null http://127.0.0.1:8000/health && wget -q -T 2 -O /dev/null http://127.0.0.1:8080/
+      interval: 1s
+      timeout: 5s
+      retries: 60
+    networks:
+      - p10-internal
+      - p10-loopback
     restart: on-failure:3
 
   operator:
@@ -120,3 +162,8 @@ services:
       - /tmp:mode=0700,uid=${DC_RUNTIME_UID:?non-root runtime uid required},gid=${DC_RUNTIME_GID:?non-root runtime gid required}
     network_mode: none
     restart: "no"
+
+networks:
+  p10-internal:
+    internal: true
+  p10-loopback:

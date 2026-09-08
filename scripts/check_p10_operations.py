@@ -15,6 +15,7 @@ if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from scripts.build_p10_candidate import build_bundle
+from scripts.check_p10_distribution import MANIFEST_KEYS, load_manifest, verify_manifest
 from scripts.p10_gate_support import GateError, emit_main
 
 COMMANDS = {
@@ -60,15 +61,29 @@ def check_operations(root: Path) -> dict[str, object]:
         result = build_bundle(root, output, revision, reference, studio)
         if result["member_count"] != 6:
             raise GateError("bundle_member_count_invalid")
-        manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
+        manifest = load_manifest(output / "manifest.json")
+        verify_manifest(manifest, template=False)
         if manifest["runtime_image"] != reference:
             raise GateError("operation_release_binding_invalid")
+        if set(manifest) != MANIFEST_KEYS or "source_timestamp" in manifest:
+            raise GateError("operation_release_manifest_schema_invalid")
+        binding = json.loads(
+            (output / "operations-source-binding.json").read_text(encoding="utf-8")
+        )
+        if not isinstance(binding.get("source_timestamp"), str):
+            raise GateError("operation_source_binding_timestamp_missing")
     for marker in (
         "--no-build --pull never",
         "services_must_be_stopped",
         "verify-backup",
         "remote_distribution_authorization_required",
         "--purge-data",
+        "manifest_schema_valid",
+        "plutil -type",
+        "manifest_type schema_version",
+        "manifest_type template",
+        "manifest_type platforms",
+        "manifest_type schema_versions",
     ):
         if marker not in launcher:
             raise GateError("operation_safety_control_missing")

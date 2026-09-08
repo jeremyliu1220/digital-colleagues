@@ -39,34 +39,73 @@ FORBIDDEN_WORKFLOW = (
     "id-token: write",
     "attestations: write",
 )
+MANIFEST_KEYS = {
+    "schema_version",
+    "distribution_format",
+    "template",
+    "product_name",
+    "python_version",
+    "display_version",
+    "maturity",
+    "source_revision",
+    "compose_project",
+    "runtime_image",
+    "studio_image",
+    "platforms",
+    "schema_versions",
+    "migration_008",
+    *REMOTE_STATES,
+}
+
+
+def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    value: dict[str, Any] = {}
+    for key, item in pairs:
+        if key in value:
+            raise GateError("manifest_duplicate_field")
+        value[key] = item
+    return value
+
+
+def load_manifest(path: Path) -> dict[str, Any]:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=_unique_object)
+    except GateError:
+        raise
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise GateError("manifest_json_invalid") from exc
+    if not isinstance(value, dict):
+        raise GateError("manifest_shape_invalid")
+    return value
 
 
 def verify_manifest(value: dict[str, Any], *, template: bool) -> None:
-    required = {
-        "schema_version",
-        "distribution_format",
-        "template",
-        "product_name",
-        "python_version",
-        "display_version",
-        "maturity",
-        "source_revision",
-        "compose_project",
-        "runtime_image",
-        "studio_image",
-        "platforms",
-        "schema_versions",
-        "migration_008",
-        *REMOTE_STATES,
-    }
     if (
-        set(value) != required
+        set(value) != MANIFEST_KEYS
+        or type(value["schema_version"]) is not int
         or value["schema_version"] != 1
+        or not isinstance(value["distribution_format"], str)
         or value["distribution_format"] != "digital-colleagues-p10-bundle-v1"
     ):
         raise GateError("manifest_shape_invalid")
     if (
-        value["template"] is not template
+        type(value["template"]) is not bool
+        or value["template"] is not template
+        or not all(
+            isinstance(value[key], str)
+            for key in (
+                "product_name",
+                "python_version",
+                "display_version",
+                "maturity",
+                "source_revision",
+                "compose_project",
+                "runtime_image",
+                "studio_image",
+                "migration_008",
+                *REMOTE_STATES,
+            )
+        )
         or value["product_name"] != PRODUCT_NAME
         or value["python_version"] != PYTHON_VERSION
         or value["display_version"] != DISPLAY_VERSION
@@ -74,17 +113,71 @@ def verify_manifest(value: dict[str, Any], *, template: bool) -> None:
     ):
         raise GateError("manifest_metadata_invalid")
     if (
-        value["platforms"] != list(PLATFORMS)
+        not isinstance(value["platforms"], list)
+        or not all(isinstance(item, str) for item in value["platforms"])
+        or value["platforms"] != list(PLATFORMS)
+        or not isinstance(value["schema_versions"], list)
+        or not all(type(item) is int for item in value["schema_versions"])
         or value["schema_versions"] != list(range(1, 8))
         or value["migration_008"] != "absent"
     ):
         raise GateError("manifest_platform_or_schema_invalid")
+    if value["compose_project"] != "digital-colleagues-p10":
+        raise GateError("manifest_compose_identity_invalid")
     if any(value[key] != state for key, state in REMOTE_STATES.items()):
         raise GateError("remote_authorization_state_invalid")
-    if not template and (
-        not valid_digest_ref(value["runtime_image"]) or not valid_digest_ref(value["studio_image"])
+    if template:
+        if (
+            value["source_revision"] != "IMPLEMENTATION_COMMIT_REQUIRED"
+            or value["runtime_image"]
+            != "LOCAL_REGISTRY_REQUIRED/digital-colleagues/runtime@sha256:EXACT_DIGEST_REQUIRED"
+            or value["studio_image"]
+            != "LOCAL_REGISTRY_REQUIRED/digital-colleagues/studio@sha256:EXACT_DIGEST_REQUIRED"
+        ):
+            raise GateError("manifest_template_placeholder_invalid")
+    elif (
+        re.fullmatch(r"[0-9a-f]{40}", value["source_revision"]) is None
+        or not valid_digest_ref(value["runtime_image"])
+        or not valid_digest_ref(value["studio_image"])
     ):
-        raise GateError("manifest_image_reference_invalid")
+        raise GateError("manifest_image_or_revision_invalid")
+
+
+def verify_compose_network_boundary(compose: str) -> None:
+    def service_block(service: str) -> str:
+        match = re.search(
+            rf"(?ms)^  {re.escape(service)}:\n(?P<body>.*?)(?=^  [A-Za-z0-9_-]+:\n|^networks:\n|\Z)",
+            compose,
+        )
+        if match is None:
+            raise GateError("compose_service_missing")
+        return match.group("body")
+
+    for service in ("api", "worker", "studio"):
+        block = service_block(service)
+        network = re.search(r"(?m)^    networks:\n(?P<body>(?:      - [^\n]+\n)+)", block)
+        if network is None or network.group("body") != "      - p10-internal\n":
+            raise GateError("compose_internal_network_membership_invalid")
+    gateway = service_block("gateway")
+    gateway_network = re.search(r"(?m)^    networks:\n(?P<body>(?:      - [^\n]+\n)+)", gateway)
+    if (
+        gateway_network is None
+        or gateway_network.group("body") != "      - p10-internal\n      - p10-loopback\n"
+        or "127.0.0.1:${DC_API_PORT" not in gateway
+        or "127.0.0.1:${DC_STUDIO_PORT" not in gateway
+        or "    volumes:\n" in gateway
+        or "    environment:\n" in gateway
+    ):
+        raise GateError("compose_loopback_gateway_boundary_invalid")
+    operator = service_block("operator")
+    if "    network_mode: none\n" not in operator or "    networks:\n" in operator:
+        raise GateError("compose_operator_network_boundary_invalid")
+    match = re.search(r"(?ms)^networks:\n(?P<body>.*)\Z", compose)
+    if (
+        match is None
+        or match.group("body").strip() != "p10-internal:\n    internal: true\n  p10-loopback:"
+    ):
+        raise GateError("compose_internal_network_definition_invalid")
 
 
 def verify_remote_fixture(value: dict[str, Any]) -> None:
@@ -213,7 +306,7 @@ def inspect_oci_layout(path: Path) -> dict[str, object]:
 
 
 def check_distribution(root: Path) -> dict[str, object]:
-    template = load_json(root / "distribution/p10/release-manifest.template.json")
+    template = load_manifest(root / "distribution/p10/release-manifest.template.json")
     verify_manifest(template, template=True)
     policy = load_json(root / "distribution/p10/verification-policy.json")
     if policy.get("synthetic_fixture_may_satisfy_remote_gate") is not False or any(
@@ -232,6 +325,7 @@ def check_distribution(root: Path) -> dict[str, object]:
     ):
         if marker not in compose:
             raise GateError("compose_distribution_boundary_missing")
+    verify_compose_network_boundary(compose)
     workflow = (root / ".github/workflows/ci.yml").read_text(encoding="utf-8").lower()
     if any(marker in workflow for marker in FORBIDDEN_WORKFLOW):
         raise GateError("workflow_publication_authority_forbidden")
