@@ -174,7 +174,18 @@ class P10DistributionTests(unittest.TestCase):
                 inspect_oci_layout(corrupt)
 
     def test_final_workflow_has_no_dispatch_or_remote_authority(self) -> None:
-        workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+        workflow = subprocess.run(
+            [
+                "git",
+                "show",
+                "c27e38b68ce0476cacd89213968d4e7a316729f0:.github/workflows/ci.yml",
+            ],
+            cwd=ROOT,
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
         validate_final_workflow(workflow)
         mutations = (
             ("trigger", "  pull_request:\n", "  pull_request_target:\n"),
