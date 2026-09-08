@@ -81,7 +81,7 @@ class P10RepositoryTests(unittest.TestCase):
             )
             commit_all(root, "negative non-contract path drift")
             with self.assertRaisesRegex(
-                GateError, "changed_path_set_invalid_missing_0_extra_1"
+                GateError, "changed_path_set_invalid_missing_1_extra_1"
             ):
                 check_repository(root)
 

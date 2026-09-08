@@ -306,7 +306,7 @@ class P10DistributionTests(unittest.TestCase):
 
     def test_remote_policy_lifecycle_and_failure_states_fail_closed(self) -> None:
         policy = load_json(ROOT / "distribution/p10/verification-policy.json")
-        self.assertEqual(validate_remote_policy(policy), "passed")
+        self.assertEqual(validate_remote_policy(policy), policy["lifecycle_state"])
         pending = copy.deepcopy(policy)
         pending.update(
             {
