@@ -550,8 +550,8 @@ case "$COMMAND" in
     emit_ok up_ok
     ;;
   down)
-    verify_bundle || emit_error distribution_verification_failed "$EXIT_VERIFICATION"
     acquire_lock
+    verify_bundle || emit_error distribution_verification_failed "$EXIT_VERIFICATION"
     verify_managed_identity
     configure_compose
     compose down --remove-orphans >/dev/null 2>&1 || emit_error runtime_stop_failed "$EXIT_RUNTIME"
