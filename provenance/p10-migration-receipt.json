@@ -44,7 +44,7 @@
     {
       "url": "https://cli.github.com/manual/gh_attestation_verify",
       "checked_at": "2026-09-08T09:04:31Z",
-      "observed_contract": "GitHub CLI verification can consume a local bundle and artifact, bind them to an exact repository, signer digest, source ref and digest, certificate identity and issuer, and reject self-hosted runners without using the GitHub API."
+      "observed_contract": "GitHub CLI verification can verify an exact oci://subject@digest against the repository attestation API, or consume a local bundle and artifact while binding them to an exact repository, signer digest, source ref and digest, certificate identity and issuer and rejecting self-hosted runners without using the GitHub API. The corrected P10 verification uses both forms."
     },
     {
       "url": "https://github.com/actions/checkout/commit/d23441a48e516b6c34aea4fa41551a30e30af803",

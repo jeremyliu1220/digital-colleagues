@@ -48,6 +48,23 @@ digest `sha256:b7dd4c2b35922ec31a9b38c15316283706a9aab0ffab2101a18f7bf106165f2e`
 are retained as `superseded_contract_noncompliant_source`. They are not active release-lock
 references and must not be selected by a final P10 bundle or execution path.
 
+The scoped correction published the contract-compliant source
+`62b226064d2597a4ca6a67f9f2c20a79a815732b` in publication run
+[`34235760264`](https://github.com/jeremyliu1220/digital-colleagues/actions/runs/34235760264).
+The active runtime index is
+`sha256:a5bb41bdb85bf7b5a75dc79967e26943c098b024b64fdd345f5b4c6f4688991d`;
+the active Studio index is
+`sha256:7791d80d9fa464bbd1574601deba5a30ca6d980dab8c8275c24c117fae81e4c9`.
+Read-only verification run
+[`34237810474`](https://github.com/jeremyliu1220/digital-colleagues/actions/runs/34237810474)
+passed all exact-digest checks. Its publication job was skipped. The immediately preceding
+verification run
+[`34236719816`](https://github.com/jeremyliu1220/digital-colleagues/actions/runs/34236719816)
+failed closed before registry verification because the verifier rejected the legitimate
+`published_pending_verification` lifecycle. The corrected verifier accepts only the exact
+source and digest tuple already locked in policy; that failed run remains public and did
+not republish, delete, or overwrite an artifact.
+
 ## Historical one-time activation workflow
 
 The preserved activation history used the following controls. The final branch workflow
@@ -67,7 +84,8 @@ attestations: write
 artifact-metadata: write
 ```
 
-The verification job has `contents: read` only. It does not log in to GHCR and cannot
+The verification job has `contents: read` and `attestations: read` only. It does not log
+in to GHCR and cannot
 mint an OIDC token, push a package, generate an attestation, or mutate a registry.
 Neither job uploads a workflow artifact, creates a Git tag or Release, or selects bytes
 through a mutable tag.
@@ -147,8 +165,9 @@ residue.
 ## Revision semantics and final lock
 
 The active publication source revision is the contract-compliant commit whose Dockerfiles
-and temporary workflow
-built, signed, and attested the images. It remains fixed even after the branch advances.
+and temporary workflow built, signed, and attested the images. It remains fixed even after
+the branch advances. Verification run `34237810474` is the only active correction
+verification result; run `34236719816` remains a fail-closed historical result.
 The final evidence implementation revision is the later commit that records verified
 digests/run identities and removes every publish/verify job and all remote write
 permissions. `artifacts/p10/summary.json` records these as separate fields.

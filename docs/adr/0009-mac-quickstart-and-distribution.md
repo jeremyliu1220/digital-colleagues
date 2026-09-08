@@ -55,6 +55,24 @@ removes both remote jobs and every write permission.
 No artifact upload, Git tag, GitHub Release, main push, merge, history rewrite, personal
 Cosign key, provider credential, or P11 work is authorized.
 
+## Active corrected remote gate result
+
+Publication run `34235760264` fixed the contract-compliant source
+`62b226064d2597a4ca6a67f9f2c20a79a815732b`. Its runtime index is
+`sha256:a5bb41bdb85bf7b5a75dc79967e26943c098b024b64fdd345f5b4c6f4688991d`
+and its Studio index is
+`sha256:7791d80d9fa464bbd1574601deba5a30ca6d980dab8c8275c24c117fae81e4c9`.
+Read-only verification run `34237810474` passed the exact index, child manifest, config,
+layer, anonymous pull, Cosign identity/issuer/source revision, offline attestation bundle,
+and direct GitHub CLI OCI-attestation checks. Its publication job was skipped.
+
+Verification run `34236719816` immediately before it failed closed because the verifier
+did not yet admit the legitimate `published_pending_verification` lifecycle. The correction
+requires its three inputs to equal the source and digests already locked in policy, and no
+republication occurred. Both runs remain in public history. After the passing run, the
+branch workflow was returned to read-only push/pull-request CI with no dispatch interface,
+remote job, package write, OIDC, or attestation permission.
+
 ## Superseded remote gate result
 
 Publication run `34202520699` fixed source revision
@@ -69,7 +87,9 @@ remote write path. Independent acceptance later found that the publication sourc
 digests remain public but are `superseded_contract_noncompliant_source`; they are not an
 active release lock or final P10 execution choice. A scoped correction restores the file to
 accepted P9 bytes and requires a new source revision, new digests, and new independent
-verification before the remote gate may return to `passed`.
+verification before the remote gate may return to `passed`. The corrected result above
+satisfies that replacement requirement without deleting or overwriting the superseded
+objects.
 
 ## Consequences
 
