@@ -11,9 +11,11 @@ import tempfile
 import unittest
 from pathlib import Path
 from typing import Any
+from unittest.mock import patch
 
 from scripts.check_p10_compose_runtime import validate_external_egress_probe
 from scripts.check_p10_distribution import (
+    _verify_attestation,
     check_distribution,
     inspect_oci_layout,
     validate_activation_workflow,
@@ -183,6 +185,38 @@ class P10DistributionTests(unittest.TestCase):
             self.assertIn(old, workflow)
             with self.subTest(label=label), self.assertRaises(GateError):
                 validate_activation_workflow(workflow.replace(old, new, 1))
+
+    def test_attestation_verifier_uses_one_exact_signer_policy(self) -> None:
+        digest = "sha256:" + "1" * 64
+        revision = "a" * 40
+        captured: list[str] = []
+
+        def run(command: list[str], **_: object) -> str:
+            captured.extend(command)
+            return json.dumps(
+                [
+                    {
+                        "verificationResult": {
+                            "statement": {
+                                "subject": [
+                                    {
+                                        "name": RUNTIME_SUBJECT,
+                                        "digest": {"sha256": digest.removeprefix("sha256:")},
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                ]
+            )
+
+        with patch("scripts.check_p10_distribution._remote_run", side_effect=run):
+            _verify_attestation(ROOT, Path("/tmp/gh"), RUNTIME_SUBJECT, digest, revision, {})
+        self.assertIn("--cert-identity", captured)
+        self.assertIn("--signer-digest", captured)
+        self.assertIn("--source-digest", captured)
+        self.assertNotIn("--signer-repo", captured)
+        self.assertNotIn("--signer-workflow", captured)
 
     def test_remote_policy_lifecycle_and_failure_states_fail_closed(self) -> None:
         policy = load_json(ROOT / "distribution/p10/verification-policy.json")

@@ -345,6 +345,11 @@ def validate_activation_workflow(workflow: str) -> None:
     if (
         "inputs.operation == 'verify'" not in verify
         or "inputs.confirm == 'VERIFY-P10-CANDIDATE'" not in verify
+        or "inputs.candidate_sha == '05e73ea23ac650edfae59fa409a770fdf967af3a'" not in verify
+        or "github.sha == '05e73ea23ac650edfae59fa409a770fdf967af3a'" not in publish
+        or "PUBLISHED_SOURCE_SHA: 05e73ea23ac650edfae59fa409a770fdf967af3a" not in guard
+        or 'test "$GITHUB_SHA" = "$PUBLISHED_SOURCE_SHA"' not in guard
+        or 'test "$CANDIDATE_SHA" = "$PUBLISHED_SOURCE_SHA"' not in guard
         or 'test "$GITHUB_REPOSITORY" = "jeremyliu1220/digital-colleagues"' not in guard
         or 'test "$GITHUB_REF" = "refs/heads/codex/p10-mac-quickstart"' not in guard
         or "github.event_name != 'workflow_dispatch'" not in public
@@ -968,10 +973,6 @@ def _verify_attestation(
         f"oci://{subject}@{digest}",
         "-R",
         REMOTE_REPOSITORY,
-        "--signer-repo",
-        REMOTE_REPOSITORY,
-        "--signer-workflow",
-        f"github.com/{REMOTE_REPOSITORY}/{REMOTE_WORKFLOW_PATH}",
         "--signer-digest",
         source_revision,
         "--source-ref",

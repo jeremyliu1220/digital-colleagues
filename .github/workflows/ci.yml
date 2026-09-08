@@ -83,6 +83,7 @@ jobs:
       CANDIDATE_SHA: ${{ inputs.candidate_sha }}
       RUNTIME_DIGEST: ${{ inputs.runtime_digest }}
       STUDIO_DIGEST: ${{ inputs.studio_digest }}
+      PUBLISHED_SOURCE_SHA: 05e73ea23ac650edfae59fa409a770fdf967af3a
     steps:
       - name: Fail closed unless repository, ref, revision, and operation are exact
         shell: bash
@@ -90,15 +91,17 @@ jobs:
           set -euo pipefail
           test "$GITHUB_REPOSITORY" = "jeremyliu1220/digital-colleagues"
           test "$GITHUB_REF" = "refs/heads/codex/p10-mac-quickstart"
-          test "$CANDIDATE_SHA" = "$GITHUB_SHA"
           [[ "$CANDIDATE_SHA" =~ ^[0-9a-f]{40}$ ]]
           case "$OPERATION" in
             publish)
+              test "$GITHUB_SHA" = "$PUBLISHED_SOURCE_SHA"
+              test "$CANDIDATE_SHA" = "$GITHUB_SHA"
               test "$CONFIRM" = "PUBLISH-P10-CANDIDATE"
               test -z "$RUNTIME_DIGEST"
               test -z "$STUDIO_DIGEST"
               ;;
             verify)
+              test "$CANDIDATE_SHA" = "$PUBLISHED_SOURCE_SHA"
               test "$CONFIRM" = "VERIFY-P10-CANDIDATE"
               [[ "$RUNTIME_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
               [[ "$STUDIO_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
@@ -116,6 +119,7 @@ jobs:
       github.event_name == 'workflow_dispatch' &&
       github.repository == 'jeremyliu1220/digital-colleagues' &&
       github.ref == 'refs/heads/codex/p10-mac-quickstart' &&
+      github.sha == '05e73ea23ac650edfae59fa409a770fdf967af3a' &&
       inputs.candidate_sha == github.sha &&
       inputs.operation == 'publish' &&
       inputs.confirm == 'PUBLISH-P10-CANDIDATE'
@@ -251,7 +255,7 @@ jobs:
       github.event_name == 'workflow_dispatch' &&
       github.repository == 'jeremyliu1220/digital-colleagues' &&
       github.ref == 'refs/heads/codex/p10-mac-quickstart' &&
-      inputs.candidate_sha == github.sha &&
+      inputs.candidate_sha == '05e73ea23ac650edfae59fa409a770fdf967af3a' &&
       inputs.operation == 'verify' &&
       inputs.confirm == 'VERIFY-P10-CANDIDATE'
     runs-on: ubuntu-latest
