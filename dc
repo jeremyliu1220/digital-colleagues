@@ -603,6 +603,7 @@ case "$COMMAND" in
     emit_ok restore_ok "\"rollback_backup_verified\":true"
     ;;
   update)
+    [ -x /usr/bin/plutil ] || emit_error remote_distribution_authorization_required "$EXIT_AUTHORIZATION"
     verify_bundle || emit_error distribution_verification_failed "$EXIT_VERIFICATION"
     [ "$(manifest_get remote_distribution_gate)" = passed ] || emit_error remote_distribution_authorization_required "$EXIT_AUTHORIZATION"
     emit_error remote_distribution_authorization_required "$EXIT_AUTHORIZATION"
