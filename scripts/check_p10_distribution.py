@@ -359,6 +359,16 @@ def validate_activation_workflow(
         )
         or "scripts/check_p10_distribution.py --remote-from-env" not in verify
         or "P10_REMOTE_DOCKER_CONFIG" not in verify
+        or verify.count("gh attestation verify") != 2
+        or (
+            '"oci://ghcr.io/jeremyliu1220/digital-colleagues-runtime@'
+            '$P10_REMOTE_RUNTIME_DIGEST"' not in verify
+        )
+        or (
+            '"oci://ghcr.io/jeremyliu1220/digital-colleagues-studio@'
+            '$P10_REMOTE_STUDIO_DIGEST"' not in verify
+        )
+        or verify.count("-R jeremyliu1220/digital-colleagues") != 2
     ):
         raise GateError("workflow_verify_not_read_only")
     common_dispatch = (
@@ -1330,6 +1340,12 @@ def verify_remote_distribution(
         revision = source_revision
         runtime = runtime_digest
         studio = studio_digest
+    elif lifecycle == "published_pending_verification":
+        revision = policy["published_source_revision"]
+        runtime = policy["runtime_digest"]
+        studio = policy["studio_digest"]
+        if (source_revision, runtime_digest, studio_digest) != (revision, runtime, studio):
+            raise GateError("published_policy_verification_input_mismatch")
     elif lifecycle == "passed":
         revision = policy["published_source_revision"]
         runtime = policy["runtime_digest"]

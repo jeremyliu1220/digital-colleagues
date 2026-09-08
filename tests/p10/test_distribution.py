@@ -28,6 +28,7 @@ from scripts.check_p10_distribution import (
     validate_remote_policy,
     verify_compose_network_boundary,
     verify_manifest,
+    verify_remote_distribution,
     verify_remote_fixture,
 )
 from scripts.p10_gate_support import (
@@ -211,7 +212,8 @@ class P10DistributionTests(unittest.TestCase):
             text=True,
             check=True,
         ).stdout
-        validate_activation_workflow(historical, "05e73ea23ac650edfae59fa409a770fdf967af3a")
+        with self.assertRaisesRegex(GateError, "workflow_verify_not_read_only"):
+            validate_activation_workflow(historical, "05e73ea23ac650edfae59fa409a770fdf967af3a")
         with self.assertRaises(GateError):
             validate_activation_workflow(
                 historical.replace("packages: write", "packages: read"),
@@ -354,6 +356,37 @@ class P10DistributionTests(unittest.TestCase):
         for key in REMOTE_RESULT_KEYS:
             published[key] = "published_pending_verification"
         self.assertEqual(validate_remote_policy(published), "published_pending_verification")
+        with (
+            tempfile.TemporaryDirectory(prefix="dc-p10-published-verify-") as name,
+            patch(
+                "scripts.check_p10_distribution._install_verification_tools",
+                return_value=(Path("gh"), Path("cosign")),
+            ),
+            patch(
+                "scripts.check_p10_distribution._verify_registry_subject",
+                return_value={"platforms": ["linux/amd64", "linux/arm64"]},
+            ),
+            patch("scripts.check_p10_distribution._verify_cosign"),
+            patch("scripts.check_p10_distribution._verify_attestation"),
+        ):
+            result = verify_remote_distribution(
+                ROOT,
+                published,
+                Path(name),
+                source_revision=revision,
+                runtime_digest=published["runtime_digest"],
+                studio_digest=published["studio_digest"],
+            )
+            self.assertEqual(result["remote_distribution_gate"], "passed")
+            with self.assertRaisesRegex(GateError, "published_policy_verification_input_mismatch"):
+                verify_remote_distribution(
+                    ROOT,
+                    published,
+                    Path(name),
+                    source_revision="b" * 40,
+                    runtime_digest=published["runtime_digest"],
+                    studio_digest=published["studio_digest"],
+                )
         passed = copy.deepcopy(published)
         passed.update(
             {

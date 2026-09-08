@@ -297,6 +297,12 @@ jobs:
           set -euo pipefail
           python3 -B scripts/check_p10_distribution.py --remote-from-env \
             > "$RUNNER_TEMP/p10-remote-result.json"
+          gh attestation verify \
+            "oci://ghcr.io/jeremyliu1220/digital-colleagues-runtime@$P10_REMOTE_RUNTIME_DIGEST" \
+            -R jeremyliu1220/digital-colleagues
+          gh attestation verify \
+            "oci://ghcr.io/jeremyliu1220/digital-colleagues-studio@$P10_REMOTE_STUDIO_DIGEST" \
+            -R jeremyliu1220/digital-colleagues
       - name: Record public verification evidence
         shell: bash
         run: |
