@@ -16,6 +16,7 @@ from unittest.mock import patch
 from scripts.check_p10_compose_runtime import validate_external_egress_probe
 from scripts.check_p10_distribution import (
     _remote_command_failure_category,
+    _verify_anonymous_exact_digest_pulls,
     _verify_attestation,
     check_distribution,
     inspect_oci_layout,
@@ -229,12 +230,38 @@ class P10DistributionTests(unittest.TestCase):
             "anonymous_exact_digest_pull_failed",
         )
         self.assertEqual(
+            _remote_command_failure_category(
+                ["docker", "image", "rm", "--force", "subject@sha256:digest"]
+            ),
+            "anonymous_exact_digest_pull_cleanup_failed",
+        )
+        self.assertEqual(
             _remote_command_failure_category(["/tmp/tools/cosign", "verify"]),
             "cosign_verification_failed",
         )
         self.assertEqual(
             _remote_command_failure_category(["/tmp/tools/gh", "attestation", "verify"]),
             "github_attestation_verification_failed",
+        )
+
+    def test_anonymous_platform_pulls_are_isolated_in_the_local_image_store(self) -> None:
+        reference = "subject@sha256:digest"
+        commands: list[list[str]] = []
+
+        def run(command: list[str], **_: object) -> str:
+            commands.append(command)
+            return ""
+
+        with patch("scripts.check_p10_distribution._remote_run", side_effect=run):
+            _verify_anonymous_exact_digest_pulls(ROOT, reference, {})
+        self.assertEqual(
+            commands,
+            [
+                ["docker", "pull", "--platform", "linux/amd64", reference],
+                ["docker", "image", "rm", "--force", reference],
+                ["docker", "pull", "--platform", "linux/arm64", reference],
+                ["docker", "image", "rm", "--force", reference],
+            ],
         )
 
     def test_remote_policy_lifecycle_and_failure_states_fail_closed(self) -> None:

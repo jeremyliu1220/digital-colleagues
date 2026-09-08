@@ -716,12 +716,36 @@ def _remote_command_failure_category(command: list[str]) -> str:
         return "remote_buildx_inspect_failed"
     if command[:2] == ["docker", "pull"]:
         return "anonymous_exact_digest_pull_failed"
+    if command[:3] == ["docker", "image", "rm"]:
+        return "anonymous_exact_digest_pull_cleanup_failed"
     executable = Path(command[0]).name if command else ""
     if executable == "cosign":
         return "cosign_verification_failed"
     if executable == "gh":
         return "github_attestation_verification_failed"
     return "remote_verification_command_failed"
+
+
+def _verify_anonymous_exact_digest_pulls(
+    root: Path,
+    reference: str,
+    environment: dict[str, str],
+) -> None:
+    # A classic Docker image store cannot retain two platform variants under
+    # one index digest. Remove only the just-pulled public reference before
+    # selecting the next platform; the registry operation remains anonymous
+    # and exact-digest bound.
+    for target in PLATFORMS:
+        _remote_run(
+            ["docker", "pull", "--platform", target, reference],
+            root=root,
+            environment=environment,
+        )
+        _remote_run(
+            ["docker", "image", "rm", "--force", reference],
+            root=root,
+            environment=environment,
+        )
 
 
 def _bearer_challenge(headers: Any) -> tuple[str, str, str]:
@@ -908,20 +932,7 @@ def _verify_registry_subject(
             layer_count += 1
     if sorted(platforms) != sorted(PLATFORMS) or config_count != 2 or layer_count < 2:
         raise GateError("remote_platform_or_blob_set_invalid")
-    for target in PLATFORMS:
-        _remote_run(
-            ["docker", "pull", "--platform", target, reference],
-            root=root,
-            environment=environment,
-        )
-    machine = platform.machine()
-    if platform.system() == "Darwin" and machine in {"arm64", "x86_64"}:
-        native = "linux/arm64" if machine == "arm64" else "linux/amd64"
-        _remote_run(
-            ["docker", "pull", "--platform", native, reference],
-            root=root,
-            environment=environment,
-        )
+    _verify_anonymous_exact_digest_pulls(root, reference, environment)
     return {
         "subject": subject,
         "digest": digest,
