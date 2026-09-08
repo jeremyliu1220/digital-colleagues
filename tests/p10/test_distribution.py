@@ -6,6 +6,7 @@ import copy
 import hashlib
 import io
 import json
+import subprocess
 import tarfile
 import tempfile
 import unittest
@@ -15,12 +16,15 @@ from unittest.mock import patch
 
 from scripts.check_p10_compose_runtime import validate_external_egress_probe
 from scripts.check_p10_distribution import (
+    DOCKER_DESKTOP_BUILDX,
+    _docker_buildx_command,
     _remote_command_failure_category,
     _verify_anonymous_exact_digest_pulls,
     _verify_attestation,
     check_distribution,
     inspect_oci_layout,
     validate_activation_workflow,
+    validate_final_workflow,
     validate_remote_policy,
     verify_compose_network_boundary,
     verify_manifest,
@@ -98,7 +102,7 @@ class P10DistributionTests(unittest.TestCase):
         result = check_distribution(ROOT)
         self.assertEqual(result["compose_build_count"], 0)
         self.assertEqual(result["platforms"], ["linux/amd64", "linux/arm64"])
-        self.assertEqual(result["remote_distribution_gate"], "authorized_pending")
+        self.assertEqual(result["remote_distribution_gate"], "passed")
 
     def test_mutable_missing_platform_and_remote_promotion_fail(self) -> None:
         template = load_json(ROOT / "distribution/p10/release-manifest.template.json")
@@ -168,25 +172,44 @@ class P10DistributionTests(unittest.TestCase):
             with self.assertRaisesRegex(GateError, "digest_mismatch"):
                 inspect_oci_layout(corrupt)
 
-    def test_publication_workflow_and_write_permissions_fail(self) -> None:
+    def test_final_workflow_has_no_dispatch_or_remote_authority(self) -> None:
         workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
-        validate_activation_workflow(workflow)
+        validate_final_workflow(workflow)
         mutations = (
-            ("repository", "jeremyliu1220/digital-colleagues", "wrong/repository"),
             ("trigger", "  pull_request:\n", "  pull_request_target:\n"),
-            (
-                "permission",
-                "      attestations: read\n    env:\n      GH_TOKEN:",
-                "      id-token: write\n    env:\n      GH_TOKEN:",
-            ),
-            ("source", "source_revision=$GITHUB_SHA", "source_revision=wrong"),
-            ("tag", "DISPLAY_TAG: sha-${{ github.sha }}", "DISPLAY_TAG: latest"),
-            ("digest-input", "      runtime_digest:\n", "      missing_digest:\n"),
+            ("dispatch", "  push:\n", "  push:\n  workflow_dispatch:\n"),
+            ("permission", "  contents: read\n", "  id-token: write\n"),
+            ("remote-job", "jobs:\n", "jobs:\n  p10-verify:\n    runs-on: ubuntu-latest\n"),
         )
         for label, old, new in mutations:
             self.assertIn(old, workflow)
             with self.subTest(label=label), self.assertRaises(GateError):
-                validate_activation_workflow(workflow.replace(old, new, 1))
+                validate_final_workflow(workflow.replace(old, new, 1))
+
+    def test_historical_activation_validator_rejects_unsafe_mutations(self) -> None:
+        historical = subprocess.run(
+            [
+                "git",
+                "show",
+                "a003d540093df9a08437c47e9c8ff16970e5e645:.github/workflows/ci.yml",
+            ],
+            cwd=ROOT,
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+        validate_activation_workflow(historical)
+        with self.assertRaises(GateError):
+            validate_activation_workflow(historical.replace("packages: write", "packages: read"))
+
+    def test_docker_desktop_buildx_is_selected_without_host_docker_config(self) -> None:
+        with (
+            patch("scripts.check_p10_distribution.platform.system", return_value="Darwin"),
+            patch.object(Path, "is_file", return_value=True),
+            patch("scripts.check_p10_distribution.os.access", return_value=True),
+        ):
+            self.assertEqual(_docker_buildx_command(), [str(DOCKER_DESKTOP_BUILDX)])
 
     def test_attestation_verifier_uses_one_exact_signer_policy(self) -> None:
         digest = "sha256:" + "1" * 64
@@ -212,9 +235,16 @@ class P10DistributionTests(unittest.TestCase):
                 ]
             )
 
-        with patch("scripts.check_p10_distribution._remote_run", side_effect=run):
+        with (
+            patch("scripts.check_p10_distribution._remote_run", side_effect=run),
+            patch(
+                "scripts.check_p10_distribution._load_registry_attestation_bundle",
+                return_value=(b"artifact", b"{}"),
+            ),
+        ):
             _verify_attestation(ROOT, Path("/tmp/gh"), RUNTIME_SUBJECT, digest, revision, {})
         self.assertIn("--cert-identity", captured)
+        self.assertIn("--bundle", captured)
         self.assertIn("--signer-digest", captured)
         self.assertIn("--source-digest", captured)
         self.assertNotIn("--signer-repo", captured)
@@ -223,6 +253,10 @@ class P10DistributionTests(unittest.TestCase):
     def test_remote_command_failures_report_a_public_stage(self) -> None:
         self.assertEqual(
             _remote_command_failure_category(["docker", "buildx", "imagetools", "inspect"]),
+            "remote_buildx_inspect_failed",
+        )
+        self.assertEqual(
+            _remote_command_failure_category([str(DOCKER_DESKTOP_BUILDX), "imagetools", "inspect"]),
             "remote_buildx_inspect_failed",
         )
         self.assertEqual(
@@ -266,11 +300,30 @@ class P10DistributionTests(unittest.TestCase):
 
     def test_remote_policy_lifecycle_and_failure_states_fail_closed(self) -> None:
         policy = load_json(ROOT / "distribution/p10/verification-policy.json")
-        self.assertEqual(validate_remote_policy(policy), "authorized_pending")
+        self.assertEqual(validate_remote_policy(policy), "passed")
+        pending = copy.deepcopy(policy)
+        pending.update(
+            {
+                "lifecycle_state": "authorized_pending",
+                "published_source_revision": "workflow_dispatch_candidate_sha",
+                "publication_workflow_run_id": "pending",
+                "publication_workflow_run_url": "pending",
+                "verification_workflow_run_id": "pending",
+                "verification_workflow_run_url": "pending",
+                "runtime_digest": "pending",
+                "runtime_visibility": "pending",
+                "studio_digest": "pending",
+                "studio_visibility": "pending",
+                "anonymous_pull": "pending",
+            }
+        )
+        for key in REMOTE_RESULT_KEYS:
+            pending[key] = "authorized_pending"
+        self.assertEqual(validate_remote_policy(pending), "authorized_pending")
         revision = "a" * 40
         publication_run = "1001"
         verification_run = "1002"
-        published = copy.deepcopy(policy)
+        published = copy.deepcopy(pending)
         published.update(
             {
                 "lifecycle_state": "published_pending_verification",

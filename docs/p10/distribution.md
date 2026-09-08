@@ -34,9 +34,20 @@ exactly:
 Unknown, mixed, skipped, failed, private, tag-only, or synthetic substitution states fail
 closed. The final candidate must contain only `passed`.
 
-## One-time activation workflow
+The locked publication source is `05e73ea23ac650edfae59fa409a770fdf967af3a`.
+Publication run
+[`34202520699`](https://github.com/jeremyliu1220/digital-colleagues/actions/runs/34202520699)
+created the two public indexes, keyless signatures, and GitHub provenance attestations.
+Independent read-only verification run
+[`34206039435`](https://github.com/jeremyliu1220/digital-colleagues/actions/runs/34206039435)
+verified the exact digests recorded in the policy. The publish job was skipped in that
+verification run.
 
-Normal `push` and `pull_request` events retain read-only, non-publishing P10 CI.
+## Historical one-time activation workflow
+
+The preserved activation history used the following controls. The final branch workflow
+has removed `workflow_dispatch`, both remote jobs, and every package/OIDC/attestation
+permission; normal `push` and `pull_request` events retain read-only, non-publishing P10 CI.
 `pull_request_target` is forbidden. The temporary `workflow_dispatch` interface requires
 `operation`, `confirm`, `candidate_sha`, `runtime_digest`, and `studio_digest`.
 
@@ -90,14 +101,35 @@ For each subject it:
 - runs `docker buildx imagetools inspect --raw`;
 - verifies the index digest and the exact two-platform set;
 - resolves and hashes both child manifests and configs, and resolves every layer;
-- performs anonymous exact-digest pulls for both required platforms and the native Mac
-  platform;
+- performs anonymous exact-digest pulls for both required platforms, removing only the
+  just-pulled task reference between platform selections so classic Docker image stores
+  cannot reuse a different platform under the same index digest, then retains one native
+  exact-digest copy only for the timed `--pull never` quickstarts and removes it afterward;
 - runs Cosign with the exact certificate identity, exact OIDC issuer, ordinary claim
   checking, and exact `source_revision` annotation;
-- runs `gh attestation verify oci://<subject>@<digest> -R
-  jeremyliu1220/digital-colleagues` with exact signer workflow/digest, source ref/digest,
-  certificate identity/issuer, SLSA provenance predicate, and GitHub-hosted-runner
-  requirement.
+- anonymously resolves the digest-derived OCI attestation index, hashes its exact subject
+  index and Sigstore bundle, then runs `gh attestation verify <hashed-index> --bundle
+  <hashed-bundle> -R jeremyliu1220/digital-colleagues` with exact signer digest, source
+  ref/digest, certificate identity/issuer, SLSA provenance predicate, and
+  GitHub-hosted-runner requirement. This offline verification path requires neither a
+  GitHub API token nor registry credentials. The independent GitHub Actions run separately
+  verified the required `oci://<subject>@<digest>` form against the GitHub attestation API.
+
+The first verification attempt, run `34203006909`, failed closed because mutually
+exclusive GitHub CLI signer-policy flags were combined. Run `34204280131` then exposed a
+missing read-only attestation permission. Run `34204837101` was retained as an
+unclassified verifier failure; public stage classification in run `34205272328` isolated
+the remaining failure to the anonymous pull. Docker's classic image store cannot retain
+both variants under one multi-platform index, so the verifier now removes only its
+task-pulled exact reference between platform pulls. Run `34206039435` passed all remote
+checks. No failed run triggered publication, package deletion, history rewriting, or a
+second image publication.
+
+The Mac rerun also rejected GitHub CLI's interactive OAuth request because its minimum
+account scope exceeded this public read-only gate. The final verifier instead resolves the
+digest-derived attestation artifact anonymously, verifies every OCI descriptor and hash,
+and supplies the bundle to GitHub CLI offline. No CLI account token or GHCR credential is
+required or recorded.
 
 The command then creates a checksum-bound bundle whose manifest uses the publication
 source revision and the two exact GHCR digests. It executes three new Mac quickstarts from

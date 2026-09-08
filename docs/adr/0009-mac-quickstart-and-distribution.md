@@ -55,6 +55,17 @@ removes both remote jobs and every write permission.
 No artifact upload, Git tag, GitHub Release, main push, merge, history rewrite, personal
 Cosign key, provider credential, or P11 work is authorized.
 
+## Remote gate result
+
+Publication run `34202520699` fixed source revision
+`05e73ea23ac650edfae59fa409a770fdf967af3a` and produced the two public digest-bound
+indexes recorded in the verification policy. Read-only verification run `34206039435`
+passed the index, anonymous pull, Cosign identity/issuer/annotation, and GitHub provenance
+checks. Earlier verification failures remain in public workflow history: incompatible
+GitHub CLI policy flags, missing attestation read authority, and classic Docker image-store
+platform reuse were corrected without republishing. The final workflow has no dispatch or
+remote write path.
+
 ## Consequences
 
 - A source checkout is not needed by a bundle user and no build occurs during quickstart.

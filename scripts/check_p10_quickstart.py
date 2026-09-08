@@ -198,13 +198,16 @@ def check_remote_distribution(root: Path) -> dict[str, object]:
             source_revision=revision,
             oci={"runtime": runtime, "studio": studio},
         )
-        quickstart = run_quickstart_trials(
-            root,
-            candidate,
-            work / "trials",
-            maximum_seconds=60,
-            remote=True,
-        )
+        try:
+            quickstart = run_quickstart_trials(
+                root,
+                candidate,
+                work / "trials",
+                maximum_seconds=60,
+                remote=True,
+            )
+        finally:
+            cleanup_candidate(root, candidate)
         return {
             "schema_version": 1,
             "gate": "p10_remote_distribution_and_quickstart_clean",

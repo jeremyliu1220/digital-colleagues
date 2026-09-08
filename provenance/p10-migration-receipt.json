@@ -8,8 +8,8 @@
   "official_documentation": [
     {
       "url": "https://docs.docker.com/build/building/multi-platform/",
-      "checked_at": "2026-09-07T15:12:21Z",
-      "observed_contract": "Multi-platform output uses an OCI index with platform-specific manifests; emulation or multi-node builders may supply non-native builds."
+      "checked_at": "2026-09-08T08:50:09Z",
+      "observed_contract": "Multi-platform output uses an OCI index with platform-specific manifests; Docker Engine 29 and current Docker Desktop use the containerd image store, while older classic stores cannot retain a complete multi-platform index locally."
     },
     {
       "url": "https://docs.github.com/en/actions/concepts/security/artifact-attestations",
@@ -43,8 +43,8 @@
     },
     {
       "url": "https://cli.github.com/manual/gh_attestation_verify",
-      "checked_at": "2026-09-08T05:28:03Z",
-      "observed_contract": "GitHub CLI verification can bind an OCI digest to an exact repository, signer workflow, signer digest, source ref, source digest, certificate identity, issuer, and GitHub-hosted runner."
+      "checked_at": "2026-09-08T09:04:31Z",
+      "observed_contract": "GitHub CLI verification can consume a local bundle and artifact, bind them to an exact repository, signer digest, source ref and digest, certificate identity and issuer, and reject self-hosted runners without using the GitHub API."
     },
     {
       "url": "https://github.com/actions/checkout/commit/d23441a48e516b6c34aea4fa41551a30e30af803",

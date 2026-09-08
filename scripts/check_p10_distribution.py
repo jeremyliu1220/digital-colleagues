@@ -20,7 +20,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -48,6 +48,7 @@ from scripts.p10_gate_support import (
 )
 
 FORBIDDEN_FINAL_WORKFLOW = (
+    "workflow_dispatch:",
     "docker push",
     "build-push-action",
     "upload-artifact",
@@ -56,6 +57,7 @@ FORBIDDEN_FINAL_WORKFLOW = (
     "gh release",
     "packages: write",
     "id-token: write",
+    "attestations: read",
     "attestations: write",
 )
 ACTION_PINS = {
@@ -119,6 +121,20 @@ COSIGN_DIGESTS = {
     "arm64": "5fadd012ae6381a6a29ff86a7d39aa873878852f1073fc90b15995961ecfb084",
     "x86_64": "4c3e7af8372d3ca3296e62fa56f23fcbb5721cc6ac1827900d398f110d7cd280",
 }
+DOCKER_DESKTOP_BUILDX = Path(
+    "/Applications/Docker.app/Contents/Resources/cli-plugins/docker-buildx"
+)
+OCI_INDEX_ACCEPT = (
+    "application/vnd.oci.image.index.v1+json,"
+    "application/vnd.docker.distribution.manifest.list.v2+json,"
+    "application/vnd.oci.image.manifest.v1+json,"
+    "application/vnd.docker.distribution.manifest.v2+json"
+)
+OCI_MANIFEST_ACCEPT = (
+    "application/vnd.oci.image.manifest.v1+json,"
+    "application/vnd.docker.distribution.manifest.v2+json"
+)
+SIGSTORE_BUNDLE_TYPE = "application/vnd.dev.sigstore.bundle.v0.3+json"
 MANIFEST_KEYS = {
     "schema_version",
     "distribution_format",
@@ -381,6 +397,13 @@ def validate_final_workflow(workflow: str) -> None:
         )
     ):
         raise GateError("final_workflow_remote_job_present")
+    jobs = workflow.split("\njobs:\n", 1)
+    if (
+        len(jobs) != 2
+        or "permissions:\n  contents: read\n" not in workflow
+        or re.findall(r"(?m)^  ([a-z0-9][a-z0-9-]*):\n", jobs[1]) != ["p10-public-gate"]
+    ):
+        raise GateError("final_workflow_read_only_shape_invalid")
 
 
 def verify_manifest(value: dict[str, Any], *, template: bool) -> None:
@@ -624,13 +647,125 @@ def inspect_oci_layout(path: Path) -> dict[str, object]:
     }
 
 
+def _curl_https_request(
+    url: str,
+    headers: dict[str, str],
+    *,
+    method: str,
+    maximum_bytes: int,
+) -> tuple[int, bytes, dict[str, str]]:
+    parsed = urllib.parse.urlsplit(url)
+    if parsed.scheme != "https" or not parsed.netloc or parsed.username or parsed.password:
+        raise urllib.error.URLError("invalid_https_url")
+    for key, value in headers.items():
+        if any(character in key + value for character in ("\r", "\n")):
+            raise urllib.error.URLError("invalid_https_header")
+    with tempfile.TemporaryDirectory(prefix="dc-p10-https-") as name:
+        work = Path(name)
+        header_path = work / "headers"
+        body_path = work / "body"
+        command = [
+            "/usr/bin/curl",
+            "--silent",
+            "--show-error",
+            "--location",
+            "--proto",
+            "=https",
+            "--max-time",
+            "60",
+            "--dump-header",
+            str(header_path),
+            "--output",
+            str(body_path),
+            "--write-out",
+            "%{http_code}",
+            "--config",
+            "-",
+        ]
+        if method == "HEAD":
+            command.append("--head")
+        elif method == "GET":
+            command.extend(["--max-filesize", str(maximum_bytes)])
+        else:
+            raise urllib.error.URLError("invalid_https_method")
+        command.append(url)
+        config_lines = []
+        for key, value in headers.items():
+            escaped = f"{key}: {value}".replace("\\", "\\\\").replace('"', '\\"')
+            config_lines.append(f'header = "{escaped}"')
+        try:
+            completed = subprocess.run(
+                command,
+                input="\n".join(config_lines) + "\n",
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                text=True,
+                timeout=70,
+                check=False,
+            )
+            status_text = completed.stdout.strip()
+            if completed.returncode != 0 or re.fullmatch(r"[1-5][0-9]{2}", status_text) is None:
+                raise urllib.error.URLError("system_https_request_failed")
+            content = b"" if method == "HEAD" else body_path.read_bytes()
+            raw_headers = header_path.read_bytes()
+        except (OSError, subprocess.SubprocessError) as exc:
+            raise urllib.error.URLError("system_https_request_failed") from exc
+    if len(content) > maximum_bytes:
+        raise urllib.error.URLError("system_https_response_oversized")
+    blocks = [
+        block
+        for block in re.split(rb"\r?\n\r?\n", raw_headers.strip())
+        if block.startswith(b"HTTP/")
+    ]
+    if not blocks:
+        raise urllib.error.URLError("system_https_headers_invalid")
+    response_headers: dict[str, str] = {}
+    for line in blocks[-1].splitlines()[1:]:
+        if b":" not in line:
+            continue
+        header_key, header_value = line.split(b":", 1)
+        response_headers[header_key.decode("ascii", "strict").lower()] = header_value.decode(
+            "latin-1", "strict"
+        ).strip()
+    return int(status_text), content, response_headers
+
+
+def _https_request(
+    url: str,
+    headers: dict[str, str] | None = None,
+    *,
+    method: str = "GET",
+    maximum_bytes: int,
+) -> tuple[int, bytes, dict[str, str]]:
+    request_headers = headers or {}
+    if platform.system() == "Darwin":
+        return _curl_https_request(
+            url,
+            request_headers,
+            method=method,
+            maximum_bytes=maximum_bytes,
+        )
+    request = urllib.request.Request(url, headers=request_headers, method=method)
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response:
+            content = b"" if method == "HEAD" else response.read(maximum_bytes + 1)
+            response_headers = {key.lower(): value for key, value in response.headers.items()}
+            status = response.status
+    except urllib.error.HTTPError as exc:
+        content = b"" if method == "HEAD" else exc.read(maximum_bytes + 1)
+        response_headers = {key.lower(): value for key, value in exc.headers.items()}
+        status = exc.code
+    if len(content) > maximum_bytes:
+        raise urllib.error.URLError("https_response_oversized")
+    return status, content, response_headers
+
+
 def _download(url: str, maximum_bytes: int) -> bytes:
     try:
-        with urllib.request.urlopen(url, timeout=60) as response:
-            content = cast(bytes, response.read(maximum_bytes + 1))
+        status, content, _ = _https_request(url, maximum_bytes=maximum_bytes)
     except (OSError, urllib.error.URLError) as exc:
         raise GateError("verification_tool_download_failed") from exc
-    if not content or len(content) > maximum_bytes:
+    if status != 200 or not content:
         raise GateError("verification_tool_download_invalid")
     return content
 
@@ -712,7 +847,9 @@ def _remote_run(
 
 
 def _remote_command_failure_category(command: list[str]) -> str:
-    if command[:3] == ["docker", "buildx", "imagetools"]:
+    if command[:3] == ["docker", "buildx", "imagetools"] or (
+        command and Path(command[0]).name == "docker-buildx" and command[1:2] == ["imagetools"]
+    ):
         return "remote_buildx_inspect_failed"
     if command[:2] == ["docker", "pull"]:
         return "anonymous_exact_digest_pull_failed"
@@ -724,6 +861,16 @@ def _remote_command_failure_category(command: list[str]) -> str:
     if executable == "gh":
         return "github_attestation_verification_failed"
     return "remote_verification_command_failed"
+
+
+def _docker_buildx_command() -> list[str]:
+    if (
+        platform.system() == "Darwin"
+        and DOCKER_DESKTOP_BUILDX.is_file()
+        and os.access(DOCKER_DESKTOP_BUILDX, os.X_OK)
+    ):
+        return [str(DOCKER_DESKTOP_BUILDX)]
+    return ["docker", "buildx"]
 
 
 def _verify_anonymous_exact_digest_pulls(
@@ -749,7 +896,7 @@ def _verify_anonymous_exact_digest_pulls(
 
 
 def _bearer_challenge(headers: Any) -> tuple[str, str, str]:
-    value = headers.get("WWW-Authenticate", "")
+    value = headers.get("www-authenticate", "")
     match = re.fullmatch(r'Bearer realm="([^"]+)",service="([^"]+)",scope="([^"]+)"', value)
     if match is None or not match.group(1).startswith("https://ghcr.io/"):
         raise GateError("anonymous_registry_challenge_invalid")
@@ -759,38 +906,40 @@ def _bearer_challenge(headers: Any) -> tuple[str, str, str]:
 def _registry_exchange(subject: str, digest: str) -> tuple[str, bytes]:
     repository = subject.removeprefix("ghcr.io/")
     url = f"https://ghcr.io/v2/{repository}/manifests/{digest}"
-    headers = {
-        "Accept": (
-            "application/vnd.oci.image.index.v1+json,"
-            "application/vnd.docker.distribution.manifest.list.v2+json,"
-            "application/vnd.oci.image.manifest.v1+json,"
-            "application/vnd.docker.distribution.manifest.v2+json"
-        )
-    }
+    headers = {"Accept": OCI_INDEX_ACCEPT}
     try:
-        with urllib.request.urlopen(
-            urllib.request.Request(url, headers=headers), timeout=60
-        ) as response:
-            return "", response.read(8 * 1024 * 1024)
-    except urllib.error.HTTPError as exc:
-        if exc.code != 401:
-            raise GateError("anonymous_registry_manifest_unavailable") from exc
-        realm, service, scope = _bearer_challenge(exc.headers)
+        status, raw_index, response_headers = _https_request(
+            url, headers, maximum_bytes=8 * 1024 * 1024
+        )
+    except (OSError, urllib.error.URLError) as exc:
+        raise GateError("anonymous_registry_manifest_unavailable") from exc
+    if status == 200:
+        return "", raw_index
+    if status != 401:
+        raise GateError("anonymous_registry_manifest_unavailable")
+    realm, service, scope = _bearer_challenge(response_headers)
     token_url = realm + "?" + urllib.parse.urlencode({"service": service, "scope": scope})
     try:
-        with urllib.request.urlopen(token_url, timeout=60) as response:
-            token_value = json.loads(response.read(1024 * 1024))
+        token_status, token_content, _ = _https_request(token_url, maximum_bytes=1024 * 1024)
+        if token_status != 200:
+            raise urllib.error.URLError("anonymous_registry_token_status_invalid")
+        token_value = json.loads(token_content)
     except (OSError, urllib.error.URLError, json.JSONDecodeError) as exc:
         raise GateError("anonymous_registry_token_failed") from exc
     token = token_value.get("token") if isinstance(token_value, dict) else None
     if not isinstance(token, str) or not token:
         raise GateError("anonymous_registry_token_invalid")
-    request = urllib.request.Request(url, headers={**headers, "Authorization": f"Bearer {token}"})
     try:
-        with urllib.request.urlopen(request, timeout=60) as response:
-            return token, response.read(8 * 1024 * 1024)
+        manifest_status, raw_index, _ = _https_request(
+            url,
+            {**headers, "Authorization": f"Bearer {token}"},
+            maximum_bytes=8 * 1024 * 1024,
+        )
     except (OSError, urllib.error.URLError) as exc:
         raise GateError("anonymous_registry_manifest_unavailable") from exc
+    if manifest_status != 200:
+        raise GateError("anonymous_registry_manifest_unavailable")
+    return token, raw_index
 
 
 def _registry_object(
@@ -800,27 +949,24 @@ def _registry_object(
     *,
     method: str = "GET",
     maximum_bytes: int = 8 * 1024 * 1024,
+    accept: str = OCI_MANIFEST_ACCEPT,
 ) -> tuple[bytes, Any]:
     repository = subject.removeprefix("ghcr.io/")
-    request = urllib.request.Request(
-        f"https://ghcr.io/v2/{repository}/{path}",
-        headers={
-            "Authorization": f"Bearer {token}",
-            "Accept": (
-                "application/vnd.oci.image.manifest.v1+json,"
-                "application/vnd.docker.distribution.manifest.v2+json"
-            ),
-        },
-        method=method,
-    )
+    headers = {"Accept": accept}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
     try:
-        with urllib.request.urlopen(request, timeout=60) as response:
-            content = b"" if method == "HEAD" else response.read(maximum_bytes + 1)
-            if len(content) > maximum_bytes:
-                raise GateError("anonymous_registry_object_oversized")
-            return content, response.headers
+        status, content, response_headers = _https_request(
+            f"https://ghcr.io/v2/{repository}/{path}",
+            headers,
+            method=method,
+            maximum_bytes=maximum_bytes,
+        )
     except (OSError, urllib.error.URLError) as exc:
         raise GateError("anonymous_registry_object_unavailable") from exc
+    if status != 200:
+        raise GateError("anonymous_registry_object_unavailable")
+    return content, response_headers
 
 
 def _sha256_matches(content: bytes, digest: str) -> bool:
@@ -836,7 +982,7 @@ def _verify_registry_subject(
 ) -> dict[str, object]:
     reference = f"{subject}@{digest}"
     buildx_raw = _remote_run(
-        ["docker", "buildx", "imagetools", "inspect", "--raw", reference],
+        [*_docker_buildx_command(), "imagetools", "inspect", "--raw", reference],
         root=root,
         environment=environment,
     )
@@ -926,13 +1072,21 @@ def _verify_registry_subject(
             _, headers = _registry_object(
                 subject, f"blobs/{layer_digest}", token, method="HEAD", maximum_bytes=0
             )
-            response_digest = headers.get("Docker-Content-Digest")
+            response_digest = headers.get("docker-content-digest")
             if response_digest is not None and response_digest != layer_digest:
                 raise GateError("remote_layer_digest_mismatch")
             layer_count += 1
     if sorted(platforms) != sorted(PLATFORMS) or config_count != 2 or layer_count < 2:
         raise GateError("remote_platform_or_blob_set_invalid")
     _verify_anonymous_exact_digest_pulls(root, reference, environment)
+    machine = platform.machine()
+    if platform.system() == "Darwin" and machine in {"arm64", "x86_64"}:
+        native = "linux/arm64" if machine == "arm64" else "linux/amd64"
+        _remote_run(
+            ["docker", "pull", "--platform", native, reference],
+            root=root,
+            environment=environment,
+        )
     return {
         "subject": subject,
         "digest": digest,
@@ -984,6 +1138,93 @@ def _verify_cosign(
             raise GateError("cosign_signature_claim_invalid")
 
 
+def _load_registry_attestation_bundle(subject: str, digest: str) -> tuple[bytes, bytes]:
+    token, raw_index = _registry_exchange(subject, digest)
+    if not _sha256_matches(raw_index, digest):
+        raise GateError("attestation_artifact_digest_mismatch")
+    attestation_tag = digest.replace(":", "-", 1)
+    raw_referrer_index, _ = _registry_object(
+        subject,
+        f"manifests/{attestation_tag}",
+        token,
+        accept=OCI_INDEX_ACCEPT,
+    )
+    try:
+        referrer_index = json.loads(raw_referrer_index)
+    except json.JSONDecodeError as exc:
+        raise GateError("attestation_referrer_index_invalid") from exc
+    descriptors = referrer_index.get("manifests") if isinstance(referrer_index, dict) else None
+    bundle_descriptors = (
+        [
+            item
+            for item in descriptors
+            if isinstance(item, dict) and item.get("artifactType") == SIGSTORE_BUNDLE_TYPE
+        ]
+        if isinstance(descriptors, list)
+        else []
+    )
+    if len(bundle_descriptors) != 1:
+        raise GateError("attestation_referrer_descriptor_invalid")
+    artifact_digest = bundle_descriptors[0].get("digest")
+    if (
+        not isinstance(artifact_digest, str)
+        or re.fullmatch(r"sha256:[0-9a-f]{64}", artifact_digest) is None
+    ):
+        raise GateError("attestation_referrer_digest_invalid")
+    raw_artifact_manifest, _ = _registry_object(
+        subject,
+        f"manifests/{artifact_digest}",
+        token,
+        accept=OCI_MANIFEST_ACCEPT,
+    )
+    if not _sha256_matches(raw_artifact_manifest, artifact_digest):
+        raise GateError("attestation_referrer_digest_mismatch")
+    try:
+        artifact_manifest = json.loads(raw_artifact_manifest)
+    except json.JSONDecodeError as exc:
+        raise GateError("attestation_referrer_manifest_invalid") from exc
+    layers = artifact_manifest.get("layers") if isinstance(artifact_manifest, dict) else None
+    subject_descriptor = (
+        artifact_manifest.get("subject") if isinstance(artifact_manifest, dict) else None
+    )
+    if (
+        not isinstance(artifact_manifest, dict)
+        or artifact_manifest.get("artifactType") != SIGSTORE_BUNDLE_TYPE
+        or not isinstance(subject_descriptor, dict)
+        or subject_descriptor.get("digest") != digest
+        or not isinstance(layers, list)
+        or len(layers) != 1
+    ):
+        raise GateError("attestation_referrer_manifest_invalid")
+    layer = layers[0]
+    layer_digest = layer.get("digest") if isinstance(layer, dict) else None
+    layer_size = layer.get("size") if isinstance(layer, dict) else None
+    if (
+        not isinstance(layer_digest, str)
+        or re.fullmatch(r"sha256:[0-9a-f]{64}", layer_digest) is None
+        or layer.get("mediaType") != SIGSTORE_BUNDLE_TYPE
+        or type(layer_size) is not int
+        or layer_size <= 0
+        or layer_size > 2 * 1024 * 1024
+    ):
+        raise GateError("attestation_bundle_descriptor_invalid")
+    bundle, _ = _registry_object(
+        subject,
+        f"blobs/{layer_digest}",
+        token,
+        maximum_bytes=2 * 1024 * 1024,
+    )
+    if len(bundle) != layer_size or not _sha256_matches(bundle, layer_digest):
+        raise GateError("attestation_bundle_digest_mismatch")
+    try:
+        bundle_value = json.loads(bundle)
+    except json.JSONDecodeError as exc:
+        raise GateError("attestation_bundle_invalid") from exc
+    if not isinstance(bundle_value, dict):
+        raise GateError("attestation_bundle_invalid")
+    return raw_index, bundle
+
+
 def _verify_attestation(
     root: Path,
     gh: Path,
@@ -992,32 +1233,44 @@ def _verify_attestation(
     source_revision: str,
     environment: dict[str, str],
 ) -> None:
-    command = [
-        str(gh),
-        "attestation",
-        "verify",
-        f"oci://{subject}@{digest}",
-        "-R",
-        REMOTE_REPOSITORY,
-        "--signer-digest",
-        source_revision,
-        "--source-ref",
-        REMOTE_WORKFLOW_REF,
-        "--source-digest",
-        source_revision,
-        "--cert-identity",
-        REMOTE_SIGNER_IDENTITY,
-        "--cert-oidc-issuer",
-        REMOTE_OIDC_ISSUER,
-        "--deny-self-hosted-runners",
-        "--predicate-type",
-        "https://slsa.dev/provenance/v1",
-        "--format",
-        "json",
-    ]
-    if os.environ.get("P10_REMOTE_ATTESTATION_FROM_OCI") == "1":
-        command.append("--bundle-from-oci")
-    output = _remote_run(command, root=root, environment=environment)
+    artifact, bundle = _load_registry_attestation_bundle(subject, digest)
+    with tempfile.TemporaryDirectory(prefix="dc-p10-attestation-") as name:
+        work = Path(name)
+        artifact_path = work / "artifact.index.json"
+        bundle_path = work / "attestation.bundle.json"
+        artifact_path.write_bytes(artifact)
+        bundle_path.write_bytes(bundle)
+        artifact_path.chmod(0o600)
+        bundle_path.chmod(0o600)
+        output = _remote_run(
+            [
+                str(gh),
+                "attestation",
+                "verify",
+                str(artifact_path),
+                "-R",
+                REMOTE_REPOSITORY,
+                "--bundle",
+                str(bundle_path),
+                "--signer-digest",
+                source_revision,
+                "--source-ref",
+                REMOTE_WORKFLOW_REF,
+                "--source-digest",
+                source_revision,
+                "--cert-identity",
+                REMOTE_SIGNER_IDENTITY,
+                "--cert-oidc-issuer",
+                REMOTE_OIDC_ISSUER,
+                "--deny-self-hosted-runners",
+                "--predicate-type",
+                "https://slsa.dev/provenance/v1",
+                "--format",
+                "json",
+            ],
+            root=root,
+            environment=environment,
+        )
     try:
         attestations = json.loads(output)
     except json.JSONDecodeError as exc:
