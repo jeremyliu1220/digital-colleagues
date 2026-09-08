@@ -174,7 +174,7 @@ class P10DistributionTests(unittest.TestCase):
             ("trigger", "  pull_request:\n", "  pull_request_target:\n"),
             (
                 "permission",
-                "      contents: read\n    env:\n      GH_TOKEN:",
+                "      attestations: read\n    env:\n      GH_TOKEN:",
                 "      id-token: write\n    env:\n      GH_TOKEN:",
             ),
             ("source", "source_revision=$GITHUB_SHA", "source_revision=wrong"),

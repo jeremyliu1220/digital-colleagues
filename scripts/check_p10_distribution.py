@@ -328,6 +328,7 @@ def validate_activation_workflow(workflow: str) -> None:
         raise GateError("workflow_publish_step_count_invalid")
     if (
         "permissions:\n      contents: read\n" not in verify
+        or "      attestations: read\n" not in verify
         or any(
             marker in verify
             for marker in (

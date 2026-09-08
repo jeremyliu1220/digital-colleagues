@@ -262,6 +262,7 @@ jobs:
     timeout-minutes: 45
     permissions:
       contents: read
+      attestations: read
     env:
       GH_TOKEN: ${{ github.token }}
       P10_REMOTE_PUBLICATION_SHA: ${{ inputs.candidate_sha }}
