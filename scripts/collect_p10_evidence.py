@@ -163,7 +163,13 @@ def build_summary(
 
 def write_evidence(root: Path, summary: dict[str, Any]) -> None:
     destination = root / SUMMARY_PATH
-    destination.parent.mkdir(mode=0o755, parents=True, exist_ok=False)
+    try:
+        destination.parent.mkdir(mode=0o755, parents=True, exist_ok=False)
+    except FileExistsError:
+        if destination.parent.is_symlink() or not destination.parent.is_dir():
+            raise GateError("evidence_directory_invalid") from None
+    if destination.exists() or destination.is_symlink():
+        raise GateError("evidence_already_exists")
     content = (json.dumps(summary, indent=2, sort_keys=True) + "\n").encode()
     descriptor, temporary_name = tempfile.mkstemp(prefix=".summary-", dir=destination.parent)
     try:

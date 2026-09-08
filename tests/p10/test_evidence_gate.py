@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 
 from scripts.check_p10_evidence import EVIDENCE_CLASSES, REQUIRED_GATES, _safe, validate_summary
-from scripts.collect_p10_evidence import build_summary
+from scripts.collect_p10_evidence import build_summary, write_evidence
 from scripts.p10_gate_support import REMOTE_STATES, SUMMARY_PATH, GateError
 from tests.p10.fixtures import ROOT, clone_repository
 
@@ -52,6 +52,19 @@ class P10EvidenceTests(unittest.TestCase):
             with self.assertRaisesRegex(GateError, "unittest_incomplete"):
                 build_summary(root, results, unittest_result, set(REQUIRED_GATES))
             self.assertFalse((root / SUMMARY_PATH).exists())
+
+    def test_writer_accepts_an_existing_empty_evidence_directory(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="dc-p10-evidence-directory-") as name:
+            root = Path(name)
+            destination = root / SUMMARY_PATH
+            destination.parent.mkdir(parents=True)
+            write_evidence(root, {"schema_version": 1})
+            self.assertEqual(
+                destination.read_text(encoding="utf-8"),
+                '{\n  "schema_version": 1\n}\n',
+            )
+            with self.assertRaisesRegex(GateError, "evidence_already_exists"):
+                write_evidence(root, {"schema_version": 1})
 
 
 if __name__ == "__main__":
