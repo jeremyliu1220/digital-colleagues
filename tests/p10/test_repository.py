@@ -13,8 +13,10 @@ from unittest.mock import patch
 from scripts.check_p10_provenance import check_provenance
 from scripts.check_p10_repository import check_repository
 from scripts.p10_gate_support import (
+    ACCEPTANCE_ALLOWED_PATHS,
     ACCEPTANCE_COMMIT,
     BASE_COMMIT,
+    SUMMARY_PATH,
     GateError,
     safe_relative,
 )
@@ -69,19 +71,69 @@ class P10RepositoryTests(unittest.TestCase):
 
     def test_dependabot_base_drift_is_rejected_by_changed_path_gate(self) -> None:
         with tempfile.TemporaryDirectory(prefix="dc-p10-dependabot-") as name:
-            root = clone_repository(Path(name))
-            config = root / ".github/dependabot.yml"
-            config.write_text(
-                config.read_text(encoding="utf-8").replace(
-                    "open-pull-requests-limit: 5",
-                    "open-pull-requests-limit: 0",
-                    1,
-                ),
-                encoding="utf-8",
+            temporary = Path(name)
+
+            def commit_dependabot_drift(root: Path) -> None:
+                config = root / ".github/dependabot.yml"
+                config.write_text(
+                    config.read_text(encoding="utf-8").replace(
+                        "open-pull-requests-limit: 5",
+                        "open-pull-requests-limit: 0",
+                        1,
+                    ),
+                    encoding="utf-8",
+                )
+                commit_all(root, "negative non-contract path drift")
+
+            def changed_paths(root: Path) -> set[str]:
+                return set(
+                    subprocess.run(
+                        ["git", "diff", "--name-only", BASE_COMMIT, "HEAD", "--"],
+                        cwd=root,
+                        check=True,
+                        stdout=subprocess.PIPE,
+                        text=True,
+                    ).stdout.splitlines()
+                )
+
+            implementation = clone_repository(temporary / "implementation")
+            (implementation / SUMMARY_PATH).unlink(missing_ok=True)
+            self.assertFalse((implementation / SUMMARY_PATH).exists())
+            commit_dependabot_drift(implementation)
+            implementation_paths = changed_paths(implementation)
+            self.assertEqual(
+                ACCEPTANCE_ALLOWED_PATHS - implementation_paths,
+                {SUMMARY_PATH},
             )
-            commit_all(root, "negative non-contract path drift")
-            with self.assertRaisesRegex(GateError, "changed_path_set_invalid_missing_1_extra_1"):
-                check_repository(root)
+            self.assertEqual(
+                implementation_paths - ACCEPTANCE_ALLOWED_PATHS,
+                {".github/dependabot.yml"},
+            )
+            with self.assertRaisesRegex(
+                GateError,
+                r"^changed_path_set_invalid_missing_1_extra_1$",
+            ):
+                check_repository(implementation)
+
+            final = clone_repository(temporary / "final-evidence")
+            final_summary = final / SUMMARY_PATH
+            if not final_summary.exists():
+                final_summary.parent.mkdir(parents=True, exist_ok=True)
+                final_summary.write_text('{"fixture": "final evidence"}\n', encoding="utf-8")
+                commit_all(final, "temporary final evidence fixture")
+            self.assertTrue((final / SUMMARY_PATH).is_file())
+            commit_dependabot_drift(final)
+            final_paths = changed_paths(final)
+            self.assertEqual(ACCEPTANCE_ALLOWED_PATHS - final_paths, set())
+            self.assertEqual(
+                final_paths - ACCEPTANCE_ALLOWED_PATHS,
+                {".github/dependabot.yml"},
+            )
+            with self.assertRaisesRegex(
+                GateError,
+                r"^changed_path_set_invalid_missing_0_extra_1$",
+            ):
+                check_repository(final)
 
     def test_acceptance_history_migration_allowlist_and_p11_drift_fail(self) -> None:
         cases = {
