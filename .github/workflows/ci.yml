@@ -263,7 +263,6 @@ jobs:
       P10_REMOTE_PUBLICATION_SHA: ${{ inputs.candidate_sha }}
       P10_REMOTE_RUNTIME_DIGEST: ${{ inputs.runtime_digest }}
       P10_REMOTE_STUDIO_DIGEST: ${{ inputs.studio_digest }}
-      P10_REMOTE_DOCKER_CONFIG: ${{ runner.temp }}/p10-anonymous-docker
       P10_REMOTE_USE_INSTALLED_TOOLS: "1"
     steps:
       - name: Check out exact source
@@ -281,8 +280,10 @@ jobs:
         run: |
           set -euo pipefail
           umask 077
-          mkdir -p "$P10_REMOTE_DOCKER_CONFIG"
-          printf '%s\n' '{"auths":{}}' > "$P10_REMOTE_DOCKER_CONFIG/config.json"
+          anonymous_docker_config="$RUNNER_TEMP/p10-anonymous-docker"
+          mkdir -p "$anonymous_docker_config"
+          printf '%s\n' '{"auths":{}}' > "$anonymous_docker_config/config.json"
+          echo "P10_REMOTE_DOCKER_CONFIG=$anonymous_docker_config" >> "$GITHUB_ENV"
       - name: Verify indexes, blobs, pulls, signatures, and attestations
         env:
           DOCKER_CONFIG: ${{ env.P10_REMOTE_DOCKER_CONFIG }}
