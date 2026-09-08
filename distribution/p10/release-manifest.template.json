@@ -16,8 +16,8 @@
   ],
   "schema_versions": [1, 2, 3, 4, 5, 6, 7],
   "migration_008": "absent",
-  "ghcr_publication": "passed",
-  "registry_image_signature": "passed",
-  "registry_attestation": "passed",
-  "remote_distribution_gate": "passed"
+  "ghcr_publication": "authorized_pending",
+  "registry_image_signature": "authorized_pending",
+  "registry_attestation": "authorized_pending",
+  "remote_distribution_gate": "authorized_pending"
 }

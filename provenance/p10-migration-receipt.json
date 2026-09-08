@@ -29,7 +29,7 @@
     {
       "url": "https://docs.github.com/en/code-security/how-tos/secure-your-supply-chain/secure-your-dependencies/configure-version-updates",
       "checked_at": "2026-09-08T06:59:23Z",
-      "observed_contract": "Version-update pull requests are disabled per ecosystem by setting open-pull-requests-limit to zero in dependabot.yml."
+      "observed_contract": "Failed-experiment background only: GitHub documents disabling version-update pull requests per ecosystem with open-pull-requests-limit zero, but the immutable P10 allowlist does not authorize changing dependabot.yml and the final candidate retains accepted P9 bytes."
     },
     {
       "url": "https://docs.sigstore.dev/cosign/signing/signing_with_containers/",
@@ -93,12 +93,6 @@
     }
   ],
   "new_implementations": [
-    {
-      "destination": ".github/dependabot.yml",
-      "classification": "new_or_modified_p10_implementation",
-      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
-      "gate_result": "not_a_source_migration"
-    },
     {
       "destination": ".github/workflows/ci.yml",
       "classification": "new_or_modified_p10_implementation",
@@ -221,6 +215,12 @@
     },
     {
       "destination": "docs/security/threat-model.md",
+      "classification": "new_or_modified_p10_implementation",
+      "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
+      "gate_result": "not_a_source_migration"
+    },
+    {
+      "destination": "provenance/p10-migration-receipt.json",
       "classification": "new_or_modified_p10_implementation",
       "implementation_basis": "accepted_p9_p10_contract_and_listed_official_public_documentation",
       "gate_result": "not_a_source_migration"

@@ -19,13 +19,10 @@ from scripts.p10_gate_support import (
     ACCEPTED_P8_COMMIT,
     BASE_COMMIT,
     BRANCH,
-    DEPENDABOT_DISABLED_CONFIG,
-    DEPENDABOT_EXCEPTION_PATH,
-    IMPLEMENTATION_PATHS,
     MIGRATIONS,
-    P10_ALLOWED_PATHS,
     SUMMARY_PATH,
     GateError,
+    acceptance_allowed_paths,
     emit_main,
     git,
     safe_relative,
@@ -151,21 +148,16 @@ def check_repository(root: Path) -> dict[str, object]:
         or (root / ACCEPTANCE_PATH).read_bytes() != current
     ):
         raise GateError("acceptance_contract_changed")
-    try:
-        dependabot_config = (root / DEPENDABOT_EXCEPTION_PATH).read_text(encoding="utf-8")
-    except (OSError, UnicodeError) as exc:
-        raise GateError("dependabot_configuration_invalid") from exc
-    if dependabot_config != DEPENDABOT_DISABLED_CONFIG:
-        raise GateError("dependabot_configuration_invalid")
-
+    allowed_paths = acceptance_allowed_paths(root)
+    implementation_paths = allowed_paths - {SUMMARY_PATH}
     changed = _changed(root, BASE_COMMIT)
-    if changed == IMPLEMENTATION_PATHS:
+    if changed == implementation_paths:
         phase = "implementation"
-    elif changed == P10_ALLOWED_PATHS:
+    elif changed == allowed_paths:
         phase = "final_evidence"
     else:
-        missing = len(P10_ALLOWED_PATHS - changed)
-        extra = len(changed - P10_ALLOWED_PATHS)
+        missing = len(allowed_paths - changed)
+        extra = len(changed - allowed_paths)
         raise GateError(f"changed_path_set_invalid_missing_{missing}_extra_{extra}")
     status = str(git(root, "diff", "--name-status", "-M", "-C", BASE_COMMIT, "HEAD", "--"))
     for line in status.splitlines():

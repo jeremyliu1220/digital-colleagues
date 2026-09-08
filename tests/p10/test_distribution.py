@@ -100,9 +100,10 @@ class P10DistributionTests(unittest.TestCase):
 
     def test_image_only_distribution_policy_passes(self) -> None:
         result = check_distribution(ROOT)
+        policy = load_json(ROOT / "distribution/p10/verification-policy.json")
         self.assertEqual(result["compose_build_count"], 0)
         self.assertEqual(result["platforms"], ["linux/amd64", "linux/arm64"])
-        self.assertEqual(result["remote_distribution_gate"], "passed")
+        self.assertEqual(result["remote_distribution_gate"], policy["lifecycle_state"])
 
     def test_mutable_missing_platform_and_remote_promotion_fail(self) -> None:
         template = load_json(ROOT / "distribution/p10/release-manifest.template.json")
@@ -199,9 +200,14 @@ class P10DistributionTests(unittest.TestCase):
             text=True,
             check=True,
         ).stdout
-        validate_activation_workflow(historical)
+        validate_activation_workflow(
+            historical, "05e73ea23ac650edfae59fa409a770fdf967af3a"
+        )
         with self.assertRaises(GateError):
-            validate_activation_workflow(historical.replace("packages: write", "packages: read"))
+            validate_activation_workflow(
+                historical.replace("packages: write", "packages: read"),
+                "05e73ea23ac650edfae59fa409a770fdf967af3a",
+            )
 
     def test_docker_desktop_buildx_is_selected_without_host_docker_config(self) -> None:
         with (

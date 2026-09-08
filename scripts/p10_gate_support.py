@@ -17,27 +17,6 @@ ACCEPTANCE_COMMIT = "99b0045bba48de8e4d44c10ce07d60ba20738a8b"
 BRANCH = "codex/p10-mac-quickstart"
 ACCEPTANCE_PATH = "docs/p10/acceptance.md"
 SUMMARY_PATH = "artifacts/p10/summary.json"
-DEPENDABOT_EXCEPTION_PATH = ".github/dependabot.yml"
-DEPENDABOT_DISABLED_CONFIG = """# SPDX-License-Identifier: Apache-2.0
-
-version: 2
-updates:
-  - package-ecosystem: pip
-    directory: /
-    schedule:
-      interval: weekly
-    open-pull-requests-limit: 0
-  - package-ecosystem: npm
-    directory: /studio
-    schedule:
-      interval: weekly
-    open-pull-requests-limit: 0
-  - package-ecosystem: github-actions
-    directory: /
-    schedule:
-      interval: weekly
-    open-pull-requests-limit: 0
-"""
 PRODUCT_NAME = "Digital Colleagues"
 PYTHON_VERSION = "0.2.0.dev0"
 DISPLAY_VERSION = "0.2.0-dev.0"
@@ -162,7 +141,7 @@ ACCEPTANCE_ALLOWED_PATHS = frozenset(
         SUMMARY_PATH,
     }
 )
-P10_ALLOWED_PATHS = ACCEPTANCE_ALLOWED_PATHS | {DEPENDABOT_EXCEPTION_PATH}
+P10_ALLOWED_PATHS = ACCEPTANCE_ALLOWED_PATHS
 IMPLEMENTATION_PATHS = P10_ALLOWED_PATHS - {SUMMARY_PATH}
 DIGEST_REF = re.compile(r"^[A-Za-z0-9._:-]+/[A-Za-z0-9._/-]+@sha256:[0-9a-f]{64}$")
 UTC_TIMESTAMP = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$")
@@ -185,6 +164,23 @@ def git(root: Path, *arguments: str, binary: bool = False) -> str | bytes:
     if completed.returncode != 0:
         raise GateError("git_inspection_failed")
     return cast(str | bytes, completed.stdout)
+
+
+def acceptance_allowed_paths(root: Path) -> frozenset[str]:
+    """Extract and cross-check the exact allowlist from the immutable contract object."""
+
+    content = git(root, "show", f"{ACCEPTANCE_COMMIT}:{ACCEPTANCE_PATH}", binary=True)
+    assert isinstance(content, bytes)
+    try:
+        contract = content.decode("utf-8")
+        section = contract.split("## Exact changed-file allowlist", 1)[1]
+        block = section.split("```text", 1)[1].split("```", 1)[0]
+    except (UnicodeError, IndexError) as exc:
+        raise GateError("acceptance_allowlist_unreadable") from exc
+    paths = frozenset(safe_relative(line) for line in block.splitlines() if line.strip())
+    if paths != ACCEPTANCE_ALLOWED_PATHS:
+        raise GateError("acceptance_allowlist_constant_mismatch")
+    return paths
 
 
 def safe_relative(value: object) -> str:

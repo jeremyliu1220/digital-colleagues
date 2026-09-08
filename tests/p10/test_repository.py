@@ -67,20 +67,22 @@ class P10RepositoryTests(unittest.TestCase):
             with self.subTest(value=value), self.assertRaises(GateError):
                 safe_relative(value)
 
-    def test_dependabot_exception_is_exact_and_disabled(self) -> None:
+    def test_dependabot_base_drift_is_rejected_by_changed_path_gate(self) -> None:
         with tempfile.TemporaryDirectory(prefix="dc-p10-dependabot-") as name:
             root = clone_repository(Path(name))
             config = root / ".github/dependabot.yml"
             config.write_text(
                 config.read_text(encoding="utf-8").replace(
+                    "open-pull-requests-limit: 5",
                     "open-pull-requests-limit: 0",
-                    "open-pull-requests-limit: 1",
                     1,
                 ),
                 encoding="utf-8",
             )
-            commit_all(root, "negative dependabot re-enable")
-            with self.assertRaisesRegex(GateError, "dependabot_configuration_invalid"):
+            commit_all(root, "negative non-contract path drift")
+            with self.assertRaisesRegex(
+                GateError, "changed_path_set_invalid_missing_0_extra_1"
+            ):
                 check_repository(root)
 
     def test_acceptance_history_migration_allowlist_and_p11_drift_fail(self) -> None:

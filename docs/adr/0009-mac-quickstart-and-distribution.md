@@ -55,7 +55,7 @@ removes both remote jobs and every write permission.
 No artifact upload, Git tag, GitHub Release, main push, merge, history rewrite, personal
 Cosign key, provider credential, or P11 work is authorized.
 
-## Remote gate result
+## Superseded remote gate result
 
 Publication run `34202520699` fixed source revision
 `05e73ea23ac650edfae59fa409a770fdf967af3a` and produced the two public digest-bound
@@ -64,7 +64,12 @@ passed the index, anonymous pull, Cosign identity/issuer/annotation, and GitHub 
 checks. Earlier verification failures remain in public workflow history: incompatible
 GitHub CLI policy flags, missing attestation read authority, and classic Docker image-store
 platform reuse were corrected without republishing. The final workflow has no dispatch or
-remote write path.
+remote write path. Independent acceptance later found that the publication source changed
+`.github/dependabot.yml` outside the immutable 62-path allowlist. The source, runs, and both
+digests remain public but are `superseded_contract_noncompliant_source`; they are not an
+active release lock or final P10 execution choice. A scoped correction restores the file to
+accepted P9 bytes and requires a new source revision, new digests, and new independent
+verification before the remote gate may return to `passed`.
 
 ## Consequences
 

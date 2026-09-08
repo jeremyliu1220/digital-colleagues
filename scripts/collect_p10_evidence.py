@@ -23,14 +23,13 @@ from scripts.p10_gate_support import (
     BASE_COMMIT,
     BRANCH,
     DISPLAY_VERSION,
-    IMPLEMENTATION_PATHS,
     MATURITY,
-    P10_ALLOWED_PATHS,
     PRODUCT_NAME,
     PYTHON_VERSION,
     REMOTE_STATES,
     SUMMARY_PATH,
     GateError,
+    acceptance_allowed_paths,
     git,
     tree_digest,
 )
@@ -55,6 +54,8 @@ def build_summary(
     unittest: dict[str, Any],
     verified_gates: set[str],
 ) -> dict[str, Any]:
+    allowed_paths = acceptance_allowed_paths(root)
+    implementation_paths = allowed_paths - {SUMMARY_PATH}
     if (
         str(git(root, "status", "--porcelain=v1")).strip()
         or str(git(root, "branch", "--show-current")).strip() != BRANCH
@@ -68,7 +69,7 @@ def build_summary(
         for line in str(git(root, "diff", "--name-only", BASE_COMMIT, "HEAD", "--")).splitlines()
         if line
     }
-    if changed != set(IMPLEMENTATION_PATHS) or implementation in {BASE_COMMIT, ACCEPTANCE_COMMIT}:
+    if changed != set(implementation_paths) or implementation in {BASE_COMMIT, ACCEPTANCE_COMMIT}:
         raise GateError("evidence_implementation_commit_invalid")
     if unittest.get("gate_passed") is not True or any(
         unittest.get(key) != 0
@@ -114,7 +115,7 @@ def build_summary(
         "development_branch": BRANCH,
         "implementation_commit": implementation,
         "published_source_revision": published_source_revision,
-        "tree_digest": tree_digest(root, IMPLEMENTATION_PATHS),
+        "tree_digest": tree_digest(root, implementation_paths),
         "generated_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         "product": {
             "name": PRODUCT_NAME,
@@ -123,7 +124,7 @@ def build_summary(
             "maturity": MATURITY,
             "api_title": API_TITLE,
         },
-        "changed_path_count": len(P10_ALLOWED_PATHS),
+        "changed_path_count": len(allowed_paths),
         "historical_drift_count": 0,
         "migrations": {"count": 7, "migration_008": False, "historical_drift_count": 0},
         "capability_boundary": {

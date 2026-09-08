@@ -19,14 +19,13 @@ from scripts.p10_gate_support import (
     BASE_COMMIT,
     BRANCH,
     DISPLAY_VERSION,
-    IMPLEMENTATION_PATHS,
     MATURITY,
-    P10_ALLOWED_PATHS,
     PYTHON_VERSION,
     REMOTE_STATES,
     SUMMARY_PATH,
     UTC_TIMESTAMP,
     GateError,
+    acceptance_allowed_paths,
     emit_main,
     git,
     load_json,
@@ -138,6 +137,8 @@ def _safe(value: object, root: Path) -> None:
 
 
 def validate_summary(root: Path, summary: dict[str, Any]) -> dict[str, object]:
+    allowed_paths = acceptance_allowed_paths(root)
+    implementation_paths = allowed_paths - {SUMMARY_PATH}
     if set(summary) != SUMMARY_KEYS:
         raise GateError("evidence_shape_invalid")
     repository = check_repository(root)
@@ -157,8 +158,8 @@ def validate_summary(root: Path, summary: dict[str, Any]) -> dict[str, object]:
         "development_branch": BRANCH,
         "implementation_commit": implementation,
         "published_source_revision": summary["distribution"]["published_source_revision"],
-        "tree_digest": tree_digest(root, IMPLEMENTATION_PATHS),
-        "changed_path_count": len(P10_ALLOWED_PATHS),
+        "tree_digest": tree_digest(root, implementation_paths),
+        "changed_path_count": len(allowed_paths),
         "historical_drift_count": 0,
     }
     if any(summary.get(key) != value for key, value in expected.items()):

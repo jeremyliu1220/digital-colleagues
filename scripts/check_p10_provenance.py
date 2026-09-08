@@ -12,11 +12,11 @@ if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from scripts.p10_gate_support import (
-    IMPLEMENTATION_PATHS,
     OFFICIAL_URLS,
-    P10_ALLOWED_PATHS,
+    SUMMARY_PATH,
     UTC_TIMESTAMP,
     GateError,
+    acceptance_allowed_paths,
     emit_main,
     git,
     load_json,
@@ -24,11 +24,12 @@ from scripts.p10_gate_support import (
 )
 
 RECEIPT = "provenance/p10-migration-receipt.json"
-COVERED = IMPLEMENTATION_PATHS - {RECEIPT}
 BASIS = "accepted_p9_p10_contract_and_listed_official_public_documentation"
 
 
 def check_provenance(root: Path) -> dict[str, object]:
+    allowed_paths = acceptance_allowed_paths(root)
+    implementation_paths = allowed_paths - {SUMMARY_PATH}
     path = root / RECEIPT
     if not path.is_file() or path.is_symlink():
         raise GateError("receipt_file_invalid")
@@ -92,7 +93,7 @@ def check_provenance(root: Path) -> dict[str, object]:
         ):
             raise GateError("implementation_classification_invalid")
         destinations.add(destination)
-    if destinations != COVERED:
+    if destinations != implementation_paths:
         raise GateError("provenance_coverage_invalid")
     committed = {
         line
@@ -108,7 +109,7 @@ def check_provenance(root: Path) -> dict[str, object]:
         ).splitlines()
         if line
     }
-    if committed not in (set(IMPLEMENTATION_PATHS), set(P10_ALLOWED_PATHS)):
+    if committed not in (set(implementation_paths), set(allowed_paths)):
         raise GateError("committed_phase_invalid")
     text = path.read_text(encoding="utf-8")
     if (

@@ -34,14 +34,19 @@ exactly:
 Unknown, mixed, skipped, failed, private, tag-only, or synthetic substitution states fail
 closed. The final candidate must contain only `passed`.
 
-The locked publication source is `05e73ea23ac650edfae59fa409a770fdf967af3a`.
-Publication run
+The first publication attempt used source
+`05e73ea23ac650edfae59fa409a770fdf967af3a`. Publication run
 [`34202520699`](https://github.com/jeremyliu1220/digital-colleagues/actions/runs/34202520699)
-created the two public indexes, keyless signatures, and GitHub provenance attestations.
-Independent read-only verification run
+created two public indexes, keyless signatures, and GitHub provenance attestations.
+Read-only verification run
 [`34206039435`](https://github.com/jeremyliu1220/digital-colleagues/actions/runs/34206039435)
-verified the exact digests recorded in the policy. The publish job was skipped in that
-verification run.
+verified those registry objects. Independent acceptance subsequently found that the source
+contained a base-to-candidate change outside the immutable acceptance allowlist. That source,
+both runs, runtime digest
+`sha256:41567ba87a088944cf9a2c17b9b0f4359554c66b2ec1f6d52db46067e1ab9092`, and Studio
+digest `sha256:b7dd4c2b35922ec31a9b38c15316283706a9aab0ffab2101a18f7bf106165f2e`
+are retained as `superseded_contract_noncompliant_source`. They are not active release-lock
+references and must not be selected by a final P10 bundle or execution path.
 
 ## Historical one-time activation workflow
 
@@ -115,15 +120,16 @@ For each subject it:
   GitHub API token nor registry credentials. The independent GitHub Actions run separately
   verified the required `oci://<subject>@<digest>` form against the GitHub attestation API.
 
-The first verification attempt, run `34203006909`, failed closed because mutually
+For the superseded publication, the first verification attempt, run `34203006909`, failed
+closed because mutually
 exclusive GitHub CLI signer-policy flags were combined. Run `34204280131` then exposed a
 missing read-only attestation permission. Run `34204837101` was retained as an
 unclassified verifier failure; public stage classification in run `34205272328` isolated
 the remaining failure to the anonymous pull. Docker's classic image store cannot retain
 both variants under one multi-platform index, so the verifier now removes only its
-task-pulled exact reference between platform pulls. Run `34206039435` passed all remote
-checks. No failed run triggered publication, package deletion, history rewriting, or a
-second image publication.
+task-pulled exact reference between platform pulls. Run `34206039435` passed all technical
+remote checks, but that result cannot cure the source contract violation. No failed run
+triggered package deletion or history rewriting.
 
 The Mac rerun also rejected GitHub CLI's interactive OAuth request because its minimum
 account scope exceeded this public read-only gate. The final verifier instead resolves the
@@ -140,7 +146,8 @@ residue.
 
 ## Revision semantics and final lock
 
-The publication source revision is the commit whose Dockerfiles and temporary workflow
+The active publication source revision is the contract-compliant commit whose Dockerfiles
+and temporary workflow
 built, signed, and attested the images. It remains fixed even after the branch advances.
 The final evidence implementation revision is the later commit that records verified
 digests/run identities and removes every publish/verify job and all remote write
@@ -155,17 +162,18 @@ publication source through the exact `candidate_sha == github.sha` guard.
 
 The first push to the newly public repository caused the pre-existing
 `.github/dependabot.yml` configuration to open nine unrequested version-update pull
-requests. Publication remained disabled. The repository owner separately authorized
-closing those pull requests, deleting their bot branches, and disabling further version
-updates. The pull requests were closed without merge and their branches were deleted.
+requests. Publication remained disabled. The pull requests were later closed without
+merge and their bot branches were deleted under separate owner authorization.
 
-GitHub documents `open-pull-requests-limit: 0` as the configuration mechanism for
-disabling version-update pull requests for a package ecosystem. A post-contract,
-owner-authorized exception therefore permits only `.github/dependabot.yml`, with the
-existing three ecosystem entries preserved and every limit fixed to zero. The repository
-gate accepts only those exact bytes; a missing entry, nonzero limit, or any other extra
-path fails closed. This exception does not change the immutable acceptance contract or
-authorize dependency changes.
+An attempted containment changed each `open-pull-requests-limit` from `5` to `0`, relying
+on GitHub's documented per-ecosystem disable mechanism. Although operationally narrow, the
+file is not one of the immutable P10 acceptance allowlist's 62 paths. The attempted gate,
+test, documentation, and provenance exception therefore violated the fixed contract and
+was rejected by independent acceptance. The final candidate restores
+`.github/dependabot.yml` byte-for-byte to the accepted P9 base and the repository gate now
+rejects any drift of that path as an extra changed path. If the restored configuration
+opens another pull request, this P10 correction records and reports it; it does not create
+another allowlist exception or claim authority to change the file.
 
 ## Claim boundary
 

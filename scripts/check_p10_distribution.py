@@ -272,7 +272,9 @@ def _validate_action_pins(workflow: str) -> None:
         raise GateError("workflow_action_not_immutable")
 
 
-def validate_activation_workflow(workflow: str) -> None:
+def validate_activation_workflow(
+    workflow: str, published_source_revision: str | None = None
+) -> None:
     _validate_action_pins(workflow)
     if "pull_request_target:" in workflow or ":latest" in workflow:
         raise GateError("workflow_unsafe_trigger_or_tag")
@@ -359,19 +361,35 @@ def validate_activation_workflow(workflow: str) -> None:
         or "P10_REMOTE_DOCKER_CONFIG" not in verify
     ):
         raise GateError("workflow_verify_not_read_only")
-    if (
-        "inputs.operation == 'verify'" not in verify
-        or "inputs.confirm == 'VERIFY-P10-CANDIDATE'" not in verify
-        or "inputs.candidate_sha == '05e73ea23ac650edfae59fa409a770fdf967af3a'" not in verify
-        or "github.sha == '05e73ea23ac650edfae59fa409a770fdf967af3a'" not in publish
-        or "PUBLISHED_SOURCE_SHA: 05e73ea23ac650edfae59fa409a770fdf967af3a" not in guard
-        or 'test "$GITHUB_SHA" = "$PUBLISHED_SOURCE_SHA"' not in guard
-        or 'test "$CANDIDATE_SHA" = "$PUBLISHED_SOURCE_SHA"' not in guard
-        or 'test "$GITHUB_REPOSITORY" = "jeremyliu1220/digital-colleagues"' not in guard
-        or 'test "$GITHUB_REF" = "refs/heads/codex/p10-mac-quickstart"' not in guard
-        or "github.event_name != 'workflow_dispatch'" not in public
+    common_dispatch = (
+        "inputs.operation == 'verify'",
+        "inputs.confirm == 'VERIFY-P10-CANDIDATE'",
+        'test "$GITHUB_REPOSITORY" = "jeremyliu1220/digital-colleagues"',
+        'test "$GITHUB_REF" = "refs/heads/codex/p10-mac-quickstart"',
+    )
+    if any(value not in workflow for value in common_dispatch) or (
+        "github.event_name != 'workflow_dispatch'" not in public
     ):
         raise GateError("workflow_dispatch_guard_invalid")
+    if published_source_revision is None:
+        if (
+            "inputs.candidate_sha == github.sha" not in verify
+            or 'test "$CANDIDATE_SHA" = "$GITHUB_SHA"' not in guard
+            or "PUBLISHED_SOURCE_SHA" in guard
+        ):
+            raise GateError("workflow_dispatch_guard_invalid")
+    else:
+        if re.fullmatch(r"[0-9a-f]{40}", published_source_revision) is None:
+            raise GateError("workflow_publication_revision_invalid")
+        locked = (
+            f"inputs.candidate_sha == '{published_source_revision}'",
+            f"github.sha == '{published_source_revision}'",
+            f"PUBLISHED_SOURCE_SHA: {published_source_revision}",
+            'test "$GITHUB_SHA" = "$PUBLISHED_SOURCE_SHA"',
+            'test "$CANDIDATE_SHA" = "$PUBLISHED_SOURCE_SHA"',
+        )
+        if any(value not in workflow for value in locked):
+            raise GateError("workflow_dispatch_guard_invalid")
     if any(
         marker in workflow.lower()
         for marker in ("upload-artifact", "gh release", "git tag", "write-all")
@@ -1404,8 +1422,13 @@ def check_distribution(root: Path) -> dict[str, object]:
             raise GateError("compose_distribution_boundary_missing")
     verify_compose_network_boundary(compose)
     workflow = (root / ".github/workflows/ci.yml").read_text(encoding="utf-8")
-    if lifecycle in {"authorized_pending", "published_pending_verification"}:
-        validate_activation_workflow(workflow)
+    if lifecycle == "authorized_pending":
+        if "workflow_dispatch:" in workflow:
+            validate_activation_workflow(workflow)
+        else:
+            validate_final_workflow(workflow)
+    elif lifecycle == "published_pending_verification":
+        validate_activation_workflow(workflow, str(policy["published_source_revision"]))
     else:
         validate_final_workflow(workflow)
     for dockerfile in (root / "Dockerfile.p10", root / "studio/Dockerfile.p10"):
