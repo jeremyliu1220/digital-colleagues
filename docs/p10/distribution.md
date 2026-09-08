@@ -119,6 +119,22 @@ non-publishing CI. The historical activation commit remains reachable; it is nev
 amended or rewritten. Moving the branch tip prevents another dispatch for the old
 publication source through the exact `candidate_sha == github.sha` guard.
 
+## Remote repository automation containment
+
+The first push to the newly public repository caused the pre-existing
+`.github/dependabot.yml` configuration to open nine unrequested version-update pull
+requests. Publication remained disabled. The repository owner separately authorized
+closing those pull requests, deleting their bot branches, and disabling further version
+updates. The pull requests were closed without merge and their branches were deleted.
+
+GitHub documents `open-pull-requests-limit: 0` as the configuration mechanism for
+disabling version-update pull requests for a package ecosystem. A post-contract,
+owner-authorized exception therefore permits only `.github/dependabot.yml`, with the
+existing three ecosystem entries preserved and every limit fixed to zero. The repository
+gate accepts only those exact bytes; a missing entry, nonzero limit, or any other extra
+path fails closed. This exception does not change the immutable acceptance contract or
+authorize dependency changes.
+
 ## Claim boundary
 
 Remote registry evidence is public distribution evidence, not a formal GitHub Release,

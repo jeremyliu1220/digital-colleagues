@@ -17,6 +17,27 @@ ACCEPTANCE_COMMIT = "99b0045bba48de8e4d44c10ce07d60ba20738a8b"
 BRANCH = "codex/p10-mac-quickstart"
 ACCEPTANCE_PATH = "docs/p10/acceptance.md"
 SUMMARY_PATH = "artifacts/p10/summary.json"
+DEPENDABOT_EXCEPTION_PATH = ".github/dependabot.yml"
+DEPENDABOT_DISABLED_CONFIG = """# SPDX-License-Identifier: Apache-2.0
+
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+  - package-ecosystem: npm
+    directory: /studio
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+"""
 PRODUCT_NAME = "Digital Colleagues"
 PYTHON_VERSION = "0.2.0.dev0"
 DISPLAY_VERSION = "0.2.0-dev.0"
@@ -60,6 +81,7 @@ OFFICIAL_URLS = (
     "https://docs.github.com/en/actions/concepts/security/artifact-attestations",
     "https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations",
     "https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry",
+    "https://docs.github.com/en/code-security/how-tos/secure-your-supply-chain/secure-your-dependencies/configure-version-updates",
     "https://docs.sigstore.dev/cosign/signing/signing_with_containers/",
     "https://docs.sigstore.dev/cosign/verifying/verify/",
     "https://cli.github.com/manual/gh_attestation_verify",
@@ -74,7 +96,7 @@ OFFICIAL_URLS = (
     "https://support.apple.com/en-gb/guide/deployment/dep0a2cb7686/web",
 )
 
-P10_ALLOWED_PATHS = frozenset(
+ACCEPTANCE_ALLOWED_PATHS = frozenset(
     {
         ".github/workflows/ci.yml",
         "Dockerfile.p10",
@@ -140,6 +162,7 @@ P10_ALLOWED_PATHS = frozenset(
         SUMMARY_PATH,
     }
 )
+P10_ALLOWED_PATHS = ACCEPTANCE_ALLOWED_PATHS | {DEPENDABOT_EXCEPTION_PATH}
 IMPLEMENTATION_PATHS = P10_ALLOWED_PATHS - {SUMMARY_PATH}
 DIGEST_REF = re.compile(r"^[A-Za-z0-9._:-]+/[A-Za-z0-9._/-]+@sha256:[0-9a-f]{64}$")
 UTC_TIMESTAMP = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$")

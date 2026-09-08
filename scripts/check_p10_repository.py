@@ -19,6 +19,8 @@ from scripts.p10_gate_support import (
     ACCEPTED_P8_COMMIT,
     BASE_COMMIT,
     BRANCH,
+    DEPENDABOT_DISABLED_CONFIG,
+    DEPENDABOT_EXCEPTION_PATH,
     IMPLEMENTATION_PATHS,
     MIGRATIONS,
     P10_ALLOWED_PATHS,
@@ -149,6 +151,12 @@ def check_repository(root: Path) -> dict[str, object]:
         or (root / ACCEPTANCE_PATH).read_bytes() != current
     ):
         raise GateError("acceptance_contract_changed")
+    try:
+        dependabot_config = (root / DEPENDABOT_EXCEPTION_PATH).read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
+        raise GateError("dependabot_configuration_invalid") from exc
+    if dependabot_config != DEPENDABOT_DISABLED_CONFIG:
+        raise GateError("dependabot_configuration_invalid")
 
     changed = _changed(root, BASE_COMMIT)
     if changed == IMPLEMENTATION_PATHS:
