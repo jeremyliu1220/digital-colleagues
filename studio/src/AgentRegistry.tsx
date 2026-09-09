@@ -4,7 +4,7 @@ import { ChangeEvent, useCallback, useEffect, useState } from "react";
 
 import { t } from "./i18n";
 
-type PackageRecord = {
+export type PackageRecord = {
   package: {
     metadata: {
       package_id: string;
@@ -19,10 +19,16 @@ type PackageRecord = {
   trust_state: string;
   install_state: string;
   attestation: null | {
+    verification: string;
+    artifact_digest: string;
     signer: string;
+    signer_digest: string;
     repository: string;
     workflow: string;
     build_identity: string;
+    source_ref: string;
+    source_digest: string;
+    predicate_type: string;
   };
   revision: number;
 };
@@ -78,6 +84,124 @@ type AuditRecord = {
   occurred_at: string;
 };
 
+const CAPABILITY_OPTIONS = [
+  "read_work",
+  "manage_work",
+  "propose_reference_message",
+  "propose_internal_record",
+  "notify_human",
+  "read_audit",
+] as const;
+
+const EFFECT_CAPABILITIES = new Set([
+  "propose_reference_message",
+  "propose_internal_record",
+  "notify_human",
+]);
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function deploymentDraftBody(
+  record: PackageRecord,
+  deploymentId: string,
+  grantedCapabilities: string[],
+  extraConfirmed: boolean,
+  idempotencyKey: string,
+) {
+  const requested = new Set(record.package.content.requested_capabilities);
+  const adminExtra = grantedCapabilities.filter(
+    (value) => !requested.has(value),
+  );
+  if (
+    !deploymentId.trim() ||
+    grantedCapabilities.length === 0 ||
+    !grantedCapabilities.some((value) => EFFECT_CAPABILITIES.has(value)) ||
+    (adminExtra.length > 0 && !extraConfirmed)
+  ) {
+    throw new Error(t("registry.deployment_input_required"));
+  }
+  return {
+    deployment_id: deploymentId.trim(),
+    package_id: record.package.metadata.package_id,
+    package_version: record.package.metadata.version,
+    package_digest: record.package_digest,
+    display_name:
+      record.package.metadata.display["en-US"]?.name ||
+      record.package.metadata.package_id,
+    description: t("registry.default_description"),
+    mission: t("registry.default_mission"),
+    service_relationship: t("registry.default_relationship"),
+    granted_capabilities: [...grantedCapabilities].sort(),
+    timezone: "UTC",
+    idempotency_key: idempotencyKey,
+  };
+}
+
+export function AuthoritySelection({
+  requested,
+  granted,
+  busy,
+  extraConfirmed,
+  onToggle,
+  onConfirmExtra,
+}: {
+  requested: string[];
+  granted: string[];
+  busy: boolean;
+  extraConfirmed: boolean;
+  onToggle: (capability: string) => void;
+  onConfirmExtra: (confirmed: boolean) => void;
+}) {
+  const requestedSet = new Set(requested);
+  const adminExtra = granted.filter((value) => !requestedSet.has(value));
+  return (
+    <fieldset className="registry-authority" disabled={busy}>
+      <legend>{t("registry.select_capabilities")}</legend>
+      <p>{t("registry.select_capabilities_help")}</p>
+      <div className="registry-capabilities">
+        {CAPABILITY_OPTIONS.map((capability) => (
+          <label key={capability}>
+            <input
+              type="checkbox"
+              value={capability}
+              checked={granted.includes(capability)}
+              onChange={() => onToggle(capability)}
+            />
+            <span>{capability}</span>
+            <small>
+              {t(
+                requestedSet.has(capability)
+                  ? "registry.capability_requested"
+                  : "registry.capability_not_requested",
+              )}
+            </small>
+          </label>
+        ))}
+      </div>
+      {!granted.some((value) => EFFECT_CAPABILITIES.has(value)) && (
+        <p className="registry-authority-warning" role="status">
+          {t("registry.effect_required")}
+        </p>
+      )}
+      {adminExtra.length > 0 && (
+        <div className="registry-extra-warning" role="alert">
+          <strong>{t("registry.admin_extra")}</strong>
+          <p>{adminExtra.join(" · ")}</p>
+          <p>{t("registry.extra_warning")}</p>
+          <label>
+            <input
+              type="checkbox"
+              value="confirm_admin_extra"
+              checked={extraConfirmed}
+              onChange={(event) => onConfirmExtra(event.target.checked)}
+            />
+            {t("registry.confirm_extra")}
+          </label>
+        </div>
+      )}
+    </fieldset>
+  );
+}
+
 async function request<T>(
   path: string,
   csrf: string,
@@ -111,19 +235,44 @@ function key(prefix: string) {
 export function AgentRegistry({
   csrf,
   canManage,
+  initialPackages = [],
+  initialDeployments = [],
 }: {
   csrf: string;
   canManage: boolean;
+  initialPackages?: PackageRecord[];
+  initialDeployments?: Deployment[];
 }) {
-  const [packages, setPackages] = useState<PackageRecord[]>([]);
-  const [deployments, setDeployments] = useState<Deployment[]>([]);
+  const [packages, setPackages] = useState<PackageRecord[]>(initialPackages);
+  const [deployments, setDeployments] =
+    useState<Deployment[]>(initialDeployments);
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [localArchive, setLocalArchive] = useState<LocalArchive | null>(null);
   const [deploymentId, setDeploymentId] = useState("");
   const [targetDigest, setTargetDigest] = useState("");
+  const [grantedCapabilities, setGrantedCapabilities] = useState<string[]>([]);
+  const [extraConfirmed, setExtraConfirmed] = useState(false);
   const [audit, setAudit] = useState<AuditRecord[]>([]);
   const [busy, setBusy] = useState("");
   const [notice, setNotice] = useState("");
+  const selectedPackage = packages.find(
+    (record) =>
+      record.package_digest === targetDigest &&
+      record.trust_state === "trusted" &&
+      record.install_state === "installed",
+  );
+  const selectedRequested =
+    selectedPackage?.package.content.requested_capabilities ?? [];
+  const selectedAdminExtra = grantedCapabilities.filter(
+    (value) => !selectedRequested.includes(value),
+  );
+  const canCreateDraft = Boolean(
+    !busy &&
+    selectedPackage &&
+    deploymentId.trim() &&
+    grantedCapabilities.some((value) => EFFECT_CAPABILITIES.has(value)) &&
+    (selectedAdminExtra.length === 0 || extraConfirmed),
+  );
 
   const refresh = useCallback(async () => {
     const [nextPackages, nextDeployments, nextDrafts] = await Promise.all([
@@ -246,43 +395,43 @@ export function AgentRegistry({
   }
 
   async function createDeployment() {
-    const selected = packages.find(
-      (record) =>
-        record.package_digest === targetDigest &&
-        record.trust_state === "trusted" &&
-        record.install_state === "installed",
-    );
-    if (!selected || !deploymentId.trim()) {
+    if (!selectedPackage) {
       setNotice(t("registry.deployment_input_required"));
       return;
     }
-    const requested = selected.package.content.requested_capabilities;
-    const effectGrants = requested.filter((value) =>
-      [
-        "propose_reference_message",
-        "propose_internal_record",
-        "notify_human",
-      ].includes(value),
-    );
+    let body: ReturnType<typeof deploymentDraftBody>;
+    try {
+      body = deploymentDraftBody(
+        selectedPackage,
+        deploymentId,
+        grantedCapabilities,
+        extraConfirmed,
+        key("create-draft"),
+      );
+    } catch (error) {
+      setNotice(
+        error instanceof Error
+          ? error.message
+          : t("registry.deployment_input_required"),
+      );
+      return;
+    }
     await mutate(t("registry.create_draft"), () =>
-      request("/deployment-drafts", csrf, {
-        deployment_id: deploymentId.trim(),
-        package_id: selected.package.metadata.package_id,
-        package_version: selected.package.metadata.version,
-        package_digest: selected.package_digest,
-        display_name:
-          selected.package.metadata.display["en-US"]?.name ||
-          selected.package.metadata.package_id,
-        description: t("registry.default_description"),
-        mission: t("registry.default_mission"),
-        service_relationship: t("registry.default_relationship"),
-        granted_capabilities:
-          effectGrants.length > 0 ? effectGrants : ["notify_human"],
-        timezone: "UTC",
-        idempotency_key: key("create-draft"),
-      }),
+      request("/deployment-drafts", csrf, body),
     );
     setDeploymentId("");
+    setTargetDigest("");
+    setGrantedCapabilities([]);
+    setExtraConfirmed(false);
+  }
+
+  function toggleGrant(capability: string) {
+    setGrantedCapabilities((current) =>
+      current.includes(capability)
+        ? current.filter((value) => value !== capability)
+        : [...current, capability],
+    );
+    setExtraConfirmed(false);
   }
 
   async function draftAction(draft: Draft, action: "review" | "confirm") {
@@ -429,7 +578,11 @@ export function AgentRegistry({
             {t("registry.target_package")}
             <select
               value={targetDigest}
-              onChange={(event) => setTargetDigest(event.target.value)}
+              onChange={(event) => {
+                setTargetDigest(event.target.value);
+                setGrantedCapabilities([]);
+                setExtraConfirmed(false);
+              }}
               disabled={Boolean(busy)}
             >
               <option value="">{t("registry.choose_package")}</option>
@@ -450,8 +603,18 @@ export function AgentRegistry({
                 ))}
             </select>
           </label>
+          {selectedPackage && (
+            <AuthoritySelection
+              requested={selectedRequested}
+              granted={grantedCapabilities}
+              busy={Boolean(busy)}
+              extraConfirmed={extraConfirmed}
+              onToggle={toggleGrant}
+              onConfirmExtra={setExtraConfirmed}
+            />
+          )}
           <button
-            disabled={Boolean(busy)}
+            disabled={!canCreateDraft}
             onClick={() => void createDeployment()}
           >
             {t("registry.create_draft")}
@@ -477,6 +640,8 @@ export function AgentRegistry({
                   </header>
                   <p className="mono">{record.package_digest}</p>
                   <dl>
+                    <dt>{t("registry.package_version")}</dt>
+                    <dd>{record.package.metadata.version}</dd>
                     <dt>{t("registry.source")}</dt>
                     <dd>{record.source}</dd>
                     <dt>{t("registry.trust_state")}</dt>
@@ -489,13 +654,63 @@ export function AgentRegistry({
                         " · ",
                       )}
                     </dd>
-                    <dt>{t("registry.provenance")}</dt>
-                    <dd>
-                      {record.attestation
-                        ? `${record.attestation.signer} · ${record.attestation.repository} · ${record.attestation.workflow} · ${record.attestation.build_identity} · ${record.archive_digest}`
-                        : t("registry.no_attestation")}
-                    </dd>
                   </dl>
+                  {record.attestation ? (
+                    <section
+                      className="registry-trust-review"
+                      aria-label={t("registry.trust_review")}
+                    >
+                      <h3>{t("registry.provenance")}</h3>
+                      <dl>
+                        <dt>{t("registry.verification_result")}</dt>
+                        <dd>{record.attestation.verification}</dd>
+                        <dt>{t("registry.signer")}</dt>
+                        <dd>{record.attestation.signer}</dd>
+                        <dt>{t("registry.repository")}</dt>
+                        <dd>{record.attestation.repository}</dd>
+                        <dt>{t("registry.workflow")}</dt>
+                        <dd>{record.attestation.workflow}</dd>
+                        <dt>{t("registry.build_identity")}</dt>
+                        <dd>{record.attestation.build_identity}</dd>
+                        <dt>{t("registry.signer_digest")}</dt>
+                        <dd className="mono">
+                          {record.attestation.signer_digest}
+                        </dd>
+                        <dt>{t("registry.artifact_digest")}</dt>
+                        <dd className="mono">
+                          {record.attestation.artifact_digest}
+                        </dd>
+                        <dt>{t("registry.archive_digest")}</dt>
+                        <dd className="mono">{record.archive_digest}</dd>
+                        <dt>{t("registry.source_ref")}</dt>
+                        <dd>{record.attestation.source_ref}</dd>
+                        <dt>{t("registry.source_digest")}</dt>
+                        <dd className="mono">
+                          {record.attestation.source_digest}
+                        </dd>
+                        <dt>{t("registry.predicate_type")}</dt>
+                        <dd>{record.attestation.predicate_type}</dd>
+                      </dl>
+                      <p className="registry-origin-warning">
+                        {t("registry.attestation_origin_only")}
+                      </p>
+                      <p>{t("registry.trust_independent")}</p>
+                      <p className="registry-authority-warning">
+                        {deployments.some(
+                          (deployment) =>
+                            deployment.package_id ===
+                              record.package.metadata.package_id &&
+                            deployment.package_version ===
+                              record.package.metadata.version &&
+                            deployment.package_digest === record.package_digest,
+                        )
+                          ? t("registry.authority_bound")
+                          : t("registry.authority_unbound")}
+                      </p>
+                    </section>
+                  ) : (
+                    <p>{t("registry.no_attestation")}</p>
+                  )}
                   {canManage && (
                     <div className="registry-actions">
                       <button

@@ -43,6 +43,20 @@ def check_studio(root: Path) -> dict[str, object]:
     required = {
         "registry.validate",
         "registry.provenance",
+        "registry.verification_result",
+        "registry.signer",
+        "registry.repository",
+        "registry.workflow",
+        "registry.build_identity",
+        "registry.signer_digest",
+        "registry.artifact_digest",
+        "registry.archive_digest",
+        "registry.source_ref",
+        "registry.source_digest",
+        "registry.predicate_type",
+        "registry.attestation_origin_only",
+        "registry.trust_independent",
+        "registry.authority_unbound",
         "registry.requested",
         "registry.granted",
         "registry.trust",
@@ -50,6 +64,8 @@ def check_studio(root: Path) -> dict[str, object]:
         "registry.install",
         "registry.register",
         "registry.create_draft",
+        "registry.select_capabilities",
+        "registry.confirm_extra",
         "registry.review",
         "registry.confirm",
         "registry.activate",
@@ -65,7 +81,16 @@ def check_studio(root: Path) -> dict[str, object]:
     if not required <= set(en):
         raise GateError("P11 Studio control translations are incomplete")
     component = (root / "studio/src/AgentRegistry.tsx").read_text()
-    for marker in ("aria-live", "disabled={Boolean(busy)}", "permission_diff", "active_limit"):
+    for marker in (
+        "aria-live",
+        "disabled={Boolean(busy)}",
+        "permission_diff",
+        "active_limit",
+        "AuthoritySelection",
+        "signer_digest",
+        "attestation_origin_only",
+        "authority_unbound",
+    ):
         if marker not in component:
             raise GateError("P11 Studio accessibility or lifecycle marker is absent")
     return {

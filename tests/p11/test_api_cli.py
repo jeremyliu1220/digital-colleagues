@@ -2,10 +2,17 @@
 
 from __future__ import annotations
 
+import io
+import json
+import secrets
+import threading
 import unittest
+from contextlib import redirect_stdout
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest.mock import MagicMock
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 from fastapi import FastAPI
 from fastapi.routing import APIRoute
@@ -17,6 +24,7 @@ from digital_colleagues.api.p11_app import (
     install_p11_routes,
 )
 from digital_colleagues.application.errors import PermissionDeniedError
+from digital_colleagues.cli import _normalized_api_origin, _request
 from digital_colleagues.core.governance import AuthorizationAction
 from digital_colleagues.governance.rbac import action_matrix
 from tests.p11.fixtures import ROOT, build_harness
@@ -98,6 +106,160 @@ class ApiCliTests(unittest.TestCase):
         self.assertNotIn("--session-cookie", source)
         self.assertNotIn("--csrf-token", source)
         self.assertIn('remote.add_argument("--origin")', source)
+
+    def test_cli_accepts_only_exact_ip_literal_loopback_origins(self) -> None:
+        self.assertEqual(
+            _normalized_api_origin("http://127.0.0.1:8000/"),
+            "http://127.0.0.1:8000",
+        )
+        self.assertEqual(
+            _normalized_api_origin("https://[::1]:8443"),
+            "https://[::1]:8443",
+        )
+        invalid = (
+            "http://localhost:8000",
+            "http://127.0.0.2:8000",
+            "http://0.0.0.0:8000",
+            "http://user@127.0.0.1:8000",
+            "http://127.0.0.1:8000/api/v1",
+            "http://127.0.0.1:8000?value=1",
+            "http://127.0.0.1:8000#value",
+            "http://127.0.0.1:0",
+            "http://127.0.0.1:65536",
+            "http://127.0.0.1:not-a-port",
+            "http://127.0.0.1:",
+        )
+        for value in invalid:
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                _normalized_api_origin(value)
+
+    def test_cli_refuses_origin_rebinding_before_reading_credentials(self) -> None:
+        output = io.StringIO()
+        with (
+            patch("digital_colleagues.cli._auth") as authentication,
+            redirect_stdout(output),
+            self.assertRaises(SystemExit),
+        ):
+            _request(
+                base_url="http://127.0.0.1:8000",
+                origin="http://127.0.0.1:8001",
+                path="/api/v1/catalog",
+                method="GET",
+                body=None,
+            )
+        authentication.assert_not_called()
+        self.assertEqual(json.loads(output.getvalue())["error"]["code"], "invalid_server")
+
+    def test_cli_redirect_refusal_never_forwards_credentials(self) -> None:
+        first_observations: list[tuple[str, bool, bool]] = []
+        second_request_count = 0
+
+        class DestinationHandler(BaseHTTPRequestHandler):
+            def do_GET(self) -> None:
+                nonlocal second_request_count
+                second_request_count += 1
+                self.send_response(200)
+                self.end_headers()
+
+            do_POST = do_GET
+
+            def log_message(self, format: str, *args: object) -> None:
+                del format, args
+
+        destination = ThreadingHTTPServer(("127.0.0.1", 0), DestinationHandler)
+        destination_port = destination.server_address[1]
+
+        class SourceHandler(BaseHTTPRequestHandler):
+            def _observe(self) -> None:
+                first_observations.append(
+                    (
+                        self.command,
+                        "Cookie" in self.headers,
+                        "X-CSRF-Token" in self.headers,
+                    )
+                )
+
+            def do_GET(self) -> None:
+                self._observe()
+                payload = b"{}"
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+
+            def do_POST(self) -> None:
+                self._observe()
+                self.send_response(307)
+                self.send_header(
+                    "Location",
+                    f"http://127.0.0.1:{destination_port}/redirect-target",
+                )
+                self.end_headers()
+
+            def log_message(self, format: str, *args: object) -> None:
+                del format, args
+
+        source = ThreadingHTTPServer(("127.0.0.1", 0), SourceHandler)
+        source_port = source.server_address[1]
+        threads = [
+            threading.Thread(target=server.serve_forever, daemon=True)
+            for server in (source, destination)
+        ]
+        for thread in threads:
+            thread.start()
+        try:
+            endpoint = f"http://127.0.0.1:{source_port}"
+            self._with_cli_auth(
+                lambda: _request(
+                    base_url=endpoint,
+                    origin=endpoint,
+                    path="/api/v1/catalog",
+                    method="GET",
+                    body=None,
+                )
+            )
+            output = io.StringIO()
+            with redirect_stdout(output), self.assertRaises(SystemExit):
+                self._with_cli_auth(
+                    lambda: _request(
+                        base_url=endpoint,
+                        origin=endpoint,
+                        path="/api/v1/agent-packages",
+                        method="POST",
+                        body={},
+                    )
+                )
+            self.assertEqual(
+                first_observations,
+                [("GET", True, False), ("POST", True, True)],
+            )
+            self.assertEqual(second_request_count, 0)
+            self.assertEqual(
+                json.loads(output.getvalue())["error"]["code"],
+                "remote_request_refused",
+            )
+        finally:
+            source.shutdown()
+            destination.shutdown()
+            source.server_close()
+            destination.server_close()
+            for thread in threads:
+                thread.join(timeout=2)
+
+    @staticmethod
+    def _with_cli_auth(operation: object) -> object:
+        envelope = json.dumps(
+            {
+                "session_cookie": secrets.token_urlsafe(24),
+                "csrf_token": secrets.token_urlsafe(24),
+            }
+        ).encode()
+        with patch(
+            "digital_colleagues.cli.sys.stdin",
+            SimpleNamespace(buffer=io.BytesIO(envelope)),
+        ):
+            return operation()  # type: ignore[operator]
 
     def test_p11_role_matrix_is_fail_closed_for_management(self) -> None:
         matrix = action_matrix()

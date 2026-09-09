@@ -201,6 +201,7 @@ class GitHubCliAttestationVerifier:
             verification=AttestationVerification.VERIFIED,
             artifact_digest=artifact_digest,
             signer=self._field(result, "buildSignerURI"),
+            signer_digest=policy.signer_digest,
             repository=policy.repository,
             workflow=policy.signer_workflow,
             build_identity=policy.build_identity,

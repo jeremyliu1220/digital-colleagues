@@ -6,18 +6,36 @@ from __future__ import annotations
 
 import argparse
 import base64
+import ipaddress
 import json
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 from typing import NoReturn
 
-from digital_colleagues.adapters.package.archive import ARCHIVE_MAX_BYTES
-from digital_colleagues.application.p11_services import P11PackageService
+from digital_colleagues.adapters.package.archive import (
+    ARCHIVE_MAX_BYTES,
+    PackageArchiveValidator,
+)
 
 STDIN_AUTH_MAX_BYTES = 8_192
 HTTP_RESPONSE_MAX_BYTES = 1_048_576
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(
+        self,
+        req: urllib.request.Request,
+        fp: object,
+        code: int,
+        msg: str,
+        headers: object,
+        newurl: str,
+    ) -> None:
+        del req, fp, code, msg, headers, newurl
+        return None
 
 
 def _fail(code: str) -> NoReturn:
@@ -57,6 +75,39 @@ def _auth() -> tuple[str, str]:
     return cookie, csrf
 
 
+def _normalized_api_origin(value: str) -> str:
+    if not isinstance(value, str) or not value or len(value) > 512:
+        raise ValueError("invalid local API origin")
+    try:
+        parsed = urllib.parse.urlsplit(value)
+        port = parsed.port
+    except ValueError as exc:
+        raise ValueError("invalid local API origin") from exc
+    if (
+        parsed.scheme not in {"http", "https"}
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.hostname is None
+        or parsed.netloc.endswith(":")
+        or parsed.path not in {"", "/"}
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise ValueError("invalid local API origin")
+    try:
+        address = ipaddress.ip_address(parsed.hostname)
+    except ValueError as exc:
+        raise ValueError("invalid local API origin") from exc
+    if address not in {ipaddress.ip_address("127.0.0.1"), ipaddress.ip_address("::1")}:
+        raise ValueError("invalid local API origin")
+    if port is not None and not 1 <= port <= 65_535:
+        raise ValueError("invalid local API origin")
+    default_port = 80 if parsed.scheme == "http" else 443
+    host = f"[{address.compressed}]" if address.version == 6 else address.compressed
+    authority = host if port in {None, default_port} else f"{host}:{port}"
+    return f"{parsed.scheme}://{authority}"
+
+
 def _request(
     *,
     base_url: str,
@@ -65,29 +116,39 @@ def _request(
     method: str,
     body: dict[str, object] | None,
 ) -> object:
-    cookie, csrf = _auth()
-    if (
-        not base_url.startswith(("http://", "https://"))
-        or not origin.startswith(("http://", "https://"))
-        or len(base_url) > 512
-        or len(origin) > 512
-    ):
+    try:
+        api_origin = _normalized_api_origin(base_url)
+        request_origin = _normalized_api_origin(origin)
+    except ValueError:
         _fail("invalid_server")
+    if request_origin != api_origin:
+        _fail("invalid_server")
+    cookie, csrf = _auth()
     encoded = None if body is None else json.dumps(body, separators=(",", ":")).encode()
+    headers = {
+        "Accept": "application/json",
+        "Cookie": f"dc_session={cookie}",
+    }
+    if method != "GET":
+        headers.update(
+            {
+                "Content-Type": "application/json",
+                "Origin": request_origin,
+                "X-CSRF-Token": csrf,
+            }
+        )
     request = urllib.request.Request(
-        base_url.rstrip("/") + path,
+        api_origin + path,
         data=encoded,
         method=method,
-        headers={
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-            "Cookie": f"dc_session={cookie}",
-            "Origin": origin.rstrip("/"),
-            "X-CSRF-Token": csrf,
-        },
+        headers=headers,
+    )
+    opener = urllib.request.build_opener(
+        urllib.request.ProxyHandler({}),
+        _NoRedirect(),
     )
     try:
-        with urllib.request.urlopen(request, timeout=20) as response:
+        with opener.open(request, timeout=20) as response:
             payload = response.read(HTTP_RESPONSE_MAX_BYTES + 1)
     except (OSError, urllib.error.HTTPError, urllib.error.URLError):
         _fail("remote_request_refused")
@@ -201,7 +262,7 @@ def main() -> int:
     arguments = _parser().parse_args()
     try:
         if arguments.command == "package-check":
-            inspection = P11PackageService.inspect(
+            inspection = PackageArchiveValidator().validate(
                 _archive(arguments.archive),
                 expected_archive_digest=arguments.expected_digest,
             )

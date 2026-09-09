@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import subprocess
 import unittest
 from collections.abc import Mapping, Sequence
+from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -15,7 +17,7 @@ from digital_colleagues.adapters.package.github_attestation import (
     GitHubCliAttestationVerifier,
     UnavailableGitHubAttestationVerifier,
 )
-from digital_colleagues.application.errors import ValidationError
+from digital_colleagues.application.errors import ReplayConflictError, ValidationError
 from digital_colleagues.application.p11_contracts import (
     GitHubAttestationPolicy,
     PackageRegistrationRequest,
@@ -102,6 +104,7 @@ class AttestationTests(unittest.TestCase):
             artifact=ARTIFACT, artifact_digest=DIGEST, bundle=b"{}", policy=policy()
         )
         self.assertEqual(verified.artifact_digest, DIGEST)
+        self.assertEqual(verified.signer_digest, SIGNER_DIGEST)
 
     def test_wrong_subject_digest_fails_closed(self) -> None:
         with self.assertRaises(ValidationError):
@@ -247,8 +250,126 @@ class AttestationTests(unittest.TestCase):
                 )
                 self.assertEqual(first, second)
                 self.assertEqual(len(calls), 1)
+                expected_payload = {
+                    "archive_digest": digest(archive),
+                    "package_digest": first.package_digest,
+                    "source": PackageSource.GITHUB_RELEASE.value,
+                    "attestation_bundle_digest": digest(b"{}"),
+                    "repository": policy().repository,
+                    "signer_workflow": policy().signer_workflow,
+                    "signer_digest": policy().signer_digest,
+                    "source_ref": policy().source_ref,
+                    "source_digest": policy().source_digest,
+                    "build_identity": policy().build_identity,
+                }
+                encoded = json.dumps(
+                    expected_payload,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                    sort_keys=True,
+                ).encode()
+                expected_request_digest = "sha256:" + hashlib.sha256(encoded).hexdigest()
+                row = harness.store._connection.execute(
+                    "SELECT request_digest FROM p11_operation_replay "
+                    "WHERE operation = 'register_package' AND idempotency_key = ?",
+                    ("github-replay",),
+                ).fetchone()
+                self.assertEqual(row["request_digest"], expected_request_digest)
             finally:
                 harness.store.close()
+
+    def test_registration_replay_binds_bundle_and_every_policy_field_before_verification(
+        self,
+    ) -> None:
+        archive = package_archive()
+        calls: list[Sequence[str]] = []
+
+        def runner(command: Sequence[str], **_: object) -> subprocess.CompletedProcess[bytes]:
+            calls.append(command)
+            return subprocess.CompletedProcess(
+                [],
+                0,
+                stdout=result(artifact_digest=digest(archive)),
+                stderr=b"",
+            )
+
+        verifier = GitHubCliAttestationVerifier(
+            executable="gh",
+            trusted_root=b"{}",
+            clock=lambda: NOW,
+            runner=runner,
+        )
+        original_policy = policy()
+        original_bundle = b'{"offline":"bundle-one"}'
+        with TemporaryDirectory() as value:
+            harness = build_harness(Path(value) / "rebind.sqlite", attestation=verifier)
+            try:
+                harness.packages.register(
+                    session=harness.session,
+                    request=PackageRegistrationRequest(
+                        archive=archive,
+                        source=PackageSource.GITHUB_RELEASE,
+                        expected_archive_digest=digest(archive),
+                        attestation_bundle=original_bundle,
+                        github_policy=original_policy,
+                    ),
+                    idempotency_key="github-policy-rebind",
+                )
+                mutations = {
+                    "bundle": PackageRegistrationRequest(
+                        archive=archive,
+                        source=PackageSource.GITHUB_RELEASE,
+                        expected_archive_digest=digest(archive),
+                        attestation_bundle=b'{"offline":"bundle-two"}',
+                        github_policy=original_policy,
+                    ),
+                    "repository": self._registration_request(
+                        archive, replace(original_policy, repository="other/repository")
+                    ),
+                    "signer_workflow": self._registration_request(
+                        archive,
+                        replace(original_policy, signer_workflow="other/repository/workflow.yml"),
+                    ),
+                    "signer_digest": self._registration_request(
+                        archive,
+                        replace(original_policy, signer_digest="sha256:" + "4" * 64),
+                    ),
+                    "source_ref": self._registration_request(
+                        archive, replace(original_policy, source_ref="refs/tags/v2.0.0")
+                    ),
+                    "source_digest": self._registration_request(
+                        archive,
+                        replace(original_policy, source_digest="sha256:" + "5" * 64),
+                    ),
+                    "build_identity": self._registration_request(
+                        archive,
+                        replace(original_policy, build_identity="other-build@refs/tags/v1.0.0"),
+                    ),
+                }
+                for field, request in mutations.items():
+                    with self.subTest(field=field), self.assertRaises(ReplayConflictError):
+                        harness.packages.register(
+                            session=harness.session,
+                            request=request,
+                            idempotency_key="github-policy-rebind",
+                        )
+                self.assertEqual(len(calls), 1)
+                dump = "\n".join(harness.store._connection.iterdump())
+                self.assertFalse(original_bundle.decode() in dump)
+            finally:
+                harness.store.close()
+
+    @staticmethod
+    def _registration_request(
+        archive: bytes, github_policy: GitHubAttestationPolicy
+    ) -> PackageRegistrationRequest:
+        return PackageRegistrationRequest(
+            archive=archive,
+            source=PackageSource.GITHUB_RELEASE,
+            expected_archive_digest=digest(archive),
+            attestation_bundle=b'{"offline":"bundle-one"}',
+            github_policy=github_policy,
+        )
 
 
 if __name__ == "__main__":

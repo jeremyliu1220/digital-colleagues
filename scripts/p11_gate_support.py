@@ -12,6 +12,8 @@ from typing import Any
 
 BASE_COMMIT = "4bef5629d450c6bb3940f606fc90194e008ee8fd"
 ACCEPTANCE_COMMIT = "b3963aadf4702b924e72dc1e7306799780eecfbd"
+PRIOR_EVIDENCE_COMMIT = "54c411e594659bf83fec56f538a11d1ea3b6e523"
+PRIOR_SUMMARY_BLOB = "da0d602d323689cd1f40393e475dfedc5147eaa5"
 BRANCH = "codex/p11-agent-packages"
 SUMMARY_PATH = "artifacts/p11/summary.json"
 CLAIM = "p11_agent_package_multi_agent_lifecycle_candidate"
@@ -80,3 +82,28 @@ def public_tree_digest(root: Path, paths: tuple[str, ...]) -> str:
         framed.update(len(content).to_bytes(8, "big"))
         framed.update(content)
     return "sha256:" + framed.hexdigest()
+
+
+def candidate_diff_check(
+    root: Path,
+    *,
+    base: str = ACCEPTANCE_COMMIT,
+    head: str = "HEAD",
+) -> dict[str, object]:
+    revision_range = f"{base}...{head}"
+    completed = subprocess.run(
+        ["git", "diff", "--check", revision_range],
+        cwd=root,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        timeout=120,
+        check=False,
+    )
+    if completed.returncode != 0:
+        raise GateError("candidate implementation/evidence diff check failed")
+    return {
+        "status": "passed",
+        "failure_count": 0,
+        "range": revision_range,
+    }

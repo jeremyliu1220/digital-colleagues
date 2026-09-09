@@ -8,7 +8,6 @@ import hashlib
 import json
 from dataclasses import replace
 
-from digital_colleagues.adapters.package.archive import validate_package_archive
 from digital_colleagues.application.errors import PermissionDeniedError, StaleConflictError
 from digital_colleagues.application.p4_contracts import AuthenticatedSession
 from digital_colleagues.application.p5_contracts import PolicyEdit
@@ -26,9 +25,14 @@ from digital_colleagues.application.p11_contracts import (
 from digital_colleagues.application.p11_ports import (
     GitHubAttestationVerificationPort,
     P11PersistencePort,
+    PackageArchiveValidationPort,
 )
 from digital_colleagues.application.ports import ClockPort, IdentifierPort
-from digital_colleagues.core.agent_package import ALLOWED_CAPABILITIES, PackageSource
+from digital_colleagues.core.agent_package import (
+    ALLOWED_CAPABILITIES,
+    PackageSource,
+    sha256_digest,
+)
 from digital_colleagues.core.authority import (
     CapabilityGrant,
     Constraint,
@@ -67,28 +71,24 @@ class P11PackageService:
         *,
         store: P11PersistencePort,
         authentication: P6AuthenticationService,
+        archive_validator: PackageArchiveValidationPort,
         attestation: GitHubAttestationVerificationPort,
         clock: ClockPort,
         identifiers: IdentifierPort,
     ) -> None:
         self._store = store
         self._authentication = authentication
+        self._archive_validator = archive_validator
         self._attestation = attestation
         self._clock = clock
         self._identifiers = identifiers
 
-    @staticmethod
-    def inspect(archive: bytes, *, expected_archive_digest: str | None = None) -> PackageInspection:
-        validated = validate_package_archive(
+    def inspect(
+        self, archive: bytes, *, expected_archive_digest: str | None = None
+    ) -> PackageInspection:
+        return self._archive_validator.validate(
             archive,
             expected_archive_digest=expected_archive_digest,
-        )
-        return PackageInspection(
-            package=validated.package,
-            package_digest=validated.package_digest,
-            archive_digest=validated.archive_digest,
-            compressed_size=validated.compressed_size,
-            uncompressed_size=validated.uncompressed_size,
         )
 
     def catalog(self, session: AuthenticatedSession) -> tuple[PackageRecord, ...]:
@@ -116,11 +116,23 @@ class P11PackageService:
             request.archive,
             expected_archive_digest=request.expected_archive_digest,
         )
+        policy = request.github_policy
         request_digest = _digest(
             {
                 "archive_digest": inspection.archive_digest,
                 "package_digest": inspection.package_digest,
                 "source": request.source.value,
+                "attestation_bundle_digest": (
+                    sha256_digest(request.attestation_bundle)
+                    if request.attestation_bundle is not None
+                    else None
+                ),
+                "repository": policy.repository if policy is not None else None,
+                "signer_workflow": policy.signer_workflow if policy is not None else None,
+                "signer_digest": policy.signer_digest if policy is not None else None,
+                "source_ref": policy.source_ref if policy is not None else None,
+                "source_digest": policy.source_digest if policy is not None else None,
+                "build_identity": policy.build_identity if policy is not None else None,
             }
         )
         replay = self._store.registration_replay(
@@ -159,7 +171,11 @@ class P11PackageService:
             correlation_id=self._identifiers.derive("p11-package", inspection.package_digest),
             causation_id=self._identifiers.derive("p11-register", idempotency_key),
         )
-        return self._store.register_package(record, idempotency_key=idempotency_key)
+        return self._store.register_package(
+            record,
+            idempotency_key=idempotency_key,
+            request_digest=request_digest,
+        )
 
     def _mutate(
         self,

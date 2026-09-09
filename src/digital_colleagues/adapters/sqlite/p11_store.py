@@ -334,6 +334,7 @@ class SQLiteP11Store(SQLiteP6Store):
             verification=AttestationVerification(raw["verification"]),
             artifact_digest=raw["artifact_digest"],
             signer=raw["signer"],
+            signer_digest=raw["signer_digest"],
             repository=raw["repository"],
             workflow=raw["workflow"],
             build_identity=raw["build_identity"],
@@ -352,6 +353,7 @@ class SQLiteP11Store(SQLiteP6Store):
                 "verification": value.verification.value,
                 "artifact_digest": value.artifact_digest,
                 "signer": value.signer,
+                "signer_digest": value.signer_digest,
                 "repository": value.repository,
                 "workflow": value.workflow,
                 "build_identity": value.build_identity,
@@ -576,7 +578,13 @@ class SQLiteP11Store(SQLiteP6Store):
             ),
         )
 
-    def register_package(self, record: PackageRecord, *, idempotency_key: str) -> PackageRecord:
+    def register_package(
+        self,
+        record: PackageRecord,
+        *,
+        idempotency_key: str,
+        request_digest: str,
+    ) -> PackageRecord:
         namespace = record.namespace
         with self._transaction() as connection:
             self._require_current_membership(
@@ -584,13 +592,6 @@ class SQLiteP11Store(SQLiteP6Store):
                 actor=record.created_by,
                 action=AuthorizationAction.MANAGE_AGENT_PACKAGES,
                 namespace=namespace,
-            )
-            request_digest = _digest(
-                {
-                    "archive_digest": record.archive_digest,
-                    "package_digest": record.package_digest,
-                    "source": record.source.value,
-                }
             )
             if self._replay(
                 connection,

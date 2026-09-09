@@ -7,7 +7,10 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Protocol
 
-from digital_colleagues.application.p11_contracts import GitHubAttestationPolicy
+from digital_colleagues.application.p11_contracts import (
+    GitHubAttestationPolicy,
+    PackageInspection,
+)
 from digital_colleagues.core.deployment import (
     ColleagueDeployment,
     DeploymentDraft,
@@ -30,6 +33,15 @@ class GitHubAttestationVerificationPort(Protocol):
     ) -> GitHubAttestation: ...
 
 
+class PackageArchiveValidationPort(Protocol):
+    def validate(
+        self,
+        archive: bytes,
+        *,
+        expected_archive_digest: str | None = None,
+    ) -> PackageInspection: ...
+
+
 class P11PersistencePort(Protocol):
     def registration_replay(
         self,
@@ -43,7 +55,13 @@ class P11PersistencePort(Protocol):
         request_digest: str,
     ) -> PackageRecord | None: ...
 
-    def register_package(self, record: PackageRecord, *, idempotency_key: str) -> PackageRecord: ...
+    def register_package(
+        self,
+        record: PackageRecord,
+        *,
+        idempotency_key: str,
+        request_digest: str,
+    ) -> PackageRecord: ...
 
     def get_package(
         self, tenant_id: str, package_id: str, version: str, digest: str

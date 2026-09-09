@@ -45,9 +45,15 @@ class StudioTests(unittest.TestCase):
         source = (ROOT / "studio/src/AgentRegistry.tsx").read_text()
         for field in (
             "attestation.signer",
+            "attestation.signer_digest",
             "attestation.repository",
             "attestation.workflow",
             "attestation.build_identity",
+            "attestation.source_ref",
+            "attestation.source_digest",
+            "attestation.predicate_type",
+            "attestation.verification",
+            "attestation.artifact_digest",
             "archive_digest",
         ):
             self.assertIn(field, source)

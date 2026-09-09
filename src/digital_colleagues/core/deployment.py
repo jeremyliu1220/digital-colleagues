@@ -71,6 +71,7 @@ class GitHubAttestation:
     verification: AttestationVerification
     artifact_digest: str
     signer: str
+    signer_digest: str
     repository: str
     workflow: str
     build_identity: str
@@ -83,6 +84,7 @@ class GitHubAttestation:
         if not isinstance(self.verification, AttestationVerification):
             raise CoreInvariantError("attestation verification result is unsupported")
         require_digest(self.artifact_digest, "artifact_digest")
+        require_digest(self.signer_digest, "signer_digest")
         for value, field in (
             (self.signer, "signer"),
             (self.repository, "repository"),

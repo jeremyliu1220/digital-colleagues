@@ -24,7 +24,11 @@ from scripts.check_p11_migrations import check_migrations  # noqa: E402
 from scripts.check_p11_provenance import check_provenance  # noqa: E402
 from scripts.check_p11_repository import check_repository  # noqa: E402
 from scripts.check_p11_studio import check_studio  # noqa: E402
-from scripts.p11_gate_support import BASE_COMMIT, GateError  # noqa: E402
+from scripts.p11_gate_support import (  # noqa: E402
+    BASE_COMMIT,
+    GateError,
+    candidate_diff_check,
+)
 from scripts.run_p8_toolchain import _prepare_python  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -145,7 +149,7 @@ def run_all(root: Path, temporary: Path) -> dict[str, Any]:
     studio_quality = _studio(root, temporary / "studio-quality")
     results = {name: checker(root) for name, checker in STATIC.items()}
     _run([sys.executable, "-B", "scripts/check_public_boundary.py", "."], cwd=root, timeout=300)
-    _run(["git", "diff", "--check"], cwd=root, timeout=60)
+    diff_check = candidate_diff_check(root)
     results["compose_runtime"] = check_compose_runtime(root)
     return {
         "retained_p10": {"status": "passed", "object": BASE_COMMIT},
@@ -153,7 +157,7 @@ def run_all(root: Path, temporary: Path) -> dict[str, Any]:
         "studio_quality": studio_quality,
         "gates": results,
         "public_boundary": {"status": "passed", "failure_count": 0},
-        "diff_check": {"status": "passed", "failure_count": 0},
+        "diff_check": diff_check,
     }
 
 

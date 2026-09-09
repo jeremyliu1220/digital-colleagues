@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
+import shutil
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
+from scripts.check_p11_architecture import check_architecture
 from scripts.check_p11_repository import check_repository
 from scripts.p11_gate_support import (
     ACCEPTANCE_COMMIT,
     BASE_COMMIT,
     BRANCH,
+    GateError,
     acceptance_paths,
     git,
 )
@@ -42,6 +47,19 @@ class RepositoryTests(unittest.TestCase):
     def test_historical_migrations_have_no_base_diff(self) -> None:
         changed = git(ROOT, "diff", "--name-only", BASE_COMMIT, "--", "migrations/00[1-7]_*.sql")
         self.assertEqual(changed, "")
+
+    def test_architecture_gate_rejects_application_adapter_import(self) -> None:
+        with TemporaryDirectory() as value:
+            root = Path(value)
+            destination = root / "src/digital_colleagues"
+            destination.parent.mkdir(parents=True)
+            shutil.copytree(ROOT / "src/digital_colleagues", destination)
+            (destination / "application/regression.py").write_text(
+                "from digital_colleagues.adapters.package import archive\n",
+                encoding="utf-8",
+            )
+            with self.assertRaises(GateError):
+                check_architecture(root)
 
 
 if __name__ == "__main__":

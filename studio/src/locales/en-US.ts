@@ -323,6 +323,17 @@ export const enUS = {
   "registry.deployment_id": "Deployment ID",
   "registry.target_package": "Exact target package",
   "registry.choose_package": "Choose an installed digest",
+  "registry.select_capabilities": "Choose Mandate capability grants",
+  "registry.select_capabilities_help":
+    "Nothing is granted by default. Select each capability the Admin intends to bind.",
+  "registry.capability_requested": "Requested by package",
+  "registry.capability_not_requested": "Not requested by package",
+  "registry.effect_required":
+    "Select at least one explicit bounded effect capability before creating the draft.",
+  "registry.extra_warning":
+    "This permission difference is admin_extra. The package did not request it, and it will expand the proposed Mandate.",
+  "registry.confirm_extra":
+    "I explicitly reviewed this admin_extra permission difference.",
   "registry.create_draft": "Create deployment draft",
   "registry.deployment_input_required":
     "A stable deployment ID and exact installed package are required.",
@@ -333,6 +344,7 @@ export const enUS = {
   "registry.default_mission":
     "Perform finite work within the confirmed Mandate and Policy.",
   "registry.default_relationship": "Serves the authorized local operator.",
+  "registry.package_version": "Package version",
   "registry.source": "Source classification",
   "registry.trust_state": "Trust state",
   "registry.install_state": "Install state",
@@ -341,6 +353,26 @@ export const enUS = {
   "registry.not_granted": "Requested, not granted",
   "registry.admin_extra": "Admin grants not requested",
   "registry.provenance": "Origin attestation",
+  "registry.trust_review": "GitHub package trust review",
+  "registry.verification_result": "Verification result",
+  "registry.signer": "Signer",
+  "registry.repository": "Repository",
+  "registry.workflow": "Signer workflow",
+  "registry.build_identity": "Build identity",
+  "registry.signer_digest": "Signer digest",
+  "registry.artifact_digest": "Artifact digest",
+  "registry.archive_digest": "Archive digest",
+  "registry.source_ref": "Source ref",
+  "registry.source_digest": "Source digest",
+  "registry.predicate_type": "Predicate type",
+  "registry.attestation_origin_only":
+    "Attestation proves origin only; it does not establish trust or safety.",
+  "registry.trust_independent":
+    "Trust is a separate Admin decision for this exact package digest.",
+  "registry.authority_unbound":
+    "Authority and permissions are not bound: no deployment binding exists for this exact package.",
+  "registry.authority_bound":
+    "A deployment binding exists; its confirmed Mandate and Policy—not attestation—define authority.",
   "registry.no_attestation":
     "Not applicable; source does not carry GitHub attestation.",
   "registry.trust": "Trust exact digest",

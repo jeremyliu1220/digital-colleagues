@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from digital_colleagues import API_TITLE, __version__
+from digital_colleagues.adapters.package.archive import PackageArchiveValidator
 from digital_colleagues.adapters.package.github_attestation import (
     GitHubCliAttestationVerifier,
     UnavailableGitHubAttestationVerifier,
@@ -183,6 +184,7 @@ def build_local_runtime(
         packages = P11PackageService(
             store=store,
             authentication=authentication,
+            archive_validator=PackageArchiveValidator(),
             attestation=attestation,
             clock=clock,
             identifiers=identifiers,

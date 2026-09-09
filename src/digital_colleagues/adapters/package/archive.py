@@ -14,6 +14,7 @@ from pathlib import PurePosixPath
 from typing import Any, Final
 
 from digital_colleagues.application.errors import ValidationError
+from digital_colleagues.application.p11_contracts import PackageInspection
 from digital_colleagues.core.agent_package import (
     AgentPackage,
     agent_package_from_mapping,
@@ -38,6 +39,28 @@ class ValidatedPackageArchive:
     package_digest: str
     compressed_size: int
     uncompressed_size: int
+
+
+class PackageArchiveValidator:
+    """Application-port implementation for bounded inert ZIP validation."""
+
+    def validate(
+        self,
+        archive: bytes,
+        *,
+        expected_archive_digest: str | None = None,
+    ) -> PackageInspection:
+        validated = validate_package_archive(
+            archive,
+            expected_archive_digest=expected_archive_digest,
+        )
+        return PackageInspection(
+            package=validated.package,
+            package_digest=validated.package_digest,
+            archive_digest=validated.archive_digest,
+            compressed_size=validated.compressed_size,
+            uncompressed_size=validated.uncompressed_size,
+        )
 
 
 def _pairs(values: Iterable[tuple[str, Any]]) -> dict[str, Any]:

@@ -1448,6 +1448,48 @@ dd {
   min-height: 42px;
 }
 
+.registry-authority {
+  grid-column: 1 / -1;
+  padding: 16px;
+  border: 1px solid var(--line);
+}
+
+.registry-capabilities {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.registry-capabilities label {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid var(--line);
+}
+
+.registry-capabilities small {
+  grid-column: 2;
+  color: var(--muted);
+}
+
+.registry-extra-warning,
+.registry-origin-warning,
+.registry-authority-warning {
+  padding: 12px;
+  border-left: 4px solid var(--accent);
+  background: var(--surface-strong);
+}
+
+.registry-trust-review {
+  margin: 16px 0;
+  padding: 14px;
+  border: 1px solid var(--accent);
+}
+
+.registry-trust-review dl {
+  grid-template-columns: minmax(140px, 0.35fr) 1fr;
+}
+
 .registry-columns {
   display: grid;
   grid-template-columns: 1fr 1fr;

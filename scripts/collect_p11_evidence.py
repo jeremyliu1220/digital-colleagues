@@ -20,6 +20,8 @@ from scripts.p11_gate_support import (  # noqa: E402
     BRANCH,
     CLAIM,
     EVIDENCE_CLASSES,
+    PRIOR_EVIDENCE_COMMIT,
+    PRIOR_SUMMARY_BLOB,
     STATUS,
     SUMMARY_PATH,
     GateError,
@@ -48,21 +50,76 @@ EXCLUSIONS = (
     "P12",
 )
 
+PRIOR_IMPLEMENTATION_COMMITS = (
+    "57525b33a1678479788da39db7fc1ced9fd326a6",
+    "1fdab57ff96c031ecc3c6e049397b79b1bda18a4",
+)
+PRIOR_IMPLEMENTATION_TREE_DIGEST = (
+    "sha256:4e7b15dd0811215a9ab7529b458f55386b7ebc05dcd95e1fe18761c340d64290"
+)
+
+
+def _validate_prior_summary(summary: object) -> None:
+    if not isinstance(summary, dict):
+        raise GateError("prior P11 summary shape is invalid")
+    expected = {
+        "schema_version": 1,
+        "milestone": "P11",
+        "claim": CLAIM,
+        "status": STATUS,
+        "branch": BRANCH,
+        "base_commit": BASE_COMMIT,
+        "acceptance_commit": ACCEPTANCE_COMMIT,
+        "implementation_commits": list(PRIOR_IMPLEMENTATION_COMMITS),
+        "implementation_tree_digest": PRIOR_IMPLEMENTATION_TREE_DIGEST,
+        "changed_path_count": 59,
+    }
+    if any(summary.get(key) != value for key, value in expected.items()):
+        raise GateError("prior P11 summary identity is invalid")
+
 
 def _preconditions(root: Path) -> tuple[tuple[str, ...], tuple[str, ...]]:
     if git(root, "branch", "--show-current") != BRANCH:
         raise GateError("evidence branch identity is invalid")
     if git(root, "status", "--porcelain"):
         raise GateError("evidence requires a clean committed implementation")
-    if (root / SUMMARY_PATH).exists():
-        raise GateError("P11 summary already exists")
+    summary_path = root / SUMMARY_PATH
+    if not summary_path.is_file() or summary_path.is_symlink():
+        raise GateError("prior P11 summary is unavailable")
+    if git(root, "rev-parse", f"{PRIOR_EVIDENCE_COMMIT}:{SUMMARY_PATH}") != PRIOR_SUMMARY_BLOB:
+        raise GateError("prior evidence commit summary identity is invalid")
+    if git(root, "hash-object", SUMMARY_PATH) != PRIOR_SUMMARY_BLOB:
+        raise GateError("prior P11 summary is not byte-identical")
+    _validate_prior_summary(read_json(summary_path))
+    git(root, "merge-base", "--is-ancestor", PRIOR_EVIDENCE_COMMIT, "HEAD")
+    if git(root, "hash-object", "docs/p11/acceptance.md") != git(
+        root, "rev-parse", f"{ACCEPTANCE_COMMIT}:docs/p11/acceptance.md"
+    ):
+        raise GateError("P11 acceptance contract changed")
     paths = acceptance_paths(root)
     changed = tuple(sorted(git(root, "diff", "--name-only", BASE_COMMIT, "HEAD").splitlines()))
-    if set(changed) != set(paths) - {SUMMARY_PATH}:
-        raise GateError("implementation commit path set is incomplete")
-    commits = tuple(git(root, "rev-list", "--reverse", f"{ACCEPTANCE_COMMIT}..HEAD").splitlines())
+    if set(changed) != set(paths):
+        raise GateError("scoped-correction path set is incomplete")
+    commits = tuple(
+        git(root, "rev-list", "--reverse", f"{PRIOR_EVIDENCE_COMMIT}..HEAD").splitlines()
+    )
     if not commits:
-        raise GateError("implementation commits are absent")
+        raise GateError("scoped-correction implementation commits are absent")
+    for commit in commits:
+        touched = set(
+            git(
+                root,
+                "diff-tree",
+                "--no-commit-id",
+                "--name-only",
+                "-r",
+                commit,
+            ).splitlines()
+        )
+        if not touched or not touched <= set(paths):
+            raise GateError("scoped-correction commit path set is invalid")
+        if {SUMMARY_PATH, "docs/p11/acceptance.md"} & touched:
+            raise GateError("scoped-correction implementation commit changed protected evidence")
     return paths, commits
 
 
@@ -84,6 +141,9 @@ def build_summary(
         "base_commit": BASE_COMMIT,
         "merge_base": git(root, "merge-base", "HEAD", BASE_COMMIT),
         "acceptance_commit": ACCEPTANCE_COMMIT,
+        "prior_evidence_commit": PRIOR_EVIDENCE_COMMIT,
+        "refreshed_from_summary_blob": PRIOR_SUMMARY_BLOB,
+        "evidence_generation_head": git(root, "rev-parse", "HEAD"),
         "implementation_commits": list(implementation_commits),
         "implementation_tree_digest": public_tree_digest(root, paths),
         "changed_paths": list(paths),

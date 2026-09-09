@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+from digital_colleagues.adapters.package.archive import PackageArchiveValidator
 from digital_colleagues.adapters.package.github_attestation import (
     UnavailableGitHubAttestationVerifier,
 )
@@ -133,6 +134,7 @@ def build_harness(
     packages = P11PackageService(
         store=store,
         authentication=authentication,
+        archive_validator=PackageArchiveValidator(),
         attestation=attestation or UnavailableGitHubAttestationVerifier(),
         clock=clock,
         identifiers=identifiers,
