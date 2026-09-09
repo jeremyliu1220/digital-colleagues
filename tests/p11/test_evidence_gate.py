@@ -5,9 +5,10 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from unittest.mock import patch
 
 from scripts.collect_p11_evidence import EXCLUSIONS, _preconditions, write_evidence
-from scripts.p11_gate_support import CLAIM, STATUS, SUMMARY_PATH, GateError
+from scripts.p11_gate_support import BRANCH, CLAIM, STATUS, SUMMARY_PATH, GateError
 from tests.p11.fixtures import ROOT
 
 
@@ -29,8 +30,16 @@ class EvidenceGateTests(unittest.TestCase):
             self.assertEqual(files, [SUMMARY_PATH])
 
     def test_preconditions_refuse_dirty_implementation_tree(self) -> None:
-        with self.assertRaises(GateError):
-            _preconditions(ROOT)
+        def dirty_git(_: Path, *arguments: str) -> str:
+            if arguments == ("branch", "--show-current"):
+                return BRANCH
+            if arguments == ("status", "--porcelain"):
+                return " M tests/p11/test_evidence_gate.py"
+            self.fail(f"unexpected git call after dirty state: {arguments}")
+
+        with patch("scripts.collect_p11_evidence.git", side_effect=dirty_git):
+            with self.assertRaises(GateError):
+                _preconditions(ROOT)
 
 
 if __name__ == "__main__":
