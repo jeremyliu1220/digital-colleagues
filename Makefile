@@ -2,7 +2,7 @@
 
 PYTHON ?= python3
 
-.PHONY: help bootstrap lint typecheck test build check boundary scaffold p2-repository p2-provenance p2-architecture p2-core p3-repository p3-provenance p3-architecture p3-migrations p3-persistence p3-runtime p3-golden p4-repository p4-provenance p4-architecture p4-migrations p4-authentication p4-studio p4-compose p4-compose-runtime p4-golden p5-repository p5-provenance p5-architecture p5-migrations p5-builder p5-policy p5-studio p5-compose p5-compose-runtime p5-golden p6-repository p6-provenance p6-architecture p6-migrations p6-authentication p6-rbac p6-change-approval p6-effect-approval p6-audit-export p6-abuse p6-studio p6-compose p6-compose-runtime p6-golden p7-repository p7-provenance p7-architecture p7-model-adapter p7-channel-adapter p7-configuration p7-abuse p7-compose p7-compose-runtime p7-golden p8-repository p8-provenance p8-operations p8-backup-restore p8-diagnostics p8-supply-chain p8-reproducibility p8-release p8-compose-runtime p8-golden p9-repository p9-provenance p9-rebaseline p9-test p9-check p10-repository p10-provenance p10-distribution p10-security p10-operations p10-i18n p10-compatibility p10-reproducibility p10-compose-runtime p10-quickstart p10-remote-distribution p10-test p10-check p10-ci evidence-p1 evidence-p2 evidence-p3 evidence-p4 evidence-p5 evidence-p6 evidence-p7 evidence-p8 evidence-p9 evidence-p10 studio-dev
+.PHONY: help bootstrap lint typecheck test build check boundary scaffold p2-repository p2-provenance p2-architecture p2-core p3-repository p3-provenance p3-architecture p3-migrations p3-persistence p3-runtime p3-golden p4-repository p4-provenance p4-architecture p4-migrations p4-authentication p4-studio p4-compose p4-compose-runtime p4-golden p5-repository p5-provenance p5-architecture p5-migrations p5-builder p5-policy p5-studio p5-compose p5-compose-runtime p5-golden p6-repository p6-provenance p6-architecture p6-migrations p6-authentication p6-rbac p6-change-approval p6-effect-approval p6-audit-export p6-abuse p6-studio p6-compose p6-compose-runtime p6-golden p7-repository p7-provenance p7-architecture p7-model-adapter p7-channel-adapter p7-configuration p7-abuse p7-compose p7-compose-runtime p7-golden p8-repository p8-provenance p8-operations p8-backup-restore p8-diagnostics p8-supply-chain p8-reproducibility p8-release p8-compose-runtime p8-golden p9-repository p9-provenance p9-rebaseline p9-test p9-check p10-repository p10-provenance p10-distribution p10-security p10-operations p10-i18n p10-compatibility p10-reproducibility p10-compose-runtime p10-quickstart p10-remote-distribution p10-test p10-check p10-ci p11-repository p11-provenance p11-architecture p11-migrations p11-compatibility p11-studio p11-compose-runtime p11-test p11-check evidence-p1 evidence-p2 evidence-p3 evidence-p4 evidence-p5 evidence-p6 evidence-p7 evidence-p8 evidence-p9 evidence-p10 evidence-p11 studio-dev
 
 help:
 	@echo "bootstrap    Resolve locked tools in an isolated temporary workspace"
@@ -84,6 +84,9 @@ help:
 	@echo "p10-check    Run retained P9 and all static, OCI, Mac runtime, and timing gates"
 	@echo "p10-quickstart Build once, then measure three actual clean Mac quickstarts"
 	@echo "p10-remote-distribution Verify locked public GHCR evidence and three Mac quickstarts"
+	@echo "p11-test     Run at least 40 package, security, lifecycle, and compatibility tests"
+	@echo "p11-check    Run retained exact P10 and every P11 candidate gate"
+	@echo "p11-compose-runtime Exercise actual source Compose restart and cleanup"
 	@echo "p10-compose-runtime Exercise native digest-only Compose start and restart"
 	@echo "evidence-p10 Rerun all P10 gates and atomically write the final summary"
 	@echo "evidence-p1  Run all gates and rebuild the P1 evidence summary"
@@ -113,7 +116,7 @@ build:
 	$(PYTHON) -B -m scripts.run_p8_toolchain --scope build
 
 check:
-	$(PYTHON) -B -m scripts.run_p10_toolchain --scope all
+	$(PYTHON) -B -m scripts.run_p11_toolchain --scope all
 
 boundary:
 	$(PYTHON) -B scripts/check_public_boundary.py .
@@ -379,6 +382,33 @@ p10-ci:
 	$(PYTHON) -B scripts/check_p10_reproducibility.py .
 	$(PYTHON) -B -m unittest tests.p10.test_distribution tests.p10.test_security tests.p10.test_operations tests.p10.test_i18n tests.p10.test_compatibility tests.p10.test_reproducibility -v
 
+p11-repository:
+	$(PYTHON) -B scripts/check_p11_repository.py .
+
+p11-provenance:
+	$(PYTHON) -B scripts/check_p11_provenance.py .
+
+p11-architecture:
+	$(PYTHON) -B scripts/check_p11_architecture.py .
+
+p11-migrations:
+	PYTHONPATH=src $(PYTHON) -B scripts/check_p11_migrations.py .
+
+p11-compatibility:
+	$(PYTHON) -B scripts/check_p11_compatibility.py .
+
+p11-studio:
+	$(PYTHON) -B scripts/check_p11_studio.py .
+
+p11-compose-runtime:
+	$(PYTHON) -B -m scripts.run_p11_toolchain --scope compose-runtime
+
+p11-test:
+	$(PYTHON) -B -m scripts.run_p11_toolchain --scope test
+
+p11-check:
+	$(PYTHON) -B -m scripts.run_p11_toolchain --scope all
+
 evidence-p1:
 	$(PYTHON) -B scripts/run_p1_toolchain.py --scope all --write-evidence
 
@@ -408,6 +438,9 @@ evidence-p9:
 
 evidence-p10:
 	$(PYTHON) -B -m scripts.run_p10_toolchain --scope all --write-evidence
+
+evidence-p11:
+	$(PYTHON) -B scripts/collect_p11_evidence.py
 
 studio-dev:
 	$(PYTHON) -B -m scripts.run_p5_toolchain --studio-dev

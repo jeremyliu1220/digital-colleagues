@@ -325,3 +325,10 @@ collaboration, and S4 a governed Skill system. Self-initiated autonomy may be co
 only after those stages; none of these capabilities is required for the v0.1 P4–P8 gates.
 S1–S4 and Self-initiated autonomy have not started, do not start automatically, and remain
 uncommitted work behind independent future Gates.
+
+P11 implementation is currently a development candidate on its fixed branch. Its gate is
+the immutable `docs/p11/acceptance.md`: inert package/archive validation, offline GitHub
+origin verification, separate trust/install/draft/confirm/activate states, additive legacy
+preservation, exact namespace isolation, ten-active enforcement, retained compatibility,
+and repeatable local evidence must all pass before independent acceptance. P12 remains
+unauthorized regardless of P11 development-gate results.

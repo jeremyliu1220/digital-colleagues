@@ -440,6 +440,20 @@ additive schema need exists. Package upgrade is a new draft, connection revocati
 invalidates grants and pending effects, and database rollback uses verified backup with
 matching code rather than destructive down migration.
 
+## P11 package and multi-deployment implementation boundary
+
+P11 adds pure frozen `AgentPackage`, package trust, deployment draft, and lifecycle values;
+application ports/services; a bounded archive and offline attestation adapter; additive
+SQLite persistence; and strict HTTP/CLI/Studio mappings. Dependency direction remains
+pure core toward application and stable ports, with SQLite, process, temporary storage,
+and HTTP at adapters or composition edges.
+
+Every deployment owns an exact colleague namespace and independently bound Profile,
+Mandate, Policy, MODEL/SERVICE principals, work, approvals, effects, and audit. Package
+requested capabilities are displayed against Mandate grants but cannot create them.
+Only active lifecycle reaches retained runtime processing. A null reserved connection slot
+is persisted; P11 implements no connector, collaboration, shared-memory, or Skill runtime.
+
 ## P10 Mac quickstart and distribution boundary
 
 P10 changes only the local operator/distribution edge and product presentation. A root

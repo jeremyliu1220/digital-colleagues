@@ -272,3 +272,17 @@ never through a public issue containing sensitive details.
 Licensed under the [Apache License, Version 2.0](LICENSE). Attribution information is in
 [NOTICE](NOTICE), and the reviewed dependency record is in
 [the third-party inventory](docs/licensing/third-party-inventory.md).
+
+## P11 agent packages and deployment registry
+
+P11 development adds an inert, canonical `dc-agent/v1` package format and an independently
+governed `ColleagueDeployment` registry. Package validation, provenance, Admin trust,
+installation, draft review, exact confirmation, and activation are distinct. Package
+requests never grant authority; Mandate, Policy, current membership, and existing effect
+approval controls remain authoritative. At most ten deployments may be active on the
+local host, and only active deployments reach the runtime.
+
+See the fixed [P11 acceptance contract](docs/p11/acceptance.md),
+[compatibility contract](docs/p11/compatibility.md), and
+[local operations guide](docs/p11/operations.md). This is a development candidate awaiting
+independent acceptance. It is not a release or authorization for P12.

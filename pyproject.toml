@@ -24,6 +24,9 @@ dependencies = [
   "pydantic==2.13.5",
 ]
 
+[project.scripts]
+dc = "digital_colleagues.cli:main"
+
 [project.optional-dependencies]
 dev = [
   "httpx==0.28.1",

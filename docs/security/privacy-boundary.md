@@ -236,3 +236,17 @@ container ID, private log, or environment dump. Verification uses a task-owned e
 Docker config; checksum-pinned acceptance tools and all managed roots exist only under OS
 temporary directories. Public remote evidence is distribution evidence, not provider or
 personal acceptance data.
+
+## P11 package and registry privacy boundary
+
+Public package manifests may contain only bounded display text, inert prompts, finite
+capability requests, and declarative workflow data; they must not contain secrets,
+personal identifiers, provider identifiers, credentials, live receipts, or personal
+acceptance data. Archive validation performs no general extraction. GitHub verification
+uses temporary artifact, bundle, and trusted-root files and exposes neither their paths nor
+raw tool output.
+
+The CLI accepts session and CSRF values only in a bounded stdin envelope. SQLite remains
+private state and records only server-derived actors and safe audit projections. Evidence
+records counts, digests, finite states, and classifications—not package prompt bodies,
+credentials, absolute paths, raw database content, private logs, or live-provider data.

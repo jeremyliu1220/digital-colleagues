@@ -1414,7 +1414,101 @@ dd {
   }
 }
 
+.registry-limit {
+  margin: 24px 0;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  color: var(--accent);
+  font-family: var(--mono);
+}
+
+.registry-inspection,
+.registry-compose {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 0.35fr) auto;
+  align-items: end;
+  gap: 18px;
+  margin: 0 0 24px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.registry-inspection {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.registry-compose label {
+  display: grid;
+  gap: 8px;
+}
+
+.registry-compose input,
+.registry-compose select {
+  min-height: 42px;
+}
+
+.registry-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+}
+
+.registry-list {
+  display: grid;
+  gap: 14px;
+  padding: 0;
+  list-style: none;
+}
+
+.registry-list li,
+.registry-diff {
+  padding: 18px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.registry-list header,
+.registry-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.registry-list dl,
+.registry-diff dl {
+  display: grid;
+  grid-template-columns: minmax(110px, 0.35fr) 1fr;
+  gap: 6px 14px;
+}
+
+.registry-actions button,
+.registry-file {
+  min-height: 42px;
+}
+
+.registry-file input {
+  display: block;
+  margin-top: 8px;
+}
+
+.mono {
+  overflow-wrap: anywhere;
+  font-family: var(--mono);
+  font-size: 0.76rem;
+}
+
+.sr-live {
+  min-height: 1.5rem;
+}
+
 @media (max-width: 640px) {
+  .registry-inspection,
+  .registry-compose,
+  .registry-columns {
+    grid-template-columns: 1fr;
+  }
   .entry-screen {
     padding: 0 20px;
   }

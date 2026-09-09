@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 import { initialLocale, setLocale, t, type Locale } from "./i18n";
 import type { TranslationKey } from "./locales/en-US";
+import { AgentRegistry } from "./AgentRegistry";
 
 type Phase = "checking" | "bootstrap" | "builder" | "workspace";
 type View =
@@ -13,7 +14,8 @@ type View =
   | "wake"
   | "proposals"
   | "audit"
-  | "governance";
+  | "governance"
+  | "registry";
 type NoticeKind =
   | "success"
   | "validation"
@@ -370,6 +372,7 @@ const navigation: { id: View; label: TranslationKey; index: string }[] = [
   { id: "proposals", label: "nav.proposals", index: "05" },
   { id: "audit", label: "nav.audit", index: "06" },
   { id: "governance", label: "nav.governance", index: "07" },
+  { id: "registry", label: "nav.registry", index: "08" },
 ];
 
 function randomKey(prefix: string) {
@@ -1873,6 +1876,9 @@ function Workspace({
       </aside>
       <main className="workspace-main" key={view}>
         {notice && <Notice {...notice} />}
+        {view === "registry" && (
+          <AgentRegistry csrf={csrf} canManage={isAdmin} />
+        )}
         {view === "identity" && state.identity && (
           <section className="workspace-view" aria-labelledby="identity-title">
             <div className="view-heading">

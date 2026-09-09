@@ -240,3 +240,17 @@ to the backup instant.
 If a contributor independently creates a database, virtual environment, `node_modules`,
 cache, coverage, candidate, backup, diagnostics, log, or build directory in the repository,
 remove it before repository, release, and public-boundary gates.
+
+## P11 development gate
+
+P11 work is confined to `codex/p11-agent-packages` and the exact changed-path allowlist in
+`docs/p11/acceptance.md`. The acceptance file is immutable at its isolated first commit.
+Use `make p11-test` while developing and `make p11-check` before the implementation commit.
+The aggregate first checks the exact P10 object in an OS-temporary worktree under its
+required historical branch, then checks the current P11 candidate. Do not invoke the P10
+repository/evidence checker directly against P11.
+
+After all implementation paths are committed and the tree is clean, `make evidence-p11`
+may write the sole final evidence file. Commit that file alone and rerun both aggregate
+commands. Skips, xfails, expected failures, mock replacement of the actual Compose path,
+and evidence editing are forbidden.

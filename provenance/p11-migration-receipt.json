@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "milestone": "P11",
+  "classification": "new_public_implementation_and_transformed_project_documentation",
+  "implementation_basis": "P11 fixed acceptance contract, accepted project architecture/security boundaries, and official GitHub artifact-attestation documentation",
+  "parent_research_working_tree_read": false,
+  "source_migration_count": 0,
+  "transformed_migration_count": 0,
+  "covered_paths": [
+    "Makefile",
+    "README.md",
+    "docs/adr/0010-agent-package-and-deployment-lifecycle.md",
+    "docs/architecture/target-architecture.md",
+    "docs/development.md",
+    "docs/p11/acceptance.md",
+    "docs/p11/compatibility.md",
+    "docs/p11/operations.md",
+    "docs/roadmap.md",
+    "docs/security/privacy-boundary.md",
+    "docs/security/threat-model.md",
+    "migrations/008_agent_packages_and_deployments.sql",
+    "migrations/manifest.json",
+    "provenance/p11-migration-receipt.json",
+    "pyproject.toml",
+    "scripts/check_p11_architecture.py",
+    "scripts/check_p11_compatibility.py",
+    "scripts/check_p11_compose_runtime.py",
+    "scripts/check_p11_migrations.py",
+    "scripts/check_p11_provenance.py",
+    "scripts/check_p11_repository.py",
+    "scripts/check_p11_studio.py",
+    "scripts/collect_p11_evidence.py",
+    "scripts/p11_gate_support.py",
+    "scripts/run_p11_toolchain.py",
+    "src/digital_colleagues/adapters/package/__init__.py",
+    "src/digital_colleagues/adapters/package/archive.py",
+    "src/digital_colleagues/adapters/package/github_attestation.py",
+    "src/digital_colleagues/adapters/sqlite/p11_store.py",
+    "src/digital_colleagues/api/p11_app.py",
+    "src/digital_colleagues/application/p11_contracts.py",
+    "src/digital_colleagues/application/p11_ports.py",
+    "src/digital_colleagues/application/p11_services.py",
+    "src/digital_colleagues/cli.py",
+    "src/digital_colleagues/core/agent_package.py",
+    "src/digital_colleagues/core/deployment.py",
+    "src/digital_colleagues/core/governance.py",
+    "src/digital_colleagues/governance/rbac.py",
+    "src/digital_colleagues/local/runtime.py",
+    "src/digital_colleagues/local/worker.py",
+    "studio/src/AgentRegistry.tsx",
+    "studio/src/App.test.tsx",
+    "studio/src/App.tsx",
+    "studio/src/locales/en-US.ts",
+    "studio/src/locales/zh-TW.ts",
+    "studio/src/studioContract.ts",
+    "studio/src/styles.css",
+    "tests/p11/__init__.py",
+    "tests/p11/fixtures.py",
+    "tests/p11/test_agent_package.py",
+    "tests/p11/test_api_cli.py",
+    "tests/p11/test_archive.py",
+    "tests/p11/test_attestation.py",
+    "tests/p11/test_evidence_gate.py",
+    "tests/p11/test_lifecycle.py",
+    "tests/p11/test_migrations.py",
+    "tests/p11/test_repository.py",
+    "tests/p11/test_studio.py"
+  ],
+  "external_references": [
+    {
+      "url": "https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/verify-attestations-offline",
+      "checked_at": "2026-09-09",
+      "observed_basis": "offline bundle verification and custom trusted-root workflow"
+    },
+    {
+      "url": "https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations",
+      "checked_at": "2026-09-09",
+      "observed_basis": "artifact attestation is provenance rather than package safety or authority"
+    },
+    {
+      "url": "https://docs.github.com/en/actions/concepts/security/artifact-attestations",
+      "checked_at": "2026-09-09",
+      "observed_basis": "subject digest and build provenance identity"
+    },
+    {
+      "url": "https://docs.github.com/en/rest/repos/attestations",
+      "checked_at": "2026-09-09",
+      "observed_basis": "bundle subject identity; no REST call is made by P11 verification"
+    },
+    {
+      "url": "https://cli.github.com/manual/gh_attestation_verify",
+      "checked_at": "2026-09-09",
+      "observed_basis": "repository, signer, source, predicate, issuer, runner, bundle, root, and JSON verification flags"
+    },
+    {
+      "url": "https://cli.github.com/manual/gh_attestation_trusted-root",
+      "checked_at": "2026-09-09",
+      "observed_basis": "operator-controlled trusted-root input"
+    }
+  ],
+  "external_dependencies": {
+    "added": [],
+    "license_treatment": "No new Python or JavaScript dependency; GitHub CLI is an optional operator-configured process adapter and is not redistributed."
+  },
+  "privacy": {
+    "local_absolute_paths": false,
+    "credentials": false,
+    "private_identifiers": false,
+    "personal_data": false,
+    "live_receipts": false
+  },
+  "evidence_classes": [
+    "static",
+    "synthetic_offline",
+    "local_runtime",
+    "not_evaluated"
+  ]
+}

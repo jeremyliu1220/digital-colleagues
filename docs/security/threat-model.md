@@ -155,3 +155,19 @@ These checks establish only the recorded public registry objects and repeatable 
 quickstart path. They do not prove registry availability over time, dependency safety,
 host security, production supply-chain security, formal release readiness, or production
 readiness.
+
+## P11 package and deployment threats
+
+P11 treats ZIP structure, JSON, localization, prompts, workflow declarations,
+capabilities, attestation output, CLI output, and package source labels as untrusted. Exact
+bounds, canonical digests, duplicate/path/link/special-file rejection, a finite acyclic
+workflow, offline policy-bound verification, and sanitized errors fail closed. Attestation
+proves origin only and cannot grant trust, installation, authority, confirmation, or
+activation.
+
+Server-side current membership, exact tenant/colleague namespace, optimistic revision,
+idempotency request digest, causal audit, `BEGIN IMMEDIATE`, active slots, and SQLite
+triggers defend lifecycle mutation and activation races. Revocation blocks active exact
+bindings. Inactive deployments cannot enter API or worker execution. P11 does not defend
+an executable plugin runtime, connector lifecycle, Agent collaboration, shared memory,
+provider behavior, or production deployment because those capabilities are absent.

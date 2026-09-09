@@ -67,6 +67,20 @@ describe("Digital Colleagues Studio workflow", () => {
     ]);
   });
 
+  it("declares package trust and deployment lifecycle as separate controls", () => {
+    expect(studioContract.controls).toContain("registry.provenance");
+    expect(studioContract.controls).toContain("registry.trust");
+    expect(studioContract.controls).toContain("registry.install");
+    expect(studioContract.controls).toContain("registry.activate");
+    expect(studioContract.controls).toContain("registry.drafts");
+    expect(studioContract.controls).toContain("registry.review");
+    expect(studioContract.controls).toContain("registry.confirm");
+    expect(studioContract.controls).toContain("registry.upgrade");
+    expect(studioContract.controls).toContain("registry.rollback");
+    expect(studioContract.controls).toContain("registry.select");
+    expect(studioContract.controls).toContain("registry.audit");
+  });
+
   it("keeps locale resources exact and falls back safely", () => {
     expect(() => validateResources()).not.toThrow();
     expect(Object.keys(resources["zh-TW"]).sort()).toEqual(

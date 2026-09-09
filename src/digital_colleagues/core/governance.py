@@ -40,6 +40,12 @@ class AuthorizationAction(StrEnum):
     MANAGE_CREDENTIAL = "manage_credential"
     MANAGE_MEMBERSHIP = "manage_membership"
     EXPORT_AUDIT = "export_audit"
+    READ_AGENT_PACKAGES = "read_agent_packages"
+    MANAGE_AGENT_PACKAGES = "manage_agent_packages"
+    READ_DEPLOYMENTS = "read_deployments"
+    MANAGE_DEPLOYMENTS = "manage_deployments"
+    SELECT_DEPLOYMENT = "select_deployment"
+    READ_DEPLOYMENT_AUDIT = "read_deployment_audit"
 
 
 class MembershipStatus(StrEnum):

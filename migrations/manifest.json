@@ -42,6 +42,12 @@
       "name": "governance_hardening",
       "file": "007_governance_hardening.sql",
       "checksum": "sha256:ba572b74ffe7d16ed09ffd58791d7bb23b875806996ec897b2e73c82a593cf9c"
+    },
+    {
+      "version": 8,
+      "name": "agent_packages_and_deployments",
+      "file": "008_agent_packages_and_deployments.sql",
+      "checksum": "sha256:e7c8b61c54393933e5e4fda06da4a06b11b2b2c1e38bec3163853e41136b0253"
     }
   ]
 }

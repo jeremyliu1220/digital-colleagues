@@ -20,6 +20,8 @@ def run_once(state_directory: Path, *, adapter_environment: Mapping[str, str] | 
         for namespace in runtime.store.pending_namespaces(runtime.clock.now()):
             if namespace.scope_id is None:
                 continue
+            if not runtime.store.deployment_is_active(namespace):
+                continue
             try:
                 context = runtime.controller.service_context(namespace)
                 runtime.controller.process_once(context)

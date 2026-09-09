@@ -23,6 +23,9 @@ ROLE_ACTIONS: dict[HumanRole, frozenset[AuthorizationAction]] = {
             AuthorizationAction.SUBMIT_TRIGGER,
             AuthorizationAction.PROCESS_RUNTIME,
             AuthorizationAction.DECIDE_EFFECT,
+            AuthorizationAction.READ_AGENT_PACKAGES,
+            AuthorizationAction.READ_DEPLOYMENTS,
+            AuthorizationAction.SELECT_DEPLOYMENT,
         }
     ),
     HumanRole.AUDITOR: frozenset(
@@ -31,6 +34,9 @@ ROLE_ACTIONS: dict[HumanRole, frozenset[AuthorizationAction]] = {
             AuthorizationAction.READ_COLLEAGUE,
             AuthorizationAction.READ_GOVERNANCE,
             AuthorizationAction.EXPORT_AUDIT,
+            AuthorizationAction.READ_AGENT_PACKAGES,
+            AuthorizationAction.READ_DEPLOYMENTS,
+            AuthorizationAction.READ_DEPLOYMENT_AUDIT,
         }
     ),
 }

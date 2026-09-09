@@ -290,6 +290,80 @@ export const enUS = {
   "loading.state": "Loading durable state…",
   "session.changed":
     "Existing session expired, was revoked, or its role/membership binding changed. Use an Admin-authorized local recovery session.",
+  "nav.registry": "Agent registry",
+  "registry.kicker": "Agent packages & deployments",
+  "registry.title": "Deploy authority deliberately.",
+  "registry.boundary":
+    "Packages are inert requests. Trust, installation, exact confirmation, and activation are separate Admin decisions.",
+  "registry.validate": "Inspect local ZIP",
+  "registry.validation_ready":
+    "Local file is within the archive bound; submit an exact digest to validate it server-side.",
+  "registry.validation_failed":
+    "The local archive is missing or exceeds 131,072 bytes.",
+  "registry.validation_result": "Validated package inspection",
+  "registry.archive_sizes":
+    "{{compressed}} compressed bytes · {{uncompressed}} canonical bytes",
+  "registry.inert_notice":
+    "Validation does not trust, install, confirm, or activate this package.",
+  "registry.register": "Register as inert local package",
+  "registry.load_failed":
+    "The authorized package registry could not be loaded.",
+  "registry.completed": "{{operation}} completed and durable state refreshed.",
+  "registry.refused": "The exact package or deployment operation was refused.",
+  "registry.error": "The registry operation failed closed.",
+  "registry.active_limit": "{{count}} / 10 active on local host",
+  "registry.catalog": "Package catalog",
+  "registry.empty_catalog": "No package versions are registered.",
+  "registry.deployments": "Deployment registry",
+  "registry.empty_deployments":
+    "No ColleagueDeployment records are registered.",
+  "registry.compose": "Create an inert deployment draft",
+  "registry.compose_help":
+    "Choose one exact trusted and installed digest. Review and confirmation remain separate.",
+  "registry.deployment_id": "Deployment ID",
+  "registry.target_package": "Exact target package",
+  "registry.choose_package": "Choose an installed digest",
+  "registry.create_draft": "Create deployment draft",
+  "registry.deployment_input_required":
+    "A stable deployment ID and exact installed package are required.",
+  "registry.package_target_required":
+    "Choose an exact trusted and installed package target.",
+  "registry.default_description":
+    "Deployment created from an explicitly reviewed inert AgentPackage.",
+  "registry.default_mission":
+    "Perform finite work within the confirmed Mandate and Policy.",
+  "registry.default_relationship": "Serves the authorized local operator.",
+  "registry.source": "Source classification",
+  "registry.trust_state": "Trust state",
+  "registry.install_state": "Install state",
+  "registry.requested": "Package requests",
+  "registry.granted": "Mandate grants",
+  "registry.not_granted": "Requested, not granted",
+  "registry.admin_extra": "Admin grants not requested",
+  "registry.provenance": "Origin attestation",
+  "registry.no_attestation":
+    "Not applicable; source does not carry GitHub attestation.",
+  "registry.trust": "Trust exact digest",
+  "registry.revoke": "Revoke exact digest",
+  "registry.install": "Install inert package",
+  "registry.activate": "Activate",
+  "registry.pause": "Pause",
+  "registry.block": "Block",
+  "registry.retire": "Retire",
+  "registry.select": "Select deployment",
+  "registry.upgrade": "Review upgrade draft",
+  "registry.rollback": "Review rollback draft",
+  "registry.review": "Review exact draft",
+  "registry.confirm": "Confirm exact draft",
+  "registry.audit": "Causal deployment audit",
+  "registry.audit_loaded": "Bounded causal audit loaded.",
+  "registry.empty_audit":
+    "Select a deployment audit to inspect its safe causal records.",
+  "registry.legacy_unconfirmed":
+    "Legacy/manual authority preserved; Policy remains unconfirmed.",
+  "registry.drafts": "Exact deployment drafts",
+  "registry.draft_boundary":
+    "Create, upgrade, and rollback remain inert through review and exact digest confirmation; confirmation returns to draft before activation.",
 } as const;
 
 export type TranslationKey = keyof typeof enUS;
