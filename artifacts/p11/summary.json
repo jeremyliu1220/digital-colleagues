@@ -88,6 +88,7 @@
   },
   "diff_check": {
     "failure_count": 0,
+    "range": "b3963aadf4702b924e72dc1e7306799780eecfbd...HEAD",
     "status": "passed"
   },
   "evidence_classes": [
@@ -96,6 +97,7 @@
     "local_runtime",
     "not_evaluated"
   ],
+  "evidence_generation_head": "fed27279f4e28ed5ec357eff10fd6019d64d6d85",
   "exclusions": [
     "OpenAI live compatibility",
     "Microsoft 365 live compatibility",
@@ -115,11 +117,13 @@
   ],
   "gates": {
     "architecture": {
-      "core_file_count": 2,
-      "forbidden_core_import_count": 0,
+      "application_file_count": 17,
+      "core_file_count": 17,
+      "forbidden_dependency_import_count": 0,
       "frozen_dataclass_count": 9,
       "future_connection_slots": "null_only",
       "gate": "p11_architecture",
+      "governance_file_count": 4,
       "runtime_active_guard_count": 1,
       "schema_version": 1,
       "status": "passed"
@@ -149,7 +153,7 @@
       "cleanup_residue_count": 0,
       "credential_log_leak_count": 0,
       "deployment_flow": "draft_review_confirm_activate_select_pause",
-      "ended_at": "2026-09-09T06:23:31.484198Z",
+      "ended_at": "2026-09-09T15:17:43.389493Z",
       "environment": {
         "compose_version": "5.4.0",
         "docker_server_version": "29.7.2",
@@ -165,7 +169,7 @@
       "restart": "passed",
       "schema_version": 1,
       "source_compose": true,
-      "started_at": "2026-09-09T06:23:13.449706Z",
+      "started_at": "2026-09-09T15:17:24.989270Z",
       "status": "passed"
     },
     "migrations": {
@@ -193,7 +197,7 @@
       "allowlist_count": 59,
       "base": "4bef5629d450c6bb3940f606fc90194e008ee8fd",
       "branch": "codex/p11-agent-packages",
-      "changed_count": 58,
+      "changed_count": 59,
       "gate": "p11_repository",
       "historical_drift_count": 0,
       "schema_version": 1,
@@ -203,19 +207,19 @@
     "studio": {
       "aria_live_count": 1,
       "gate": "p11_studio",
-      "locale_key_count": 323,
+      "locale_key_count": 347,
       "locale_mismatch_count": 0,
       "placeholder_mismatch_count": 0,
-      "required_control_count": 20,
+      "required_control_count": 36,
       "schema_version": 1,
       "status": "passed"
     }
   },
   "implementation_commits": [
-    "57525b33a1678479788da39db7fc1ced9fd326a6",
-    "1fdab57ff96c031ecc3c6e049397b79b1bda18a4"
+    "687b0a0232a33c0f34d7deee83d1605da94aa7b5",
+    "fed27279f4e28ed5ec357eff10fd6019d64d6d85"
   ],
-  "implementation_tree_digest": "sha256:4e7b15dd0811215a9ab7529b458f55386b7ebc05dcd95e1fe18761c340d64290",
+  "implementation_tree_digest": "sha256:8bc5a7d431aae4fd1d46d94fd3af96f664b2f39d1b1d6ab679c50571ca8220e6",
   "merge_base": "4bef5629d450c6bb3940f606fc90194e008ee8fd",
   "migration": {
     "identity": {
@@ -273,9 +277,15 @@
     "version": 8
   },
   "milestone": "P11",
+  "prior_evidence_commit": "54c411e594659bf83fec56f538a11d1ea3b6e523",
   "provenance": "provenance/p11-migration-receipt.json",
   "public_boundary": {
     "failure_count": 0,
+    "status": "passed"
+  },
+  "refreshed_from_summary_blob": "da0d602d323689cd1f40393e475dfedc5147eaa5",
+  "retained_p10": {
+    "object": "4bef5629d450c6bb3940f606fc90194e008ee8fd",
     "status": "passed"
   },
   "schema_version": 1,
@@ -311,7 +321,10 @@
       "tests.p11.test_agent_package.AgentPackageTests.test_valid_schema_has_distinct_content_and_package_digests",
       "tests.p11.test_agent_package.AgentPackageTests.test_workflow_cycle_fails_closed",
       "tests.p11.test_agent_package.AgentPackageTests.test_workflow_node_and_depth_bounds_fail_closed",
+      "tests.p11.test_api_cli.ApiCliTests.test_cli_accepts_only_exact_ip_literal_loopback_origins",
       "tests.p11.test_api_cli.ApiCliTests.test_cli_authentication_uses_only_bounded_stdin_envelope",
+      "tests.p11.test_api_cli.ApiCliTests.test_cli_redirect_refusal_never_forwards_credentials",
+      "tests.p11.test_api_cli.ApiCliTests.test_cli_refuses_origin_rebinding_before_reading_credentials",
       "tests.p11.test_api_cli.ApiCliTests.test_console_entry_point_is_exactly_dc",
       "tests.p11.test_api_cli.ApiCliTests.test_csrf_and_origin_are_required_for_p11_mutations",
       "tests.p11.test_api_cli.ApiCliTests.test_deployment_mutation_forbids_caller_role_and_actor",
@@ -340,15 +353,19 @@
       "tests.p11.test_attestation.AttestationTests.test_non_github_source_rejects_partial_attestation_configuration",
       "tests.p11.test_attestation.AttestationTests.test_nonzero_cli_exit_fails_closed",
       "tests.p11.test_attestation.AttestationTests.test_policy_bound_offline_verification_succeeds",
+      "tests.p11.test_attestation.AttestationTests.test_registration_replay_binds_bundle_and_every_policy_field_before_verification",
       "tests.p11.test_attestation.AttestationTests.test_registration_replay_does_not_repeat_external_verification",
       "tests.p11.test_attestation.AttestationTests.test_self_hosted_attestation_fails_closed",
       "tests.p11.test_attestation.AttestationTests.test_unavailable_verifier_never_downgrades",
       "tests.p11.test_attestation.AttestationTests.test_verified_attestation_does_not_create_trust",
       "tests.p11.test_attestation.AttestationTests.test_wrong_certificate_policy_fields_fail_closed",
       "tests.p11.test_attestation.AttestationTests.test_wrong_subject_digest_fails_closed",
+      "tests.p11.test_evidence_gate.EvidenceGateTests.test_candidate_range_diff_rejects_committed_trailing_whitespace",
       "tests.p11.test_evidence_gate.EvidenceGateTests.test_claim_and_status_are_exactly_one_candidate_vocabulary",
       "tests.p11.test_evidence_gate.EvidenceGateTests.test_exclusions_keep_future_and_live_claims_out",
       "tests.p11.test_evidence_gate.EvidenceGateTests.test_preconditions_refuse_dirty_implementation_tree",
+      "tests.p11.test_evidence_gate.EvidenceGateTests.test_prior_summary_identity_change_fails_closed",
+      "tests.p11.test_evidence_gate.EvidenceGateTests.test_retained_p10_result_is_exact_and_required",
       "tests.p11.test_evidence_gate.EvidenceGateTests.test_writer_creates_only_the_summary_path",
       "tests.p11.test_lifecycle.LifecycleTests.test_concurrent_activation_cannot_exceed_ten",
       "tests.p11.test_lifecycle.LifecycleTests.test_confirmation_leaves_deployment_in_draft",
@@ -378,6 +395,7 @@
       "tests.p11.test_migrations.MigrationTests.test_schema_seven_upgrade_preserves_legacy_manual_identity",
       "tests.p11.test_repository.RepositoryTests.test_acceptance_allowlist_has_exactly_fifty_nine_paths",
       "tests.p11.test_repository.RepositoryTests.test_acceptance_commit_is_first_and_isolated",
+      "tests.p11.test_repository.RepositoryTests.test_architecture_gate_rejects_application_adapter_import",
       "tests.p11.test_repository.RepositoryTests.test_historical_migrations_have_no_base_diff",
       "tests.p11.test_repository.RepositoryTests.test_repository_gate_accepts_exact_development_scope",
       "tests.p11.test_studio.StudioTests.test_registry_controls_have_disabled_busy_states",
@@ -387,7 +405,7 @@
       "tests.p11.test_studio.StudioTests.test_registry_keeps_permission_diff_visible",
       "tests.p11.test_studio.StudioTests.test_studio_gate_has_exact_locale_parity"
     ],
-    "tests_run": 93,
+    "tests_run": 101,
     "unexpected_successes": 0
   },
   "trust_lifecycle": {
