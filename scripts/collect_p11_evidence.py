@@ -78,6 +78,14 @@ def _validate_prior_summary(summary: object) -> None:
         raise GateError("prior P11 summary identity is invalid")
 
 
+def _retained_p10_result(results: dict[str, Any]) -> dict[str, str]:
+    value = results.get("retained_p10")
+    expected = {"status": "passed", "object": BASE_COMMIT}
+    if value != expected:
+        raise GateError("retained P10 aggregate result is invalid")
+    return expected
+
+
 def _preconditions(root: Path) -> tuple[tuple[str, ...], tuple[str, ...]]:
     if git(root, "branch", "--show-current") != BRANCH:
         raise GateError("evidence branch identity is invalid")
@@ -190,6 +198,7 @@ def build_summary(
         "evidence_classes": list(EVIDENCE_CLASSES),
         "public_boundary": results["public_boundary"],
         "diff_check": results["diff_check"],
+        "retained_p10": _retained_p10_result(results),
         "provenance": "provenance/p11-migration-receipt.json",
         "exclusions": list(EXCLUSIONS),
     }

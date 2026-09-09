@@ -12,6 +12,7 @@ from unittest.mock import patch
 from scripts.collect_p11_evidence import (
     EXCLUSIONS,
     _preconditions,
+    _retained_p10_result,
     _validate_prior_summary,
     write_evidence,
 )
@@ -60,6 +61,16 @@ class EvidenceGateTests(unittest.TestCase):
         summary["claim"] = "weaker-claim"
         with self.assertRaises(GateError):
             _validate_prior_summary(summary)
+
+    def test_retained_p10_result_is_exact_and_required(self) -> None:
+        expected = {
+            "status": "passed",
+            "object": "4bef5629d450c6bb3940f606fc90194e008ee8fd",
+        }
+        self.assertEqual(_retained_p10_result({"retained_p10": expected}), expected)
+        for value in (None, {"status": "passed", "object": "wrong"}):
+            with self.subTest(value=value), self.assertRaises(GateError):
+                _retained_p10_result({"retained_p10": value})
 
     def test_candidate_range_diff_rejects_committed_trailing_whitespace(self) -> None:
         with TemporaryDirectory() as value:
