@@ -1,0 +1,163 @@
+{
+  "schema_version": 1,
+  "change": "P12",
+  "classification": "governance_only_continuity_rebaseline",
+  "implementation_basis": "Immutable P12 v2 acceptance contract and accepted P0-P11R history",
+  "base_commit": "c1562ea5201394d8a278f4b644daf4029cbb5bd4",
+  "base_tree": "ae0f33263cfc7445fef69656ad9c5cb04d4a2d00",
+  "rejected_v1_commit": "8cd9aefe5422fd60cd6bd2724ad993528e3cd4a3",
+  "acceptance": {
+    "commit": "3639fa08ca44820bb922e0644095c9fb9c24d3e6",
+    "tree": "71c411660e0f7ff26e8ad1451acaa0ea26fa384b",
+    "blob": "50453e154cf642bc7b90644660e1d956b04f966a",
+    "sha256": "be3ad1967a98c67ae34ad7c22c35a9ec1f637a780c930ae4e8349f126e64800b"
+  },
+  "parent_research_working_tree_read": false,
+  "source_migration_count": 0,
+  "transformed_migration_count": 0,
+  "covered_paths": [
+    ".github/ISSUE_TEMPLATE/feature_request.yml",
+    ".github/pull_request_template.md",
+    ".github/workflows/ci.yml",
+    "AGENTS.md",
+    "CONTRIBUTING.md",
+    "Makefile",
+    "README.md",
+    "SECURITY.md",
+    "docs/adr/0011-public-pilot-continuity-rebaseline.md",
+    "docs/architecture/target-architecture.md",
+    "docs/development.md",
+    "docs/p12/rebaseline-checklist.md",
+    "docs/product/capability-matrix.md",
+    "docs/product/post-v0.1-capability-outlook.md",
+    "docs/product/v0.2-external-dependency-register.md",
+    "docs/product/v0.2-public-pilot-capability-matrix.md",
+    "docs/product/v0.2-public-pilot-product-brief.md",
+    "docs/roadmap.md",
+    "docs/security/privacy-boundary.md",
+    "docs/security/threat-model.md",
+    "docs/security/v0.2-public-pilot-privacy-boundary.md",
+    "docs/security/v0.2-public-pilot-threat-model.md",
+    "provenance/p12-change-receipt.json",
+    "scripts/check_p12_ci_policy.py",
+    "scripts/check_p12_migrations.py",
+    "scripts/check_p12_provenance.py",
+    "scripts/check_p12_rebaseline.py",
+    "scripts/check_p12_repository.py",
+    "scripts/collect_p12_evidence.py",
+    "scripts/run_p12_toolchain.py",
+    "tests/p12/__init__.py",
+    "tests/p12/test_ci_policy.py",
+    "tests/p12/test_evidence_gate.py",
+    "tests/p12/test_migrations.py",
+    "tests/p12/test_provenance.py",
+    "tests/p12/test_rebaseline.py",
+    "tests/p12/test_repository.py"
+  ],
+  "historical_anchors": {
+    "p9_final": "11aa240af8db2ca515325dc059b1a77f7badc874",
+    "p10_final": "4bef5629d450c6bb3940f606fc90194e008ee8fd",
+    "p11_final": "7e5387f148f86b5c9b07820dd8b8f4e18e12dc38",
+    "p11r_acceptance": "61d5c94e24157b93bc4b4bcca42b4d8d2eab8fec",
+    "p11r_implementation": "4a6df2db5c964b2bd6f052db6276dc303524230b",
+    "p11r_final": "c1562ea5201394d8a278f4b644daf4029cbb5bd4"
+  },
+  "migration_protection": {
+    "immutable_files": [
+      {"path": "migrations/manifest.json", "blob": "bfd142486041029bfcc1106ef6ffd4aeb125ed36", "sha256": "3ce53dd7d4e0e7cbc0e9cf4731d6001af8bab57861acfe55184e6f6ab685cc10"},
+      {"path": "migrations/001_initial.sql", "blob": "c8758dd18f9dea402e368f93e4942a9da65edb60", "sha256": "9a9a9c031bd27072333ee30603bcd6c7e2f33f60e7920f3a69ff251836093c02"},
+      {"path": "migrations/002_runtime_indexes.sql", "blob": "505485460ce443e80ef2177e2a07aab1218e022a", "sha256": "b0728e3e910e0f0921271b2121308518945968874a667c340d9dc007cbfea11f"},
+      {"path": "migrations/003_timer_triggers.sql", "blob": "0ff7035e489fda052c6d82c401e5db3b06e8203a", "sha256": "98325116ff022277aee6ee9038083a3866e912c907d08afeb0da4c48f97d7e98"},
+      {"path": "migrations/004_local_authentication.sql", "blob": "edc24adb566568b397b30c88c610cd309f7666bb", "sha256": "dfe550129f32128eadc685cb54b70feed276ceb3274dbcbd76e214053d77e58b"},
+      {"path": "migrations/005_evaluation_observations.sql", "blob": "42612d8c47967707fb33b772bf414872f35b5ecc", "sha256": "6649985cf92d9efd378b8b69447357193fdb98eead7d3d23f9bbec1db02b2a61"},
+      {"path": "migrations/006_revisioned_colleague_builder.sql", "blob": "581e3ba9a75c15002c7bc513b69ea9a920771892", "sha256": "7909da4b0b3eb514222f1fd1068c19eb6e8b98d466a786b76c20ae7999e26bcd"},
+      {"path": "migrations/007_governance_hardening.sql", "blob": "feb7b658c8e356bf0e717ce69e5896a7c6b00c34", "sha256": "ba572b74ffe7d16ed09ffd58791d7bb23b875806996ec897b2e73c82a593cf9c"},
+      {"path": "migrations/008_agent_packages_and_deployments.sql", "blob": "a20386ab196e1ab826a0c9a9770999b0e41cb8cf", "sha256": "e7c8b61c54393933e5e4fda06da4a06b11b2b2c1e38bec3163853e41136b0253"}
+    ],
+    "future_owners": {
+      "009": "P13",
+      "010": "P14",
+      "011": "P15",
+      "012": "P16",
+      "013": "P17",
+      "014": "P18",
+      "015": "No owner"
+    }
+  },
+  "p10_protected_publication": {
+    "receipt": {
+      "path": "provenance/p10-migration-receipt.json",
+      "blob": "07565307a35902206ee7c80af66b2a02ab876b83"
+    },
+    "subjects": [
+      "ghcr.io/jeremyliu1220/digital-colleagues-runtime",
+      "ghcr.io/jeremyliu1220/digital-colleagues-studio"
+    ],
+    "sets": {
+      "superseded": {
+        "source_commit": "05e73ea23ac650edfae59fa409a770fdf967af3a",
+        "source_tag": "sha-05e73ea23ac650edfae59fa409a770fdf967af3a",
+        "runtime_digest": "sha256:41567ba87a088944cf9a2c17b9b0f4359554c66b2ec1f6d52db46067e1ab9092",
+        "studio_digest": "sha256:b7dd4c2b35922ec31a9b38c15316283706a9aab0ffab2101a18f7bf106165f2e",
+        "lifecycle": "superseded_contract_noncompliant_source"
+      },
+      "active": {
+        "source_commit": "62b226064d2597a4ca6a67f9f2c20a79a815732b",
+        "source_tag": "sha-62b226064d2597a4ca6a67f9f2c20a79a815732b",
+        "runtime_digest": "sha256:a5bb41bdb85bf7b5a75dc79967e26943c098b024b64fdd345f5b4c6f4688991d",
+        "studio_digest": "sha256:7791d80d9fa464bbd1574601deba5a30ca6d980dab8c8275c24c117fae81e4c9",
+        "lifecycle": "passed"
+      }
+    },
+    "runs": {
+      "34202520699": {"head": "05e73ea23ac650edfae59fa409a770fdf967af3a", "conclusion": "success"},
+      "34203006909": {"head": "05e73ea23ac650edfae59fa409a770fdf967af3a", "conclusion": "failure"},
+      "34204280131": {"head": "ddc04021f94ca888235c53f96ed64218de8c3e67", "conclusion": "failure"},
+      "34204837101": {"head": "ae714c128f844466c76811986c0605e39fce12cc", "conclusion": "failure"},
+      "34205272328": {"head": "76b278feedbb79b9a4c0d023e328911096fe57ae", "conclusion": "failure"},
+      "34206039435": {"head": "a003d540093df9a08437c47e9c8ff16970e5e645", "conclusion": "success"},
+      "34235760264": {"head": "62b226064d2597a4ca6a67f9f2c20a79a815732b", "conclusion": "success"},
+      "34236719816": {"head": "d9fd27670a36f699bf299f6154afce180bea64cc", "conclusion": "failure"},
+      "34237810474": {"head": "cc4acd3bda3f4d2bdfee9392c7d0f85f90c07688", "conclusion": "success"}
+    },
+    "runtime_version_count": 14,
+    "studio_version_count": 14,
+    "inventory_identity": "docs/p12/acceptance.md#exact-p12-start-ghcr-inventory-oracle",
+    "inventory_sha256": "b58cce2af1e3b672114b050ffd6cb55e9625cbcb8fb54c0a863ea00ebb617f3c",
+    "overwrite_retag_republish_delete_forbidden": true
+  },
+  "evidence_preflight": {
+    "github_authentication": "read_only_required",
+    "read_packages": "manifest_lookup_required",
+    "python_declarations": "pyproject.toml",
+    "python_locked_toolchain_and_transitives": "requirements/p8.lock",
+    "installed_version_api": "importlib.metadata.version",
+    "normalized_comparison": "packaging.version.Version",
+    "tls_primary": "system_default",
+    "tls_certificate_failure_fallback": "locked_certifi_only",
+    "repository_evidence_write": false
+  },
+  "change_counts": {
+    "product_runtime_source": 0,
+    "studio_product_behavior": 0,
+    "database_schema": 0,
+    "migration": 0,
+    "dependency_or_lock": 0,
+    "distribution": 0,
+    "evidence": 0
+  },
+  "privacy": {
+    "local_absolute_paths": false,
+    "credentials": false,
+    "private_identifiers": false,
+    "personal_data": false,
+    "live_receipts": false
+  },
+  "publication": {
+    "remote_mutation": false,
+    "tags": false,
+    "releases": false,
+    "packages_or_images": false,
+    "signatures_or_attestations": false
+  }
+}
