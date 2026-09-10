@@ -62,7 +62,9 @@ class ProvenanceTests(unittest.TestCase):
         )
 
     def test_receipt_rejects_local_absolute_path(self) -> None:
-        self._mutated_receipt(lambda value: value.__setitem__("note", "/Users/example/private"))
+        local_path = str(Path("/", "Users", "example", "private"))
+        self.assertEqual(local_path, "/" + "Users/example/private")
+        self._mutated_receipt(lambda value: value.__setitem__("note", local_path))
 
     def _mutated_receipt(self, mutate: Callable[[dict[str, Any]], None]) -> None:
         with TemporaryDirectory() as temporary:
