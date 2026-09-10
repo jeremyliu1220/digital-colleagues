@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "change": "P11R",
+  "classification": "post_p11_governance_and_ci_alignment",
+  "implementation_basis": "Immutable P11R acceptance contract and accepted P8/P11 supply-chain and test boundaries",
+  "base_commit": "7e5387f148f86b5c9b07820dd8b8f4e18e12dc38",
+  "acceptance_commit": "61d5c94e24157b93bc4b4bcca42b4d8d2eab8fec",
+  "parent_research_working_tree_read": false,
+  "source_migration_count": 0,
+  "transformed_migration_count": 0,
+  "covered_paths": [
+    ".github/workflows/ci.yml",
+    "Makefile",
+    "docs/p11r/operations.md",
+    "provenance/p11r-change-receipt.json",
+    "scripts/check_p11r_ci_policy.py",
+    "scripts/check_p11r_repository.py",
+    "scripts/check_p11r_provenance.py",
+    "scripts/collect_p11r_evidence.py",
+    "scripts/run_p11r_toolchain.py",
+    "tests/p11r/__init__.py",
+    "tests/p11r/test_ci_policy.py",
+    "tests/p11r/test_evidence_gate.py",
+    "tests/p11r/test_repository.py"
+  ],
+  "accepted_p11": {
+    "commit": "7e5387f148f86b5c9b07820dd8b8f4e18e12dc38",
+    "tree": "6d7c1b3053fefc1f3b14a4b39fde2d5adb641990",
+    "acceptance_blob": "85f2a91b85d3ec223d4f458199913a3eadbaabe9",
+    "implementation_tree_digest": "sha256:8bc5a7d431aae4fd1d46d94fd3af96f664b2f39d1b1d6ab679c50571ca8220e6"
+  },
+  "toolchain": {
+    "node_version_file": ".nvmrc",
+    "node_version": "24.15.0",
+    "node_engine": ">=24.15.0 <25",
+    "npm_version": "11.12.1",
+    "package_manager": "npm@11.12.1+sha224.8b8077c959144afd9fbfc0f0a36ecf5b5375c7b1a202f32c0c06cdcb",
+    "python_lock": "requirements/p8.lock"
+  },
+  "known_baseline": {
+    "run_id": 34414627643,
+    "classification": "post_merge_ci_configuration_drift",
+    "p11_product_defect": false,
+    "p11_acceptance_failure": false
+  },
+  "change_counts": {
+    "product_runtime_source": 0,
+    "studio_product_behavior": 0,
+    "database_schema": 0,
+    "migration": 0
+  },
+  "external_dependencies": {
+    "added": [],
+    "license_treatment": "No dependency is added; existing hash and integrity locks remain authoritative."
+  },
+  "privacy": {
+    "local_absolute_paths": false,
+    "credentials": false,
+    "private_identifiers": false,
+    "personal_data": false,
+    "live_receipts": false
+  },
+  "publication": {
+    "secrets": false,
+    "oidc": false,
+    "write_permissions": false,
+    "tags": false,
+    "releases": false,
+    "packages_or_images": false,
+    "signatures_or_attestations": false
+  }
+}
