@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   current-ci:
-    name: Current P11-aware non-publishing verification
+    name: Current P12 governance non-publishing verification
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -43,7 +43,7 @@ jobs:
           cache-dependency-path: studio/package-lock.json
       - name: Enable the package-manager integrity boundary
         run: corepack enable
-      - name: Run current P11-aware non-publishing verification
+      - name: Run current P12 governance non-publishing verification
         env:
           PYTHONPATH: src
         run: make ci

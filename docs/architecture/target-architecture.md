@@ -509,6 +509,14 @@ owns TriggerCorrelation, ambiguity quarantine, wake, and durable-truth recovery,
 RecoveryScanCheckpoint only as an optimization. P16 provides immutable bounded
 MemoryRetrievalSet identities/digests; checkpoints never copy memory bodies.
 
+P15 writes a mandatory checkpoint before waiting/needs-HUMAN, after a state-changing
+decision, after effect result or reconciliation, before stop/complete and lease release,
+and during graceful shutdown or recovery takeover. A new process with an empty chat
+context reconstructs the same continuation state and retrieval-set digest from durable
+state alone. A recovery cursor is not authority or truth: cursor loss and host replacement
+fall back to a bounded scan of durable incomplete state and cannot omit an old waiting
+project.
+
 P14 owns bounded Outlook existing-thread, Teams allowlisted-chat, and Planner latest-ETag
 `If-Match` transport adapters. Each P14 write consumes an exact current
 HumanApprovalDecision; SharePoint is read-only. P18 reuses the transports, outbox,

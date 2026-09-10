@@ -449,7 +449,7 @@ studio-dev:
 p11-ci:
 	$(PYTHON) -B -m scripts.run_p11r_toolchain --scope ci
 
-ci: p11-ci
+ci: p12-ci
 
 p11r-test:
 	$(PYTHON) -B -m scripts.run_p11r_toolchain --scope test
@@ -462,3 +462,24 @@ p11r-check:
 
 evidence-p11r:
 	$(PYTHON) -B scripts/collect_p11r_evidence.py
+
+# P12 Public Pilot continuity governance
+.PHONY: p12-test p12-implementation-check p12-ci p12-evidence-preflight evidence-p12 p12-check
+
+p12-test:
+	$(PYTHON) -B -m scripts.run_p12_toolchain --scope test
+
+p12-implementation-check:
+	$(PYTHON) -B -m scripts.run_p12_toolchain --scope implementation
+
+p12-ci:
+	$(PYTHON) -B -m scripts.run_p12_toolchain --scope ci
+
+p12-evidence-preflight:
+	$(PYTHON) -B -m scripts.run_p12_toolchain --scope evidence-preflight --implementation-head "$(P12_IMPLEMENTATION_HEAD)" --ci-run-id "$(P12_CI_RUN_ID)" --receipt-directory "$(P12_PREFLIGHT_DIRECTORY)"
+
+evidence-p12:
+	$(PYTHON) -B scripts/collect_p12_evidence.py --receipt "$(P12_PREFLIGHT_RECEIPT)" --receipt-sha256 "$(P12_PREFLIGHT_SHA256)" --authorization "$(P12_EVIDENCE_AUTHORIZATION)"
+
+p12-check:
+	$(PYTHON) -B -m scripts.run_p12_toolchain --scope final
