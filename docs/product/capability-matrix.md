@@ -62,3 +62,12 @@ limits are in the [v0.2 capability matrix](v0.2-public-pilot-capability-matrix.m
 | OIDC, SSO, or SCIM | No | Not implemented | Explicit production gap |
 | Encryption at rest | No | Not implemented | Explicit local deployment risk |
 | Compliance certification | No | Not claimed | Not claimed |
+
+## P12 B+ prospective capability map
+
+P12 changes no implemented status above. It fixes the exact future owners: P13 model
+gateway; P14 connector source/sync/dedupe and HUMAN-approved transports; P15 durable
+continuation; P16 tiered semantic-memory lifecycle; P17 trigger/correlation/recovery; P18
+bounded proactivity and AutomaticEffectAuthorization; P19 composition-only tracker; and
+P20 always-on private-live/HUMAN/soak/release evaluation. Planned records, tests, or
+documentation are not implemented capability.

@@ -9,7 +9,7 @@ The separately gated [v0.2 Public Pilot plan](v0.2-public-pilot-product-brief.md
 start or satisfy S1-S4. AgentPackage is a non-executable declaration and is not S4 Skill;
 temporary external source context is not S1 Semantic Memory; and multiple isolated
 ColleagueDeployments are not S3 shared knowledge or Agent collaboration. These distinctions
-remain authoritative throughout P9-P15.
+remain authoritative throughout the accepted P12-P20 sequence.
 
 ## Boundary and sequencing
 
@@ -29,7 +29,13 @@ explicit permission model, versioned inputs and behavior, attributable sources, 
 revocation, and misuse and abuse testing. Memory and Skills never grant authority; the
 current Mandate and policy remain authoritative.
 
-## S1 — Memory loop closure
+The B+ roadmap now gives the bounded S1 memory-lifecycle subset its own P16 gate and the
+bounded S2 goal-driven proactivity subset its own P18 gate, separated by P17 trigger and
+recovery. This does not start S3 collaboration, S4 Skills, or broader self-initiated
+autonomy. P15 continuation is operational state rather than memory; P16 memory is never
+authority; P18 cannot invent a goal or connector transport.
+
+## S1 — Memory loop closure (bounded P16 realization)
 
 Scope: close the capture, retrieval, citation, correction, supersession, retention, deletion,
 and feedback loop for Semantic Memory. Keep work state separate from remembered statements
@@ -46,7 +52,7 @@ and require sources for retained claims.
 - **Abuse tests:** cover poisoning, source spoofing, cross-namespace retrieval, retention
   bypass, deletion failure, prompt injection, and attempts to turn memory into permission.
 
-## S2 — Memory autonomy and bounded goal-driven proactivity
+## S2 — Memory autonomy and bounded goal-driven proactivity (bounded P18 realization)
 
 Scope: permit explicitly bounded use of accepted memory to pursue human-granted goals under
 allowed triggers, working hours, attention budgets, notification policies, stop conditions,

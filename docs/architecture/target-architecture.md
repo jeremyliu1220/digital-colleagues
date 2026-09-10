@@ -477,3 +477,44 @@ is locked before those jobs are removed from the branch. The publication source 
 and later evidence implementation revision remain distinct. This can establish a remote
 distribution candidate, not a formal Release, production supply-chain assurance, P10
 acceptance, or authorization for P11.
+
+## P12 B+ continuity rebaseline architecture
+
+P12 changes architecture documentation and governance only. The executable architecture,
+ports, migrations, API, Studio, worker, Compose topology, and dependencies remain the
+accepted P11R baseline. Future work preserves the dependency direction and adds records at
+their owning gates:
+
+```text
+P14 normalized sources and HUMAN-approved transports
+       |                       P16 bounded semantic-memory selection
+       v                                      |
+P17 correlation/recovery -> P15 continuation + checkpoint
+                                      |
+                                      v
+                         P18 bounded proactivity and automatic proof
+                                      |
+                                      v
+                         P19 composition-only tracker -> P20 release gate
+```
+
+ProjectScope is only deployment Namespace plus `project_id`. Exact authority/source
+revisions belong to ProjectContinuationState and SessionCheckpoint. The continuation
+state machine is exactly `active`, `waiting`, `needs_human`, `completed`, and `stopped`;
+P18 pause is a separate ProactivityState value.
+
+P15 owns exact wait state and explicit HUMAN binding but never provider polling or raw
+correlation. P17 invokes P14 source/normalization ports for bounded autonomous polling,
+owns TriggerCorrelation, ambiguity quarantine, wake, and durable-truth recovery, and uses
+RecoveryScanCheckpoint only as an optimization. P16 provides immutable bounded
+MemoryRetrievalSet identities/digests; checkpoints never copy memory bodies.
+
+P14 owns bounded Outlook existing-thread, Teams allowlisted-chat, and Planner latest-ETag
+`If-Match` transport adapters. Each P14 write consumes an exact current
+HumanApprovalDecision; SharePoint is read-only. P18 reuses the transports, outbox,
+fencing, idempotency, EffectAttempt, ActionResult, and reconciliation, adding only
+AutomaticEffectAuthorization. P19 cannot add a missing connector primitive.
+
+Future migrations stay additive behind ports: P13 owns 009, P14 owns 010, P15 owns 011,
+P16 owns 012, P17 owns 013, and P18 owns 014. Migrations 001-008 and their manifest remain
+immutable. P19/P20 add no migration, and 015 has no owner.

@@ -254,3 +254,38 @@ After all implementation paths are committed and the tree is clean, `make eviden
 may write the sole final evidence file. Commit that file alone and rerun both aggregate
 commands. Skips, xfails, expected failures, mock replacement of the actual Compose path,
 and evidence editing are forbidden.
+
+## P12 Public Pilot Continuity Rebaseline development
+
+P12 starts at exact accepted P11R commit
+`c1562ea5201394d8a278f4b644daf4029cbb5bd4` and is governed by the immutable
+`docs/p12/acceptance.md`. It changes only the exact 39-path set: the acceptance-only first
+commit, 37 implementation paths, and a separately authorized summary-only final commit.
+P12 adds governance and no runtime, Studio behavior, schema, migration, dependency,
+Compose, provider, connector, memory, trigger, proactivity, or publication capability.
+
+The clean committed implementation head runs:
+
+```bash
+make p12-test
+make p12-ci
+make ci
+make p12-implementation-check
+```
+
+`make ci` delegates only to `p12-ci`. The current gate uses exact P12 test/checker
+inventories and replays accepted P11R with `make p11r-check` only inside an OS-temporary
+checkout of its exact object and ref layout. Historical P0-P11R files and gates are never
+edited or weakened on the descendant.
+
+Evidence is a later authorization. `make p12-evidence-preflight` requires an explicit
+implementation SHA, numeric exact-head PR CI run, and caller-owned OS-temporary receipt
+directory. It verifies read-only GitHub/GHCR access, protected P10 identities, exact
+hash-locked package declarations, PEP 440 installed versions, and certificate-verified TLS.
+It writes no repository artifact. Only a later explicit authorization naming the receipt
+digest, head, run, and expiry may invoke `make evidence-p12`; that writer may create only
+`artifacts/p12/summary.json` and consumes the external receipt once.
+
+Implementation failure on a clean committed head stops for scoped correction authority.
+No contract edit, amend, rebase, squash, reset, merge commit, push, PR, evidence, tag,
+Release, publication, or P13 work is implied by a local P12 gate.

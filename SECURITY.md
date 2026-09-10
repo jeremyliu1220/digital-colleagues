@@ -26,6 +26,13 @@ Wrong or incomplete remote evidence fails closed. See the
 [v0.2 privacy boundary](docs/security/v0.2-public-pilot-privacy-boundary.md). Their planned
 controls are not evidence of live-provider security or production readiness.
 
+P12 is a governance-only Public Pilot Continuity Rebaseline. It adds no runtime security
+capability. Its accepted future boundary keeps HUMAN, MODEL, SERVICE, and
+ExternalPartyReference identities disjoint; separates memory admission from lifecycle;
+requires exact authority revalidation, mandatory checkpoints, ambiguity quarantine and
+cursor-independent recovery; and assigns AutomaticEffectAuthorization only to P18.
+These remain planned contracts until their owning P13-P20 gates pass.
+
 P10 stores state and backups below Application Support with private modes, uses exact
 digest image selection, binds ports only to loopback, gives Studio no secret mount, and
 checks FileVault without changing it. The remote gate is public distribution evidence, not

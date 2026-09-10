@@ -23,7 +23,8 @@ recorded in the project.
 
 ## Milestone discipline
 
-- Preserve the accepted P0 through P8 history, then work only in P9 through P15 order.
+- Preserve the accepted P0 through P11R history, then work only in the accepted P12
+  through P20 order.
 - Do not begin the next milestone until the current milestone's documented gate passes.
 - An exit criterion requires a repeatable command and an evidence artifact.
 - A failed hypothesis stays in the record with its consequence.
@@ -37,8 +38,14 @@ recorded in the project.
 - P9 is an authorized productization rebaseline containing only documents, ADRs, fixed
   acceptance contracts, governance gates, tests, provenance, and static/synthetic evidence.
   It adds no runtime capability and does not authorize P10.
-- P10 through P15 remain ordered, independently gated work defined in `docs/roadmap.md`.
+- P12 is the governance-only Public Pilot Continuity Rebaseline. It changes living
+  documents, governance gates, tests, provenance, CI policy, and safe evidence machinery;
+  it adds no product behavior, schema, migration, provider access, or publication.
+- P13 through P20 remain ordered, independently gated work defined in `docs/roadmap.md`.
   Passing one phase never authorizes the next.
+- The immutable P12 contract is `docs/p12/acceptance.md`. Its exact 39-path allowlist,
+  variable linear implementation/correction topology, two exact-head CI gates, evidence
+  authorization boundary, and protected P10 publication identities are mandatory.
 
 ## Source repository boundary
 

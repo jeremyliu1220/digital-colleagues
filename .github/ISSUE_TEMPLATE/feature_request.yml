@@ -30,6 +30,6 @@ body:
     id: acceptance
     attributes:
       label: Repeatable acceptance evidence
-      description: Which command and artifact would establish completion?
+      description: Which current P12-P20 owner, exact command, evidence class, and artifact would establish completion without starting a later milestone?
     validations:
       required: true

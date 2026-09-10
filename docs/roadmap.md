@@ -1,27 +1,24 @@
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 
-# P0-P15 Roadmap
+# P0-P20 Roadmap
 
 Each milestone stops at its gate. A later milestone must not begin automatically.
 
 Current checkpoint:
 
-- P8 passed independent acceptance and was fast-forward merged from
-  `codex/p8-release-readiness` to `main`.
-- The accepted P8 commit is `0bb80ab187932fbad42fbf665b8310987609a1f5`.
-- Historical P0–P8 artifacts, evidence, acceptance contracts, receipts, and migrations
-  remain unchanged.
-- The result is only a **v0.1 local reference release candidate** for version `0.1.0`: no
-  tag has been created, and nothing has been published, uploaded, or formally released.
-- It is not production-ready and establishes no production security, high availability,
-  enterprise IAM, real-provider readiness, compliance, or other excluded capability.
-- Human evaluation, live-provider evidence, and the unmeasured five-minute target remain
-  `not_evaluated`.
-- Post-v0.1 S1–S4 and Self-initiated autonomy have not started and do not start
-  automatically.
-- P9 Productization Rebaseline is authorized on its fixed development branch. It is
-  documentation/governance work only and does not change the P8 executable baseline or
-  authorize P10.
+- P0–P11R are accepted history. Local `main` and `origin/main` are fixed at the accepted
+  P11R commit `c1562ea5201394d8a278f4b644daf4029cbb5bd4`, whose tree is
+  `ae0f33263cfc7445fef69656ad9c5cb04d4a2d00`.
+- Historical P0–P11R contracts, evidence, tests, receipts, provenance, and migrations
+  001–008 remain immutable.
+- P12 is a governance-only continuity rebaseline. Its immutable acceptance contract is
+  `docs/p12/acceptance.md`; P12 adds no runtime, API, CLI, Studio, connector, schema,
+  migration, dependency, distribution, or publication capability.
+- P13–P20 remain ordered, independently accepted, and separately authorized. Completion
+  of P12 does not start any of them.
+- No Public Pilot, production readiness, production security, high availability,
+  enterprise IAM, compliance, human evaluation, live-provider compatibility, or other
+  later claim follows from this roadmap.
 
 Rebaseline boundary:
 
@@ -180,7 +177,7 @@ high availability, enterprise IAM, real-provider readiness, compliance, or any o
 excluded capability. Human evaluation, live-provider evidence, and the unmeasured
 five-minute target remain `not_evaluated`.
 
-## P9-P15 v0.2 Public Pilot sequence
+## Historical P9-P15 v0.2 Public Pilot sequence
 
 The following phases are non-mergeable and non-skippable. Every phase must complete this
 sequence before the next phase can be planned or started:
@@ -252,7 +249,7 @@ New schemas and APIs use stable product terms, not milestone names.
 Exit: package safety/provenance/trust/update/rollback, legacy preservation, and ten-Agent
 namespace/isolation gates pass. Multiple deployments do not establish S3 collaboration.
 
-## P12 — OpenAI Model Gateway
+### Superseded P9 assignment: P12 — OpenAI Model Gateway
 
 Implement the OpenAI `gpt-5.5` Responses API gateway with Structured Outputs,
 `store:false`, bounded input/output and usage/cost, connection lifecycle, prompt layering,
@@ -268,7 +265,7 @@ substitution is allowed. Without actual project access, live acceptance is
 Exit: static/synthetic gateway contracts pass; private live compatibility passes only when
 actual project access is available and separately stored.
 
-## P13 — Microsoft 365 Connector Foundation
+### Superseded P9 assignment: P13 — Microsoft 365 Connector Foundation
 
 Implement one dedicated delegated Microsoft 365 work/school identity per Agent; verified
 project multi-tenant and BYO single-tenant public-client App modes; device-code flow;
@@ -285,7 +282,7 @@ compatibility remains `not_evaluated`; mock/stub/loopback cannot substitute.
 Exit: connector authority, cursor, minimization, and synthetic/loopback gates pass; private
 live compatibility is reported only from real authorized tenants.
 
-## P14 — Built-in Project Tracker
+### Superseded P9 assignment: P14 — Built-in Project Tracker
 
 Add the bilingual official `project-tracker` AgentPackage plus setup, deploy, health,
 timeline, usage, and audit UI. Implement the exact effect outcomes
@@ -300,7 +297,7 @@ or executable Skill runtime.
 Exit: end-to-end synthetic/loopback tracker, effect-policy, failure, restart, and audit
 gates pass without live-provider overclaim.
 
-## P15 — Always-on and Public Pilot Release
+### Superseded P9 assignment: P15 — Always-on and Public Pilot Release
 
 Add Mac local and Linux/Mac mini always-on profiles, SSH-tunneled Studio, a ten-Agent
 72-hour soak, live OpenAI/Microsoft 365 acceptance, human evaluation, and release
@@ -316,6 +313,173 @@ Exit: all static, synthetic, live-private, human-evaluation, security/privacy, s
 distribution, and rollback requirements pass. Tag, push, publish, upload, or Release
 creation still requires final live acceptance and separate explicit user authorization.
 
+The preceding P12–P15 assignments are retained only as historical P9 planning context.
+They are prospectively superseded by the accepted B+ P12–P20 sequence below; no accepted
+P0–P11R history is changed.
+
+## P12 — Public Pilot Continuity Rebaseline
+
+Align the living product, architecture, security, roadmap, contribution, CI-governance,
+and provenance records to the accepted B+ decision. Establish only contracts and tests
+for the exact P12–P20 order, authority and identity boundaries, durable continuation,
+Semantic Memory, trigger recovery, bounded proactivity, Microsoft transport ownership,
+migration ownership, historical replay, evidence separation, and Public Pilot claims.
+
+P12 changes no executable product behavior. It adds no migration and cannot create a
+runtime, API, CLI, Studio, connector, dependency, distribution, evidence, Release, or
+publication capability. The immutable acceptance contract is `docs/p12/acceptance.md`.
+
+Exit: the P12 implementation-head gates pass from the exact accepted P11R base with the
+exact changed-path set, immutable history, exact-object P11R replay, complete provenance,
+protected P10 identities, and zero publication. Evidence and final acceptance remain
+separately authorized.
+
+## P13 — Migration Parser Correction and OpenAI Model Gateway
+
+The first implementation commit contains only the shared migration parser correction and
+its related tests. Parser-scope correction commits may follow if required, but migration
+009, Gateway, dependency, API, and Studio behavior remain forbidden until fresh and
+upgrade paths for migrations 001–008, trigger-body parsing, rollback, and restart all pass.
+
+After that independent sub-gate, add the bounded OpenAI Responses API Gateway with
+Structured Outputs, `store:false`, refusal/incomplete/error handling, exact model
+provenance, and no tool or effect authority. An unavailable or incompatible model requires
+a Change Decision; no silent substitution is allowed.
+
+Migration: P13 uniquely owns additive migration 009 for Gateway connection, model,
+usage, and provenance state. Migrations 001–008 remain immutable.
+
+Exit: the parser-first sub-gate and the separately accepted Gateway gate pass. Live
+compatibility remains `not_evaluated` without a separately authorized real project.
+
+## P14 — Microsoft 365 Connector Foundation
+
+Own source identity, cursor, pull-once and explicit sync, provider dedupe, and bounded
+Microsoft transports. Establish Outlook existing exact-thread reply, Teams allowlisted
+existing-chat reply, and Planner latest-ETag `If-Match` conditional update; SharePoint
+selected resources remain read-only. Every external write requires an existing exact,
+current `HumanApprovalDecision` from an authorized HUMAN principal.
+
+P14 reuses effect proposal, outbox, fencing, idempotency, `EffectAttempt`, `ActionResult`,
+and reconciliation. It cannot create, infer, or accept `AutomaticEffectAuthorization`, and
+does no raw-event correlation, `WaitingCondition` binding, wake, continuation, memory, or
+proactivity.
+
+Migration: P14 uniquely owns additive migration 010 for Microsoft connection, grant,
+source identity, cursor, dedupe, and transport state.
+
+Exit: delegated authority, bounded reads, all three HUMAN-approved write transports,
+duplicate dispatch, ambiguous-outcome reconciliation, stale/revoked authority, Planner
+409/412 and stale-ETag reproposal, and SharePoint write denial pass independently.
+
+## P15 — Durable Project Continuation
+
+Add `ProjectScope`, the exact five-value `ProjectContinuationState` (`active`, `waiting`,
+`needs_human`, `completed`, `stopped`), `WaitingCondition`, `GoalBinding`, questions, next
+actions, checkpoints, leases, and recovery takeover. `completed` and `stopped` are
+terminal; `paused` belongs only to P18 `ProactivityState`.
+
+P15 accepts only a `NormalizedWaitingSignal` carrying an exact `WaitingCondition` ID.
+Before P17 acceptance, an explicit binding can be created only through a server-side
+operation by an authorized HUMAN principal. P15 performs no raw-provider-event
+correlation, polling, or provider dedupe.
+
+Checkpoint durably before entering `waiting` or `needs_human`, after a state-changing
+decision commit, after effect result or reconciliation, before `stopped` or `completed`,
+and for lease release, graceful shutdown, and recovery takeover. A new process with an
+empty chat context must reconstruct the same work state and memory retrieval-set digest
+from durable state alone.
+
+Migration: P15 uniquely owns additive migration 011 for the exact continuation state,
+checkpoints, exact waiting kinds/statuses and ANY/ALL groups, deadlines, one-time
+consumption, questions, actions, `GoalBinding`, and explicit signal binding.
+
+Exit: normalized-signal, exact HUMAN binding, checkpoint, restart, lease, takeover, and
+blank-chat recovery scenarios pass without raw-event correlation.
+
+## P16 — Semantic Memory Lifecycle
+
+Add tiered memory-candidate admission. `MemoryAdmissionDecision` has exactly `admit` and
+`reject`; it never substitutes for `HumanApprovalDecision`. Correction, supersession,
+revocation, deletion, and expiry are separate post-admission lifecycle decisions. The
+P12 non-normative name `MemoryLifecycleDecision` does not fix P16's final type or schema.
+
+`MemoryRecord` states are exactly `active`, `superseded`, `revoked`, `deleted`, and
+`expired`; correction creates a new immutable version and silent overwrite is forbidden.
+`MemoryRetrievalSet` is an immutable bounded selection with purpose, checkpoint identity
+and revision, as-of time, record identity/version/content digest, citation/source,
+inclusion order, exclusion reasons, and a canonical ID and digest. Checkpoints retain only
+that ID and digest, not memory bodies.
+
+Migration: P16 uniquely owns additive migration 012 for candidates, admit/reject,
+immutable records and versions, conflicts, separate lifecycle, retention, revocation,
+deletion watermarks, and retrieval sets.
+
+Exit: independent Continuation and Memory gates pass, including negative authority,
+versioning, retention, revocation, deletion, bounded retrieval, and restart cases.
+
+## P17 — Trigger, Recurring Schedule, Heartbeat, Correlation, and Recovery
+
+Own autonomous bounded polling, raw-provider-event correlation, ambiguous quarantine,
+wake, startup recovery, schedules, and heartbeat semantics. `TriggerCorrelation` states
+are exactly `received`, `matched`, `ambiguous`, `consumed`, and `ignored`; only `matched`
+can enter one-time atomic consumption and `ambiguous` is quarantined.
+
+DST gap/fold and catch-up behavior is conservative and bounded. A
+`RecoveryScanCheckpoint` cursor is only a bounded-scan optimization, never the source of
+truth. Host replacement or cursor loss reconstructs from durable incomplete state without
+missing a waiting project. After P17 acceptance, only the correlation service may create
+an event-derived explicit `NormalizedWaitingSignal` binding, with actor, authority/source
+revisions, correlation, causation, dedupe, and replay protection.
+
+Migration: P17 uniquely owns additive migration 013 for schedule and occurrence records,
+all five correlation states, quarantine, wake, recovery, and scan checkpoints.
+
+Exit: independent Trigger gate passes Outlook and Teams raw-event correlation,
+ambiguity/quarantine, DST/catch-up, one-time wake, restart, cursor loss, and host
+replacement recovery scenarios.
+
+## P18 — Bounded Goal-driven Proactivity
+
+Own `ProactivityState` and the only creation of `AutomaticEffectAuthorization`, including
+low-risk eligibility and proof. P18 reuses P14's accepted Microsoft transports, outbox,
+idempotency, `ActionResult`, and reconciliation exactly; it cannot add, fork, replace, or
+complete a connector write adapter.
+
+P18 may pause only `ProactivityState`. If HUMAN direction is required, it uses P15's
+existing transition to `needs_human` and mandatory checkpoint; it does not add `paused` to
+`ProjectContinuationState`. Before P18 acceptance a `GoalBinding` cannot generate a
+proactive trigger.
+
+Migration: P18 uniquely owns additive migration 014 for proactivity and automatic-effect
+authorization records. There is no migration 015 owner in this roadmap.
+
+Exit: the independent Proactivity gate replays P14's three accepted transports under
+bounded automatic authorization and proves eligibility, pause, denial, replay, stale
+authority, reconciliation, and no-new-adapter behavior.
+
+## P19 — Built-in Public Pilot Project Tracker
+
+Build the bilingual project-tracker experience only by composing independently accepted
+P13–P18 primitives. P19 owns no connector write primitive and no migration. If the
+required Outlook, Teams, or Planner transport is absent, the gate fails; P19 cannot add,
+fork, bypass, or finish one.
+
+Exit: the composition-only tracker gate passes setup, continuation, memory, trigger,
+proactivity, authority, audit, and failure cases, including required-transport absence.
+
+## P20 — Always-on Public Pilot Release
+
+Add separately accepted always-on profiles, private-live OpenAI and Microsoft evaluation,
+human evaluation, recovery and soak evidence, distribution evidence, and the final Public
+Pilot release boundary. P20 owns no migration; migration 015 is absent unless a future
+owner-approved acceptance contract assigns it.
+
+Exit: every required static, synthetic, private-live, human-evaluation, security/privacy,
+soak, distribution, and rollback gate passes. Any tag, Release, upload, or publication
+still requires explicit authorization. Until then Public Pilot readiness remains
+`not_evaluated`.
+
 ## Post-v0.1 outlook
 
 The non-committing [Post-v0.1 Capability Outlook](product/post-v0.1-capability-outlook.md)
@@ -326,9 +490,7 @@ only after those stages; none of these capabilities is required for the v0.1 P4�
 S1–S4 and Self-initiated autonomy have not started, do not start automatically, and remain
 uncommitted work behind independent future Gates.
 
-P11 implementation is currently a development candidate on its fixed branch. Its gate is
-the immutable `docs/p11/acceptance.md`: inert package/archive validation, offline GitHub
-origin verification, separate trust/install/draft/confirm/activate states, additive legacy
-preservation, exact namespace isolation, ten-active enforcement, retained compatibility,
-and repeatable local evidence must all pass before independent acceptance. P12 remains
-unauthorized regardless of P11 development-gate results.
+P11 and the P11R CI-alignment correction are accepted history. The exact P12–P20 sequence
+above prospectively realizes bounded parts of this outlook while preserving independent
+Continuation, Memory, Trigger, and Proactivity gates. No later capability starts or gains
+an acceptance claim merely because it appears in this roadmap.

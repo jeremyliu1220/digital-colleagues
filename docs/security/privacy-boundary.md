@@ -250,3 +250,26 @@ The CLI accepts session and CSRF values only in a bounded stdin envelope. SQLite
 private state and records only server-derived actors and safe audit projections. Evidence
 records counts, digests, finite states, and classifications—not package prompt bodies,
 credentials, absolute paths, raw database content, private logs, or live-provider data.
+
+## P12 B+ continuity privacy boundary
+
+P12 stores no provider content, semantic memory, private-live result, credential, local
+path, or personal evaluation. It fixes prospective minimization rules only.
+
+P14 may persist source identity, cursor, version/etag, digest, dedupe, and bounded safe
+projection; raw Outlook, Teams, Planner, or SharePoint bodies remain temporary private
+context. P15 checkpoints persist exact durable state plus only a MemoryRetrievalSet ID and
+digest. P16 admission requires classification, provenance, scope, retention, and immutable
+versioning; raw credentials, attachments, and unrestricted bodies are never semantic
+memory. Revocation, deletion watermark, expiry, and restore checks prevent resurrection.
+
+P17 correlation persists safe occurrence, source, project/wait/checkpoint/wake, dedupe,
+correlation, and causation identities. Ambiguous provider content is quarantined in the
+private boundary and is not copied to public evidence. Recovery scans cannot reconstruct
+missing content from logs or public artifacts.
+
+Public P12 evidence contains only fixed Git/digest/run identities, safe finite gate
+results, counts, and `static`/`synthetic_offline` classifications. It excludes absolute CA
+paths, certificate content, authentication material, GH credentials, account identity,
+provider payloads, and the external preflight receipt. Provider/private-live/HUMAN/soak
+results remain `not_evaluated` until P20's separately authorized private process.

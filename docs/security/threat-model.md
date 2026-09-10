@@ -171,3 +171,22 @@ triggers defend lifecycle mutation and activation races. Revocation blocks activ
 bindings. Inactive deployments cannot enter API or worker execution. P11 does not defend
 an executable plugin runtime, connector lifecycle, Agent collaboration, shared memory,
 provider behavior, or production deployment because those capabilities are absent.
+
+## P12 B+ continuity planning threats
+
+P12 implements no control below; it fixes future owners and negative requirements:
+
+| Future threat | Required owner and control |
+| --- | --- |
+| External identity treated as HUMAN | P14-P18 keep ExternalPartyReference outside Principal and reject human approval or `human_decision` satisfaction |
+| Project identity becomes authority | P15 limits ProjectScope to Namespace/project_id and revalidates exact authority/source revisions per continuation |
+| Lost work at checkpoint boundary | P15 atomically checkpoints required transitions, decisions, effects, reconciliation, shutdown, release, and takeover |
+| Hidden chat-state dependency | P15 reconstructs the same state and retrieval digest in a new process with empty chat context |
+| Memory becomes authority or silent mutable state | P16 separates admit/reject from lifecycle, versions immutably, bounds retrieval, and enforces revocation/deletion watermarks |
+| Raw reply wakes the wrong project | P17 owns exact correlation, quarantines ambiguity, and atomically consumes only matched occurrences once |
+| Recovery cursor omits old work | P17 reconstructs from durable incomplete state and performs bounded full/anti-entropy scans after cursor loss or host replacement |
+| Transport creates automatic authority | P14 writes only under exact current HUMAN approval; P18 alone adds AutomaticEffectAuthorization |
+| Tracker repairs missing security primitive | P19 fails if a P13-P18 primitive or required P14 transport is absent |
+
+These requirements remain `static`/`synthetic_offline` planning evidence until their owning
+milestones pass. They establish no provider, security-effectiveness, or Public Pilot claim.
