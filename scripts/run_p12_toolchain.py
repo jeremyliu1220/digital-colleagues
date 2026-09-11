@@ -296,7 +296,17 @@ def replay_accepted_p11r(root: Path, temporary: Path) -> dict[str, Any]:
     )
     if _run(["git", "status", "--porcelain"], cwd=checkout).strip():
         raise P12GateError("Accepted P11R temporary checkout is not clean")
-    result = _json_from_make(_run(["make", "p11r-check"], cwd=checkout, timeout=7_200))
+    child_environment = os.environ.copy()
+    child_environment["PYTHONUNBUFFERED"] = "1"
+    child_environment["PYTHONDONTWRITEBYTECODE"] = "1"
+    result = _json_from_make(
+        _run(
+            ["make", "p11r-check"],
+            cwd=checkout,
+            environment=child_environment,
+            timeout=7_200,
+        )
+    )
     accepted = result.get("accepted_p11")
     if not isinstance(accepted, dict) or accepted.get("status") != "passed":
         raise P12GateError("Accepted P11 exact-object replay did not pass through P11R")
