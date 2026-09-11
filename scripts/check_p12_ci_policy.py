@@ -5,10 +5,10 @@
 from __future__ import annotations
 
 import argparse
-from collections import Counter
 import json
 import re
 import sys
+from collections import Counter
 from pathlib import Path
 
 if __package__ in {None, ""}:
