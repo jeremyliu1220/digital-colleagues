@@ -7,7 +7,13 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from scripts.check_p12_ci_policy import EXPECTED_WORKFLOW, PACKAGE_MANAGER, check_ci_policy
+from scripts.check_p12_ci_policy import (
+    COSIGN_INSTALLER_PIN,
+    COSIGN_RELEASE,
+    EXPECTED_WORKFLOW,
+    PACKAGE_MANAGER,
+    check_ci_policy,
+)
 from scripts.check_p12_repository import P12GateError
 
 
@@ -39,6 +45,9 @@ class CiPolicyTests(unittest.TestCase):
         with TemporaryDirectory() as value:
             result = check_ci_policy(self._root(value))
         self.assertEqual(result["status"], "passed")
+        self.assertEqual(result["action_pin_count"], 6)
+        self.assertEqual(result["cosign_installer_pin"], COSIGN_INSTALLER_PIN)
+        self.assertEqual(result["cosign_release"], COSIGN_RELEASE)
         self.assertEqual(result["publication_command_count"], 0)
 
     def test_pull_request_target_is_rejected(self) -> None:
@@ -67,6 +76,11 @@ class CiPolicyTests(unittest.TestCase):
             "actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
             "actions/checkout@v6",
         )
+        self._rejects(
+            "sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6",
+            "sigstore/cosign-installer@main",
+        )
+        self._rejects("cosign-release: v3.0.6", "cosign-release: v3.0.5")
 
     def test_persisted_checkout_credentials_are_rejected(self) -> None:
         self._rejects("persist-credentials: false", "persist-credentials: true")

@@ -299,6 +299,7 @@ def replay_accepted_p11r(root: Path, temporary: Path) -> dict[str, Any]:
     child_environment = os.environ.copy()
     child_environment["PYTHONUNBUFFERED"] = "1"
     child_environment["PYTHONDONTWRITEBYTECODE"] = "1"
+    child_environment["P10_REMOTE_USE_INSTALLED_TOOLS"] = "1"
     result = _json_from_make(
         _run(
             ["make", "p11r-check"],

@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 import json
 import re
 import sys
@@ -19,6 +20,8 @@ WORKFLOW_PATH = ".github/workflows/ci.yml"
 CHECKOUT_PIN = "d23441a48e516b6c34aea4fa41551a30e30af803"
 PYTHON_PIN = "ece7cb06caefa5fff74198d8649806c4678c61a1"
 NODE_PIN = "249970729cb0ef3589644e2896645e5dc5ba9c38"
+COSIGN_INSTALLER_PIN = "6f9f17788090df1f26f669e9d70d6ae9567deba6"
+COSIGN_RELEASE = "v3.0.6"
 NODE_VERSION = "24.15.0"
 NODE_ENGINE = ">=24.15.0 <25"
 NPM_VERSION = "11.12.1"
@@ -67,6 +70,10 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: studio/package-lock.json
+      - name: Install Cosign verification tool
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6
+        with:
+          cosign-release: v3.0.6
       - name: Enable the package-manager integrity boundary
         run: corepack enable
       - name: Run current P12 governance non-publishing verification
@@ -105,17 +112,22 @@ def check_ci_policy(root: Path) -> dict[str, object]:
     if workflow != EXPECTED_WORKFLOW:
         raise P12GateError("P12 CI workflow differs from the fixed canonical policy")
     actions = re.findall(r"^\s*uses:\s*([^\s#]+)", workflow, re.MULTILINE)
-    if len(actions) != 5 or any(
+    if len(actions) != 6 or any(
         not re.fullmatch(r"[^@\s]+@[0-9a-f]{40}", action) for action in actions
     ):
         raise P12GateError("P12 action pins are incomplete or mutable")
-    expected_actions = {
-        f"actions/checkout@{CHECKOUT_PIN}",
-        f"actions/setup-python@{PYTHON_PIN}",
-        f"actions/setup-node@{NODE_PIN}",
-    }
-    if set(actions) != expected_actions:
+    expected_actions = Counter(
+        {
+            f"actions/checkout@{CHECKOUT_PIN}": 2,
+            f"actions/setup-python@{PYTHON_PIN}": 2,
+            f"actions/setup-node@{NODE_PIN}": 1,
+            f"sigstore/cosign-installer@{COSIGN_INSTALLER_PIN}": 1,
+        }
+    )
+    if Counter(actions) != expected_actions:
         raise P12GateError("P12 action identity allowlist changed")
+    if workflow.count(f"cosign-release: {COSIGN_RELEASE}") != 1:
+        raise P12GateError("P12 Cosign release identity changed")
     forbidden = (
         "pull_request_target",
         "workflow_dispatch",
@@ -167,6 +179,8 @@ def check_ci_policy(root: Path) -> dict[str, object]:
         "push_branch": "main",
         "permission": "contents: read",
         "action_pin_count": len(actions),
+        "cosign_installer_pin": COSIGN_INSTALLER_PIN,
+        "cosign_release": COSIGN_RELEASE,
         "node_version": NODE_VERSION,
         "node_engine": NODE_ENGINE,
         "npm_version": NPM_VERSION,
