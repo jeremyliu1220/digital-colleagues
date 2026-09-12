@@ -16,7 +16,7 @@ body:
     id: milestone
     attributes:
       label: Earliest roadmap milestone
-      options: [P1, P2, P3, P4, P5, P6, P7, P8]
+      options: [P12, P13, P14, P15, P16, P17, P18, P19, P20, Outside P12-P20]
     validations:
       required: true
   - type: textarea
@@ -30,6 +30,6 @@ body:
     id: acceptance
     attributes:
       label: Repeatable acceptance evidence
-      description: Which command and artifact would establish completion?
+      description: Which current P12-P20 owner, exact command, platform-scoped evidence class, and artifact would establish completion without promoting any of the five Ubuntu-excluded P8/P10 gates or their Darwin-only anchors, changing blocked Linux Public Pilot readiness, bypassing P20-L0, or starting a later milestone?
     validations:
       required: true

@@ -171,3 +171,30 @@ triggers defend lifecycle mutation and activation races. Revocation blocks activ
 bindings. Inactive deployments cannot enter API or worker execution. P11 does not defend
 an executable plugin runtime, connector lifecycle, Agent collaboration, shared memory,
 provider behavior, or production deployment because those capabilities are absent.
+
+## P12 B+ continuity planning threats
+
+P12 implements no control below; it fixes future owners and negative requirements:
+
+| Future threat | Required owner and control |
+| --- | --- |
+| External identity treated as HUMAN | P14-P18 keep ExternalPartyReference outside Principal and reject human approval or `human_decision` satisfaction |
+| Project identity becomes authority | P15 limits ProjectScope to Namespace/project_id and revalidates exact authority/source revisions per continuation |
+| Lost work at checkpoint boundary | P15 atomically checkpoints required transitions, decisions, effects, reconciliation, shutdown, release, and takeover |
+| Hidden chat-state dependency | P15 reconstructs the same state and retrieval digest in a new process with empty chat context |
+| Memory becomes authority or silent mutable state | P16 separates admit/reject from lifecycle, versions immutably, bounds retrieval, and enforces revocation/deletion watermarks |
+| Raw reply wakes the wrong project | P17 owns exact correlation, quarantines ambiguity, and atomically consumes only matched occurrences once |
+| Recovery cursor omits old work | P17 reconstructs from durable incomplete state and performs bounded full/anti-entropy scans after cursor loss or host replacement |
+| Transport creates automatic authority | P14 writes only under exact current HUMAN approval; P18 alone adds AutomaticEffectAuthorization |
+| Tracker repairs missing security primitive | P19 fails if a P13-P18 primitive or required P14 transport is absent |
+| Darwin evidence is laundered as Linux evidence | P12 preserves five independent P8/P10 Darwin `passed` identity-only anchors, keeps each Ubuntu historical status `not_proven`, and keeps Linux Public Pilot readiness `blocked` |
+| Historical recursion hides a platform exclusion | P12 independently derives 129 gates as 124 included plus ordered exclusions `p8_compose_runtime`, `p8_golden_path`, `p10_compose_runtime`, `p10_quickstart`, and `p10_remote_distribution`; it executes the literal 5/124/17/5/151 inventory without recursive aggregates |
+| Embedded anchor is counted or treated as execution | Each excluded row embeds exactly one immutable Darwin anchor as validation data; it is not an extra inventory row, an Ubuntu execution, or a substitute gate result |
+| Private bind ownership blocks non-root Linux runtime | P20-L0 is the first and only blocking P20 portability sub-gate and must prove a least-privilege handoff with distinct host/container UIDs and 0700/0600 modes |
+| Permission broadening masks portability | P20-L0 rejects chmod 777, group/world-readable private state, privileged containers, root fallback, ignored exit status, and retry-until-pass |
+| Public PR compromises a persistent runner | P12-P20 public PR work uses ephemeral GitHub-hosted runners; persistent/general self-hosted public-PR execution is forbidden |
+
+These requirements remain `static`/`synthetic_offline` planning evidence until their owning
+milestones pass. They establish no provider, security-effectiveness, or Public Pilot claim.
+P12 governance may pass independently; it does not change the five Ubuntu `not_proven`
+statuses or `linux_public_pilot_readiness = blocked`, and it does not start P20-L0.

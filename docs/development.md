@@ -254,3 +254,69 @@ After all implementation paths are committed and the tree is clean, `make eviden
 may write the sole final evidence file. Commit that file alone and rerun both aggregate
 commands. Skips, xfails, expected failures, mock replacement of the actual Compose path,
 and evidence editing are forbidden.
+
+## P12 Public Pilot Continuity Rebaseline development
+
+P12 starts at exact accepted P11R commit
+`c1562ea5201394d8a278f4b644daf4029cbb5bd4` and is governed by the immutable
+`docs/p12/acceptance.md`. V4 changes only the exact 42-path set: the acceptance-only first
+commit, 40 implementation paths, and a separately authorized summary-only final commit.
+The rejected v1/v2 and superseded acceptance-only v3 refs remain immutable non-ancestors.
+P12 follows the exact 21-stage authorization lifecycle; completing one stage never grants
+authority for the next. P12 adds governance and no
+runtime, Studio behavior, schema, migration, dependency, Compose, provider, connector,
+memory, trigger, proactivity, or publication capability.
+
+After every implementation path is committed and the repository is clean, the exact
+formal local gate sequence runs once, in this order:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 make p12-test
+PYTHONDONTWRITEBYTECODE=1 make p12-current-ci
+PYTHONDONTWRITEBYTECODE=1 make p12-portable-history
+PYTHONDONTWRITEBYTECODE=1 make p12-implementation-check
+PYTHONDONTWRITEBYTECODE=1 make p12-ci
+PYTHONDONTWRITEBYTECODE=1 make ci
+```
+
+`make p12-test` executes exactly 136 named governance tests. `make ci` delegates only to
+`p12-ci`, whose graph is non-recursive. Portable history executes the canonical 151-item
+manifest in exact P8, P9, P10, P11, and P11R order using one isolated checkout and at most
+one locked Python environment and one required npm workspace per object. The accepted set
+is independently derived as 129 gate identities: 124 included plus five ordered excluded
+gates. Typed inventory counts are 5 setup, 124 included, 17 evidence anchors, 5 excluded,
+and 151 total. The exclusions are `p8_compose_runtime`, `p8_golden_path`,
+`p10_compose_runtime`, `p10_quickstart`, and `p10_remote_distribution`. Each excluded row
+has a distinct immutable Darwin `passed` anchor, Ubuntu result
+`not_run_platform_excluded`, and null exit status; anchors are validation data rather than
+extra inventory items. The 129 gate entrypoints are exactly 19 null and 110 non-null, the
+complete inventory has 41 null entrypoints, and the portable result reports exactly 616
+historical Python tests. The runner must not invoke accepted `p11r-check`, `p11-check`,
+`p10-check`, `p9-check`, P8 `--scope all`, or an equivalent recursive aggregate.
+
+The living GitHub workflow has two required pull-request jobs, both on
+`ubuntu-24.04`: `Current P12 governance non-publishing verification` and
+`Portable historical replay`. Each job emits exactly one canonical
+P12-CJ-1 result envelope for the exact checked-out head, after cleanup, and then preserves
+the original gate exit status. The workflow uses the nine exact pinned action invocations
+fixed by acceptance, `contents: read`, no secrets or OIDC, and zero artifact upload,
+signature, attestation, package/image publication, tag, Release, or remote write.
+
+Each excluded P8/P10 gate remains `passed` only through its separately bound Darwin anchor;
+all five Ubuntu historical execution statuses remain `not_proven`. P12 governance result,
+those five Ubuntu statuses, and Linux Public Pilot readiness (`blocked`) are independent.
+P20-L0 is the first and only blocking P20 portability sub-gate and owns the forward Linux
+private-state, Compose, local-quickstart, and remote-distribution portability proof.
+
+Evidence is a later authorization. `make p12-evidence-preflight` requires an explicit
+implementation SHA, numeric exact-head PR CI run and run attempt, and caller-owned
+OS-temporary receipt directory. It verifies read-only GitHub/GHCR access, protected P10
+identities, exact hash-locked package declarations, PEP 440 installed versions, and
+certificate-verified TLS. It writes no repository artifact. Only a later explicit
+authorization naming the receipt digest, head, run, attempt, both envelope digests, and
+expiry may invoke `make evidence-p12`; that writer may create only
+`artifacts/p12/summary.json` and consumes the external receipt once.
+
+Implementation failure on a clean committed head stops for scoped correction authority.
+No contract edit, amend, rebase, squash, reset, merge commit, push, PR, evidence, tag,
+Release, publication, or P13 work is implied by a local P12 gate.

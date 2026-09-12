@@ -326,15 +326,16 @@ packages are exact and hash-checked, npm packages use exact integrity records, D
 images use manifest digests, and CI Actions use commit IDs. This is local release-candidate
 evidence, not production software-supply-chain assurance or a publication.
 
-## P9 v0.2 Public Pilot planning boundary
+## Historical P9 v0.2 Public Pilot planning boundary
 
-P9 changes no runtime, Studio, Compose, adapter, operation, API, worker, schema, migration,
-dependency, or version. It defines the planned P10-P15 architecture while the executable
-baseline remains the unpublished `0.1.0` local reference candidate. The v0.2 plan is a
-Public Pilot, not production-ready 1.0, HA, enterprise IAM, production tenancy, compliance,
-production security, or production readiness.
+P9 changed no runtime, Studio, Compose, adapter, operation, API, worker, schema, migration,
+dependency, or version. It defined the then-planned P10-P15 architecture while the
+executable baseline remained the unpublished `0.1.0` local reference candidate. Its
+unimplemented milestone assignments are prospectively superseded by the P12 B+ section
+below; its accepted history and object boundaries remain unchanged.
 
-The planned product composition extends the existing pure-core/application/ports direction:
+The historical P9 product composition extended the existing pure-core/application/ports
+direction:
 
 ```text
 Admin Studio / future stable /api/v1 mappings
@@ -407,15 +408,16 @@ External event
 -> causal audit
 ```
 
-OpenAI is planned behind a P12 gateway using `gpt-5.5`, Responses API, Structured Outputs,
-and explicit `store:false`. It receives no tools, credentials, or execution authority and
-returns only a bounded semantic decision; the server reconstructs authoritative fields.
+The superseded P9 assignment placed OpenAI behind a P12 gateway using `gpt-5.5`, Responses
+API, Structured Outputs, and explicit `store:false`. The B+ sequence below assigns the
+parser-first gateway to P13 while retaining the same no-tools and no-authority boundary.
 
-Microsoft 365 is planned behind P13 connectors with one delegated work/school account per
-Agent, device-code public-client authentication, project multi-tenant and BYO single-tenant
-App modes, explicit consent/configuration state, Outlook per-folder delta, Teams allowlisted
-dated polling, Planner ETag/`If-Match`, and SharePoint selected read-only access. Bodies are
-temporary context, not durable memory.
+The superseded P9 assignment placed Microsoft 365 behind P13 connectors. The B+ sequence
+below assigns them to P14 while retaining delegated work/school accounts, device-code
+public-client authentication, project multi-tenant and BYO single-tenant App modes,
+explicit consent/configuration state, Outlook per-folder delta, Teams allowlisted dated
+polling, Planner ETag/`If-Match`, SharePoint selected read-only access, and temporary body
+context that is not durable memory.
 
 Every unknown, missing, stale, revoked, cross-namespace, cross-Agent, digest/schema
 mismatch, unbound resource, ambiguous authority, or budget overflow fails closed.
@@ -477,3 +479,93 @@ is locked before those jobs are removed from the branch. The publication source 
 and later evidence implementation revision remain distinct. This can establish a remote
 distribution candidate, not a formal Release, production supply-chain assurance, P10
 acceptance, or authorization for P11.
+
+## P12 B+ continuity rebaseline architecture
+
+P12 changes architecture documentation and governance only. The executable architecture,
+ports, migrations, API, Studio, worker, Compose topology, and dependencies remain the
+accepted P11R baseline. Future work preserves the dependency direction and adds records at
+their owning gates:
+
+P13 first fixes the shared migration parser, then adds the bounded OpenAI model gateway
+that returns untrusted semantic decisions to application services. The remaining B+
+composition is:
+
+```text
+P14 normalized sources and HUMAN-approved transports
+       |                       P16 bounded semantic-memory selection
+       v                                      |
+P17 correlation/recovery -> P15 continuation + checkpoint
+                                      |
+                                      v
+                         P18 bounded proactivity and automatic proof
+                                      |
+                                      v
+                         P19 composition-only tracker -> P20 release gate
+```
+
+ProjectScope is only deployment Namespace plus `project_id`. Exact authority/source
+revisions belong to ProjectContinuationState and SessionCheckpoint. The continuation
+state machine is exactly `active`, `waiting`, `needs_human`, `completed`, and `stopped`;
+P18 pause is a separate ProactivityState value.
+
+P15 owns exact wait state and explicit HUMAN binding but never provider polling or raw
+correlation. P17 invokes P14 source/normalization ports for bounded autonomous polling,
+owns TriggerCorrelation, ambiguity quarantine, wake, and durable-truth recovery, and uses
+RecoveryScanCheckpoint only as an optimization. P16 provides immutable bounded
+MemoryRetrievalSet identities/digests; checkpoints never copy memory bodies.
+
+P15 writes a mandatory checkpoint before waiting/needs-HUMAN, after a state-changing
+decision, after effect result or reconciliation, before stop/complete and lease release,
+and during graceful shutdown or recovery takeover. A new process with an empty chat
+context reconstructs the same continuation state and retrieval-set digest from durable
+state alone. A recovery cursor is not authority or truth: cursor loss and host replacement
+fall back to a bounded scan of durable incomplete state and cannot omit an old waiting
+project.
+
+P14 owns bounded Outlook existing-thread, Teams allowlisted-chat, and Planner latest-ETag
+`If-Match` transport adapters. Each P14 write consumes an exact current
+HumanApprovalDecision; SharePoint is read-only. P18 reuses the transports, outbox,
+fencing, idempotency, EffectAttempt, ActionResult, and reconciliation, adding only
+AutomaticEffectAuthorization. P19 cannot add a missing connector primitive.
+
+Future migrations stay additive behind ports: P13 owns 009, P14 owns 010, P15 owns 011,
+P16 owns 012, P17 owns 013, and P18 owns 014. Migrations 001-008 and their manifest remain
+immutable. P19/P20 add no migration, and 015 has no owner.
+
+### Platform-scoped historical execution
+
+P12 v4 does not change an accepted runtime object. Its Linux current and historical jobs
+run on the `ubuntu-24.04` runner family and isolate the exact P8, P9, P10, P11, and P11R
+objects in five distinct OS-temporary checkouts and mutable-state scopes, with at most one
+locked Python environment and one required npm workspace per object; P9 has no npm
+workspace. The 129 accepted gate identities are derived independently, not from the
+inventory classification being checked: 124 are included and five are excluded. The
+canonical 151-item manifest records 5 setup items, 124 included gates, 17 evidence anchors,
+and 5 excluded gates, in this order: `p8_compose_runtime`, `p8_golden_path`,
+`p10_compose_runtime`, `p10_quickstart`, and `p10_remote_distribution`. Gate entrypoints
+are exactly 19 null and 110 non-null; the complete inventory has 41 null entrypoints. No
+recursive historical aggregate may reintroduce an excluded leaf. Exact per-object timeout,
+cleanup, and result-digest boundaries preserve isolation, and the portable result retains
+exactly 616 historical Python tests.
+
+Each excluded row records `not_run_platform_excluded` with null exit status and embeds its
+own immutable Darwin `passed` identity-only anchor. P8 Compose and P8 Golden Path use two
+independent selections from the immutable P8 summary; P10 Compose, Quickstart, and Remote
+Distribution use three independent P10 selections, with Remote Distribution binding only
+its exact distribution and quickstart subresults. These five anchors are not extra
+inventory items and never become Ubuntu evidence.
+
+P12 governance, the five `ubuntu_historical_execution_status = not_proven` values, and
+`linux_public_pilot_readiness = blocked` are three independent status dimensions. A v4
+governance pass changes neither platform status. The UID boundary first observed by
+rejected v2 remains a forward portability risk rather than a retrospective P8/P10 failure.
+
+P20-L0 is the first and only blocking P20 portability sub-gate. It must prove the forward
+release-transition, backup, restore, restart, rollback, durable-state equality, local
+quickstart, remote-distribution quickstart, and cleanup path on an ephemeral standard Linux
+environment with different host/container UIDs, non-root containers, private 0700
+directories and 0600 files, and a least-privilege handoff. Only current P20-authorized
+operator/Compose/runtime integration may change; accepted P8/P10 objects remain unchanged.
+P13-P19 carry the unresolved Linux statuses and cannot claim P20-L0 by analogy, while their
+own complete mechanism gates may still pass.

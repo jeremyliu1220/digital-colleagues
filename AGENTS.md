@@ -23,7 +23,8 @@ recorded in the project.
 
 ## Milestone discipline
 
-- Preserve the accepted P0 through P8 history, then work only in P9 through P15 order.
+- Preserve the accepted P0 through P11R history, then work only in the accepted P12
+  through P20 order.
 - Do not begin the next milestone until the current milestone's documented gate passes.
 - An exit criterion requires a repeatable command and an evidence artifact.
 - A failed hypothesis stays in the record with its consequence.
@@ -37,8 +38,35 @@ recorded in the project.
 - P9 is an authorized productization rebaseline containing only documents, ADRs, fixed
   acceptance contracts, governance gates, tests, provenance, and static/synthetic evidence.
   It adds no runtime capability and does not authorize P10.
-- P10 through P15 remain ordered, independently gated work defined in `docs/roadmap.md`.
+- P12 is the governance-only Public Pilot Continuity Rebaseline. It changes living
+  documents, governance gates, tests, provenance, CI policy, and safe evidence machinery;
+  it adds no product behavior, schema, migration, provider access, or publication.
+- P13 through P20 remain ordered, independently gated work defined in `docs/roadmap.md`.
   Passing one phase never authorizes the next.
+- The immutable P12 v4 contract is `docs/p12/acceptance.md`. Its exact 42-path allowlist,
+  40 implementation paths, variable linear implementation/correction topology, two
+  exact-head CI gates, evidence authorization boundary, and protected P10 publication
+  identities are mandatory. The rejected v1/v2 refs and superseded v3 acceptance-only ref
+  remain immutable non-ancestors of every v4 commit.
+- The v4 acceptance identity is commit `dbdb75b6afcd226059484ec536fec82532eb3613`,
+  tree `f8d0dad5c04253eefd24353f8c9afd965cf0d6ea`, sole parent
+  `c1562ea5201394d8a278f4b644daf4029cbb5bd4`, and acceptance blob
+  `b574bb350a83a36f9ad7f521514c7d58e97393d9`.
+- P12 portable history uses five isolated exact-object checkouts and the canonical
+  151-item inventory: 5 setup items, 124 included acceptance gates, 17 evidence anchors,
+  and 5 excluded acceptance gates. The exact ordered exclusions are
+  `p8_compose_runtime`, `p8_golden_path`, `p10_compose_runtime`, `p10_quickstart`, and
+  `p10_remote_distribution`; do not invoke a recursive predecessor aggregate that would
+  reintroduce any excluded leaf.
+- The 129 accepted-gate identities are derived independently as 124 included plus 5
+  excluded. Gate entrypoints are exactly 19 null and 110 non-null; the full inventory has
+  41 null entrypoints. Portable replay retains 616 historical Python tests, while P12
+  governance has 136 unique test IDs.
+- Every excluded gate carries its own immutable Darwin `passed` identity-only anchor and
+  an Ubuntu `not_proven` result. P12 governance, the five Ubuntu historical statuses, and
+  Linux Public Pilot readiness are independent; readiness remains `blocked`.
+- P20-L0 is the first and only blocking P20 portability sub-gate. P12 follows the exact
+  21-stage authorization lifecycle; completing a stage never authorizes the next.
 
 ## Source repository boundary
 

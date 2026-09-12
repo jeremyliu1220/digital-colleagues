@@ -8,23 +8,19 @@ Digital Colleagues is an open-source, local-first control plane and reference st
 making an AI coworker's identity, delegated authority, responsibilities, finite work,
 approvals, effects, persistence, and audit causality explicit and testable.
 
-> **Project status — P8 passed independent acceptance and was fast-forward merged from
-> `codex/p8-release-readiness` to `main`.** The accepted P8 commit is
-> `0bb80ab187932fbad42fbf665b8310987609a1f5`. The result is only a **v0.1 local
-> reference release candidate** for version `0.1.0`: no tag has been created, and nothing
-> has been published, uploaded, or formally released. It is not production-ready and
-> establishes no production security, high availability, enterprise IAM, real-provider
-> readiness, compliance, or other excluded capability. Human evaluation, live-provider
-> evidence, and the unmeasured five-minute target remain `not_evaluated`. Post-v0.1 S1–S4
-> and Self-initiated autonomy have not started and do not start automatically.
-
-> **P10 candidate status.** Mac Quickstart and Distribution work is isolated on its
-> fixed [P10 acceptance contract](docs/p10/acceptance.md). The version is
-> `0.2.0.dev0`/`0.2.0-dev.0` with maturity **Public Pilot development candidate**. Local
-> gates passed, and a later explicit operator authorization fixes a one-time public GHCR,
-> keyless signature, GitHub attestation, independent verification, and workflow-lock
-> lifecycle. Only locked `passed` evidence may be offered for independent acceptance.
-> This is not a formal Release or P10 acceptance; P11 remains unauthorized.
+> **Project status — P11R is accepted and remote-closed on `main` at
+> `c1562ea5201394d8a278f4b644daf4029cbb5bd4`.** P12 is an isolated governance-only
+> v4 Historical Platform Classification Rebaseline under its immutable
+> [acceptance contract](docs/p12/acceptance.md). It adds no runtime, API, CLI, Studio,
+> schema, migration, provider, connector, memory, trigger, proactivity, release, or
+> publication capability. P10 is the sole protected historical publication; no tag or
+> GitHub Release exists. Named-provider, private-live, HUMAN-evaluation, soak, and Public
+> Pilot results remain `not_evaluated` until their owning P13-P20 gates pass.
+>
+> Five accepted P8/P10 gates are excluded from Ubuntu replay and retain distinct immutable
+> Darwin `passed` anchors. Their Ubuntu statuses remain `not_proven`, so Linux Public Pilot
+> readiness is `blocked`. P12 governance may pass without changing either status dimension.
+> P20-L0 is the first and only blocking P20 portability sub-gate and owns the forward proof.
 
 ## What makes a digital colleague different?
 
@@ -65,15 +61,37 @@ fixed historical [acceptance contract](docs/p8/acceptance.md),
 and [release Golden Path](docs/p8/release-golden-path.md). The accepted P0–P8 artifacts,
 evidence, acceptance contracts, receipts, and migrations remain historical and unchanged.
 
-## P10 development verification
+## Current development verification
 
 Prerequisites are Python 3.12+, Node.js 24.15.0, npm 11.12.1 through Corepack, Git, Make,
 and Docker Engine/Compose for the required actual operational Gate.
 
+P12's formal local gates run once, in this order, only after the implementation is
+committed and the repository is clean:
+
 ```bash
-make check
-make studio-dev
+PYTHONDONTWRITEBYTECODE=1 make p12-test
+PYTHONDONTWRITEBYTECODE=1 make p12-current-ci
+PYTHONDONTWRITEBYTECODE=1 make p12-portable-history
+PYTHONDONTWRITEBYTECODE=1 make p12-implementation-check
+PYTHONDONTWRITEBYTECODE=1 make p12-ci
+PYTHONDONTWRITEBYTECODE=1 make ci
 ```
+
+The P12 portable-history gate checks five exact accepted historical objects in isolated
+temporary checkouts, with at most one locked Python environment and one required npm
+workspace per object; P9 has no npm workspace. It derives the 129 accepted gate identities
+independently as 124 included and five excluded, and evaluates the canonical 151-item
+inventory as 5 setup items, 124 included gates, 17 evidence anchors, and 5 excluded gates.
+The exact ordered exclusions are `p8_compose_runtime`, `p8_golden_path`,
+`p10_compose_runtime`, `p10_quickstart`, and `p10_remote_distribution`. Each carries an
+independent immutable Darwin `passed` identity-only anchor and an Ubuntu `not_proven`
+result; no recursive aggregate may reintroduce any excluded leaf. Gate entrypoints are
+exactly 19 null and 110 non-null, while the complete inventory has 41 null entrypoints.
+Portable replay reports exactly 616 historical Python tests; current P12 governance has
+exactly 136 unique test IDs.
+
+For ordinary historical development, `make check` and `make studio-dev` remain available.
 
 `make check` first checks out exact accepted P9 object
 `11aa240af8db2ca515325dc059b1a77f7badc874` in an OS-temporary clone and runs its complete
@@ -84,8 +102,9 @@ lint/type/test/build, the public boundary, historical regressions, and P8 reposi
 operations, backup/restore, diagnostics, supply-chain, reproducibility, release, Compose,
 and Golden Path gates. Private databases, package environments, candidate artifacts,
 backups, diagnostics, credentials, and build trees remain outside the repository.
-`make p8-compose-runtime` and `make p8-golden` require an actual Docker runtime;
-`not_evaluated` blocks P8 evidence.
+`make p8-compose-runtime` and `make p8-golden` require an actual Docker runtime. Their
+accepted result remains Darwin-only historical evidence and must not be rerun through a
+P12 recursive aggregate or represented as Linux evidence.
 
 Useful focused commands:
 
@@ -193,6 +212,9 @@ tests/p7/                offline optional-adapter contracts, configuration, and 
 tests/p8/                release, backup/restore, diagnostics, inventory, and operations fixtures
 tests/p9/                productization rebaseline governance, negative, and evidence fixtures
 tests/p10/               Mac distribution, operator, i18n, compatibility, abuse, and evidence fixtures
+tests/p11/               AgentPackage, deployment, migration, API, Studio, and lifecycle fixtures
+tests/p11r/              accepted post-P11 current-CI alignment governance fixtures
+tests/p12/               Public Pilot Continuity Rebaseline governance and negative fixtures
 tests/persistence/       SQLite migration, namespace, transaction, and fencing tests
 tests/runtime/           Agenda, authorization, outbox, ambiguity, and crash tests
 tests/api/               in-process typed FastAPI mapping tests
@@ -208,9 +230,9 @@ artifacts, evidence, migrations 001-007, fingerprints, and provenance receipts r
 unchanged. P8 started from the accepted public P7 baseline and migrated no parent
 working-tree content.
 
-## v0.2 Public Pilot planning boundary
+## Historical P9 Public Pilot planning boundary
 
-P9 defines the future product objects and ordered P9-P15 delivery contract in the
+P9 defined the original future product objects and P9-P15 delivery proposal in the
 [v0.2 product brief](docs/product/v0.2-public-pilot-product-brief.md),
 [v0.2 capability matrix](docs/product/v0.2-public-pilot-capability-matrix.md),
 [external dependency register](docs/product/v0.2-external-dependency-register.md), and
@@ -224,9 +246,11 @@ actions to the current Mandate and Policy. AutomaticEffectAuthorization is a dur
 low-risk policy record separate from HumanApprovalDecision. External source content is
 temporary context, not Semantic Memory.
 
-The planned first providers are OpenAI `gpt-5.5` through Responses API with Structured
+The originally planned first providers were OpenAI `gpt-5.5` through Responses API with Structured
 Outputs and `store:false`, and delegated Microsoft 365 device-code connections for
-Outlook, Teams, Planner, and selected read-only SharePoint. P9 makes no provider call.
+Outlook, Teams, Planner, and selected read-only SharePoint. P9 made no provider call. The
+accepted P12 Change Decision prospectively supersedes only the unimplemented P12-P15
+assignments; the accepted P0-P11R history remains immutable.
 
 ## P10 Mac quickstart boundary
 
@@ -284,5 +308,40 @@ local host, and only active deployments reach the runtime.
 
 See the fixed [P11 acceptance contract](docs/p11/acceptance.md),
 [compatibility contract](docs/p11/compatibility.md), and
-[local operations guide](docs/p11/operations.md). This is a development candidate awaiting
-independent acceptance. It is not a release or authorization for P12.
+[local operations guide](docs/p11/operations.md), and accepted P11R current-CI alignment.
+These are historical accepted results, not authority to implement a later capability.
+
+## P12 Public Pilot Continuity Rebaseline
+
+The exact forward sequence is P12 governance rebaseline, P13 migration parser plus OpenAI
+Model Gateway, P14 Microsoft 365 Connector Foundation, P15 Durable Project Continuation,
+P16 Semantic Memory Lifecycle, P17 Trigger/Schedule/Correlation/Recovery, P18 bounded
+goal-driven proactivity, P19 the built-in bilingual project tracker, and P20 the always-on
+Public Pilot release gate. Every phase is independently accepted and remote-closed before
+the next begins.
+
+P12 fixes these future contracts without implementing them: ProjectScope is only
+deployment Namespace plus `project_id`; ProjectContinuationState has exactly `active`,
+`waiting`, `needs_human`, `completed`, and `stopped`; waits have exact kinds/statuses and
+one-time ANY/ALL consumption; GoalBinding is HUMAN-accepted and cannot proactively trigger
+before P18; memory admission is only `admit`/`reject` and later lifecycle is separate;
+recovery scans rebuild from durable incomplete state rather than trusting a cursor.
+
+P14 owns bounded HUMAN-approved Outlook existing-thread, Teams allowlisted-chat, and
+Planner latest-ETag `If-Match` write transports while SharePoint remains read-only. P18
+alone adds AutomaticEffectAuthorization and reuses those transports. P19 only composes
+accepted P13-P18 primitives. See [ADR 0011](docs/adr/0011-public-pilot-continuity-rebaseline.md)
+and the [P12 checklist](docs/p12/rebaseline-checklist.md). Passing P12 establishes only
+`static` and `synthetic_offline` governance plus `portable_historical` verification; it
+never establishes a Public Pilot claim.
+
+P12 v1 (`8cd9aefe5422fd60cd6bd2724ad993528e3cd4a3`) and v2
+(`8e08c3891dc8f761ada096c3f829ef31d3fbfd7c`) are preserved rejected attempts. V3
+(`e31bc733cbdd333648f2ce1c52ac9fe1fad83179`) is the preserved superseded
+acceptance-only attempt; it is not relabeled as rejected. All three remain immutable
+non-ancestors of v4. The v4 acceptance commit is
+`dbdb75b6afcd226059484ec536fec82532eb3613`, with sole parent the accepted P11R base and
+blob `b574bb350a83a36f9ad7f521514c7d58e97393d9`. V4 uses the two required
+`ubuntu-24.04` PR jobs and the exact 5/124/17/5/151 inventory above. Its three status
+dimensions—P12 governance, five Ubuntu historical evaluations, and Linux Public Pilot
+readiness—remain independent throughout the exact 21-stage authorization lifecycle.

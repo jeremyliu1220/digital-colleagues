@@ -16,19 +16,39 @@ target remain `not_evaluated`. Post-v0.1 S1–S4 and Self-initiated autonomy hav
 and do not start automatically. P0–P8 accepted artifacts, evidence, acceptance contracts,
 receipts, and migrations remain historical and unchanged.
 
-P10 is a Mac quickstart and distribution development candidate for a future v0.2
-Public Pilot. It adds no package runtime, model/provider call, OAuth, connector, automatic
-effect, Semantic Memory, Agent collaboration, or executable Skill. A separately authorized
-one-time remote gate fixes the repository/ref/SHA, GHCR subjects, public visibility,
-keyless signer/issuer/annotation, GitHub provenance, and final read-only workflow lock.
-Wrong or incomplete remote evidence fails closed. See the
+P10's accepted Mac quickstart and distribution candidate remains historical input to the
+future v0.2 Public Pilot. It added no package runtime, model/provider call, OAuth,
+connector, automatic effect, Semantic Memory, Agent collaboration, or executable Skill.
+Its separately authorized one-time remote gate fixed the repository/ref/SHA, GHCR
+subjects, public visibility, keyless signer/issuer/annotation, GitHub provenance, and
+final read-only workflow lock. Wrong or incomplete remote evidence failed closed. See the
 [v0.2 threat model](docs/security/v0.2-public-pilot-threat-model.md) and
 [v0.2 privacy boundary](docs/security/v0.2-public-pilot-privacy-boundary.md). Their planned
 controls are not evidence of live-provider security or production readiness.
 
-P10 stores state and backups below Application Support with private modes, uses exact
+P12 is a governance-only Public Pilot Continuity Rebaseline. It adds no runtime security
+capability. Its accepted future boundary keeps HUMAN, MODEL, SERVICE, and
+ExternalPartyReference identities disjoint; separates memory admission from lifecycle;
+requires exact authority revalidation, mandatory checkpoints, ambiguity quarantine and
+cursor-independent recovery; and assigns AutomaticEffectAuthorization only to P18.
+These remain planned contracts until their owning P13-P20 gates pass.
+
+The accepted P8 actual Compose result is historical Darwin Docker Desktop evidence only.
+On a standard GitHub-hosted Ubuntu runner, the accepted P8 0700 operator directory and
+0600 private files are owned by host UID 1001 while its immutable non-root container runs
+as UID/GID 10001:10001; native Linux denies the private bind at `pre_start_restore`.
+Therefore `linux_p8_actual_compose = not_proven` and
+`linux_public_pilot_readiness = blocked`. P12 does not fix or waive this risk. P20-L0 is
+the first blocking P20 implementation sub-gate and must prove a least-privilege forward
+backup/restore handoff while preserving non-root containers and 0700/0600 modes.
+
+Public pull-request validation uses only ephemeral GitHub-hosted `ubuntu-24.04` runners.
+Persistent or general self-hosted runners, privileged/root fallback, chmod 777 or broader
+private permissions, ignored failures, and Darwin-to-Linux claim laundering are forbidden.
+
+The accepted P10 candidate stores state and backups below Application Support with private modes, uses exact
 digest image selection, binds ports only to loopback, gives Studio no secret mount, and
-checks FileVault without changing it. The remote gate is public distribution evidence, not
+checks FileVault without changing it. Its historical remote gate is public distribution evidence, not
 proof of host, registry availability over time, supply-chain safety, production security,
 privacy, encryption, or tenant isolation.
 
