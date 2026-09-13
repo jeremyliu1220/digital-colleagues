@@ -20,10 +20,11 @@ compliance, or other excluded capability. Human evaluation, live-provider eviden
 the unmeasured five-minute target remain `not_evaluated`. Post-v0.1 S1–S4 and Self-initiated
 autonomy have not started and do not start automatically.
 
-P9 now defines a documentation-only path toward a future v0.2 Public Pilot. It does not
-change any implemented v0.1 status below. Planned v0.2 objects, phases, evidence, and claim
-limits are in the [v0.2 capability matrix](v0.2-public-pilot-capability-matrix.md) and
-[v0.2 product brief](v0.2-public-pilot-product-brief.md).
+P9 defined the original documentation-only path toward a future v0.2 Public Pilot. P12 v4
+prospectively rebaselines that path without changing any implemented v0.1 status below or
+starting P13. Planned v0.2 objects, phases, evidence, and claim limits are in the
+[v0.2 capability matrix](v0.2-public-pilot-capability-matrix.md) and [v0.2 product
+brief](v0.2-public-pilot-product-brief.md).
 
 | Capability | v0.1 target | Current status | Boundary |
 | --- | --- | --- | --- |
@@ -62,3 +63,23 @@ limits are in the [v0.2 capability matrix](v0.2-public-pilot-capability-matrix.m
 | OIDC, SSO, or SCIM | No | Not implemented | Explicit production gap |
 | Encryption at rest | No | Not implemented | Explicit local deployment risk |
 | Compliance certification | No | Not claimed | Not claimed |
+
+## P12 B+ prospective capability map
+
+P12 changes no implemented status above. It fixes the exact future owners: P13 model
+gateway; P14 connector source/sync/dedupe and HUMAN-approved transports; P15 durable
+continuation; P16 tiered semantic-memory lifecycle; P17 trigger/correlation/recovery; P18
+bounded proactivity and AutomaticEffectAuthorization; P19 composition-only tracker; and
+P20 always-on private-live/HUMAN/soak/release evaluation. Planned records, tests, or
+documentation are not implemented capability.
+
+Platform evidence remains scoped. The accepted-gate universe contains 129 identities: 124
+included in Ubuntu replay and five ordered exclusions—`p8_compose_runtime`,
+`p8_golden_path`, `p10_compose_runtime`, `p10_quickstart`, and
+`p10_remote_distribution`. Each excluded row embeds its own immutable Darwin `passed`
+identity-only anchor while its Ubuntu historical status remains `not_proven`. Those five
+anchors neither add inventory rows nor prove Linux behavior. P12 governance result, the
+five Ubuntu statuses, and Linux Public Pilot readiness (`blocked`) are independent.
+P20-L0 is the first and only blocking P20 portability sub-gate and owns the forward Linux
+private-state, Compose, local-quickstart, and remote-distribution portability proof while
+preserving accepted P8/P10 objects unchanged.

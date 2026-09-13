@@ -250,3 +250,46 @@ The CLI accepts session and CSRF values only in a bounded stdin envelope. SQLite
 private state and records only server-derived actors and safe audit projections. Evidence
 records counts, digests, finite states, and classifications—not package prompt bodies,
 credentials, absolute paths, raw database content, private logs, or live-provider data.
+
+## P12 B+ continuity privacy boundary
+
+P12 stores no provider content, semantic memory, private-live result, credential, local
+path, or personal evaluation. It fixes prospective minimization rules only.
+
+P14 may persist source identity, cursor, version/etag, digest, dedupe, and bounded safe
+projection; raw Outlook, Teams, Planner, or SharePoint bodies remain temporary private
+context. P15 checkpoints persist exact durable state plus only a MemoryRetrievalSet ID and
+digest. P16 admission requires classification, provenance, scope, retention, and immutable
+versioning; raw credentials, attachments, and unrestricted bodies are never semantic
+memory. Revocation, deletion watermark, expiry, and restore checks prevent resurrection.
+
+P17 correlation persists safe occurrence, source, project/wait/checkpoint/wake, dedupe,
+correlation, and causation identities. Ambiguous provider content is quarantined in the
+private boundary and is not copied to public evidence. Recovery scans cannot reconstruct
+missing content from logs or public artifacts.
+
+Public P12 evidence contains only fixed Git/digest/run identities, safe finite gate
+results, counts, and `static`/`synthetic_offline` classifications. It excludes absolute CA
+paths, certificate content, authentication material, GH credentials, account identity,
+provider payloads, and the external preflight receipt. Provider/private-live/HUMAN/soak
+results remain `not_evaluated` until P20's separately authorized private process.
+
+P12 v4 also keeps platform evidence explicit. The 129-gate universe is independently
+partitioned into 124 Ubuntu-included and five ordered excluded gates:
+`p8_compose_runtime`, `p8_golden_path`, `p10_compose_runtime`, `p10_quickstart`, and
+`p10_remote_distribution`. Each excluded row embeds its own immutable Darwin `passed`
+identity-only anchor while `ubuntu_historical_execution_status` remains `not_proven`.
+Those anchors contain only fixed safe object identities and bounded canonical subresults;
+they are not copied private state, Linux evidence, or additional inventory items.
+
+P12 governance, the five Ubuntu historical statuses, and
+`linux_public_pilot_readiness = blocked` are independent. The P8 private-bind mismatch and
+P10 Darwin assertions remain forward portability risks, not permission to alter accepted
+history or weaken private modes.
+
+P20-L0, the first and only blocking P20 portability sub-gate, owns the forward
+private-state, Compose, local-quickstart, and remote-distribution portability proof. Its least-privilege handoff must
+keep containers non-root, private directories 0700, private files 0600, and logs bounded
+and redacted; chmod 777, broader group/world access, root/privileged fallback, private-body
+copying, and absolute-path disclosure are forbidden. P13-P19 carry the unresolved Linux
+privacy status without changing their own mechanism-gate result.

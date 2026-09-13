@@ -1,0 +1,637 @@
+{
+  "schema_version": 1,
+  "change": "P12",
+  "contract_version": 4,
+  "classification": "governance_only_platform_scoped_continuity_rebaseline",
+  "implementation_basis": "Immutable P12 v4 acceptance contract, approved blueprint identity, and accepted P0-P11R history",
+  "base_commit": "c1562ea5201394d8a278f4b644daf4029cbb5bd4",
+  "base_tree": "ae0f33263cfc7445fef69656ad9c5cb04d4a2d00",
+  "branch": "codex/p12-public-pilot-continuity-rebaseline-v4",
+  "allowlist_path_count": 42,
+  "implementation_path_count": 40,
+  "implementation_changed_path_count": 41,
+  "final_changed_path_count": 42,
+  "acceptance": {
+    "commit": "dbdb75b6afcd226059484ec536fec82532eb3613",
+    "tree": "f8d0dad5c04253eefd24353f8c9afd965cf0d6ea",
+    "blob": "b574bb350a83a36f9ad7f521514c7d58e97393d9",
+    "sha256": "f0159ea7d164a2b57c61d62e339798ea4ea568880934b571119c67ee781c2d45"
+  },
+  "blueprint_source": {
+    "name": "p12-v4-historical-platform-classification-change-decision-blueprint.md",
+    "line_count": 1183,
+    "byte_count": 223853,
+    "sha256": "7f58f95e7f33f65348162754017da828a9db6272d0d2cec22dd7b91ace0a8263",
+    "git_blob": "854cd5691cfca94edfc1ffc1ed6a73e44a074667",
+    "repository_evidence": false
+  },
+  "parent_research_working_tree_read": false,
+  "parent_source_read_count": 0,
+  "source_migration_count": 0,
+  "transformed_migration_count": 0,
+  "allowlist": [
+    {"path": "docs/p12/acceptance.md", "classification": "acceptance_only"},
+    {"path": ".github/ISSUE_TEMPLATE/feature_request.yml", "classification": "implementation"},
+    {"path": ".github/pull_request_template.md", "classification": "implementation"},
+    {"path": ".github/workflows/ci.yml", "classification": "implementation"},
+    {"path": "AGENTS.md", "classification": "implementation"},
+    {"path": "CONTRIBUTING.md", "classification": "implementation"},
+    {"path": "Makefile", "classification": "implementation"},
+    {"path": "README.md", "classification": "implementation"},
+    {"path": "SECURITY.md", "classification": "implementation"},
+    {"path": "docs/adr/0011-public-pilot-continuity-rebaseline.md", "classification": "implementation"},
+    {"path": "docs/architecture/target-architecture.md", "classification": "implementation"},
+    {"path": "docs/development.md", "classification": "implementation"},
+    {"path": "docs/p12/portable-historical-inventory.json", "classification": "implementation"},
+    {"path": "docs/p12/rebaseline-checklist.md", "classification": "implementation"},
+    {"path": "docs/product/capability-matrix.md", "classification": "implementation"},
+    {"path": "docs/product/post-v0.1-capability-outlook.md", "classification": "implementation"},
+    {"path": "docs/product/v0.2-external-dependency-register.md", "classification": "implementation"},
+    {"path": "docs/product/v0.2-public-pilot-capability-matrix.md", "classification": "implementation"},
+    {"path": "docs/product/v0.2-public-pilot-product-brief.md", "classification": "implementation"},
+    {"path": "docs/roadmap.md", "classification": "implementation"},
+    {"path": "docs/security/privacy-boundary.md", "classification": "implementation"},
+    {"path": "docs/security/threat-model.md", "classification": "implementation"},
+    {"path": "docs/security/v0.2-public-pilot-privacy-boundary.md", "classification": "implementation"},
+    {"path": "docs/security/v0.2-public-pilot-threat-model.md", "classification": "implementation"},
+    {"path": "provenance/p12-change-receipt.json", "classification": "implementation"},
+    {"path": "scripts/check_p12_ci_policy.py", "classification": "implementation"},
+    {"path": "scripts/check_p12_historical_inventory.py", "classification": "implementation"},
+    {"path": "scripts/check_p12_migrations.py", "classification": "implementation"},
+    {"path": "scripts/check_p12_provenance.py", "classification": "implementation"},
+    {"path": "scripts/check_p12_rebaseline.py", "classification": "implementation"},
+    {"path": "scripts/check_p12_repository.py", "classification": "implementation"},
+    {"path": "scripts/collect_p12_evidence.py", "classification": "implementation"},
+    {"path": "scripts/run_p12_toolchain.py", "classification": "implementation"},
+    {"path": "tests/p12/__init__.py", "classification": "implementation"},
+    {"path": "tests/p12/test_ci_policy.py", "classification": "implementation"},
+    {"path": "tests/p12/test_evidence_gate.py", "classification": "implementation"},
+    {"path": "tests/p12/test_historical_inventory.py", "classification": "implementation"},
+    {"path": "tests/p12/test_migrations.py", "classification": "implementation"},
+    {"path": "tests/p12/test_provenance.py", "classification": "implementation"},
+    {"path": "tests/p12/test_rebaseline.py", "classification": "implementation"},
+    {"path": "tests/p12/test_repository.py", "classification": "implementation"},
+    {"path": "artifacts/p12/summary.json", "classification": "summary_only"}
+  ],
+  "portable_historical_objects": {
+    "P8": {
+      "commit": "0bb80ab187932fbad42fbf665b8310987609a1f5",
+      "tree": "311eb777c3d17a9a3722a16c394b9913c283b416",
+      "branch": "codex/p8-release-readiness"
+    },
+    "P9": {
+      "commit": "11aa240af8db2ca515325dc059b1a77f7badc874",
+      "tree": "a27cb6ce9f568b04083a88f7ba06f033235f4cbc",
+      "branch": "codex/p9-productization-rebaseline"
+    },
+    "P10": {
+      "commit": "4bef5629d450c6bb3940f606fc90194e008ee8fd",
+      "tree": "909b566b7ba9f7beb143cd0b29cf95fbd1178bbe",
+      "branch": "codex/p10-mac-quickstart"
+    },
+    "P11": {
+      "commit": "7e5387f148f86b5c9b07820dd8b8f4e18e12dc38",
+      "tree": "6d7c1b3053fefc1f3b14a4b39fde2d5adb641990",
+      "branch": "codex/p11-agent-packages"
+    },
+    "P11R": {
+      "commit": "c1562ea5201394d8a278f4b644daf4029cbb5bd4",
+      "tree": "ae0f33263cfc7445fef69656ad9c5cb04d4a2d00",
+      "branch": "codex/p11r-ci-alignment"
+    }
+  },
+  "historical_anchors": {
+    "p8_final": "0bb80ab187932fbad42fbf665b8310987609a1f5",
+    "p9_final": "11aa240af8db2ca515325dc059b1a77f7badc874",
+    "p10_final": "4bef5629d450c6bb3940f606fc90194e008ee8fd",
+    "p11_final": "7e5387f148f86b5c9b07820dd8b8f4e18e12dc38",
+    "p11r_acceptance": "61d5c94e24157b93bc4b4bcca42b4d8d2eab8fec",
+    "p11r_implementation": "4a6df2db5c964b2bd6f052db6276dc303524230b",
+    "p11r_final": "c1562ea5201394d8a278f4b644daf4029cbb5bd4"
+  },
+  "darwin_evidence_anchors": {
+    "p8_compose_runtime": {
+      "source_commit": "0bb80ab187932fbad42fbf665b8310987609a1f5",
+      "source_tree": "311eb777c3d17a9a3722a16c394b9913c283b416",
+      "source_path": "artifacts/p8/summary.json",
+      "source_blob": "964406b20e9fc1e98b8eeda3c24bf3f22f226768",
+      "source_file_sha256": "78905893f9a06bf6b5361c76a8e152dbe8de2ec53d1aede84fca2f7ce1b5921b",
+      "selection": "result = p8_summary[\"compose_runtime\"]",
+      "canonicalization": "P12-CJ-1",
+      "canonical_bytes": 2348,
+      "canonical_sha256": "a2acd8e3f935d9c520f58e76b8384514e596e59f94f7bb62e1881ce9183c9bbd",
+      "anchor_platform": "darwin",
+      "anchor_historical_status": "passed",
+      "purpose": "immutable_platform_scoped_identity_only"
+    },
+    "p8_golden_path": {
+      "source_commit": "0bb80ab187932fbad42fbf665b8310987609a1f5",
+      "source_tree": "311eb777c3d17a9a3722a16c394b9913c283b416",
+      "source_path": "artifacts/p8/summary.json",
+      "source_blob": "964406b20e9fc1e98b8eeda3c24bf3f22f226768",
+      "source_file_sha256": "78905893f9a06bf6b5361c76a8e152dbe8de2ec53d1aede84fca2f7ce1b5921b",
+      "selection": "result = p8_summary[\"golden_path\"]",
+      "canonicalization": "P12-CJ-1",
+      "canonical_bytes": 2034,
+      "canonical_sha256": "c1f1f8148cd3b0184d92720e862bbadfe7e330fd4087b7eb03190400d6742f44",
+      "anchor_platform": "darwin",
+      "anchor_historical_status": "passed",
+      "purpose": "immutable_platform_scoped_identity_only"
+    },
+    "p10_compose_runtime": {
+      "source_commit": "4bef5629d450c6bb3940f606fc90194e008ee8fd",
+      "source_tree": "909b566b7ba9f7beb143cd0b29cf95fbd1178bbe",
+      "source_path": "artifacts/p10/summary.json",
+      "source_blob": "a4c1a59fffec9c30160787a7bec584e228fb9f35",
+      "source_file_sha256": "876ddbf43f1fe09d67bf341f9a6cdd9f7ba39271a2fd2cc876a8423142cf4eae",
+      "selection": "result = p10_summary[\"compose_runtime\"]",
+      "canonicalization": "P12-CJ-1",
+      "canonical_bytes": 476,
+      "canonical_sha256": "4f6f5de0a92d2aa3bea1ab80ad94b869a4fd1cbe5f459804eea3cd86377e137b",
+      "anchor_platform": "darwin",
+      "anchor_historical_status": "passed",
+      "purpose": "immutable_platform_scoped_identity_only"
+    },
+    "p10_quickstart": {
+      "source_commit": "4bef5629d450c6bb3940f606fc90194e008ee8fd",
+      "source_tree": "909b566b7ba9f7beb143cd0b29cf95fbd1178bbe",
+      "source_path": "artifacts/p10/summary.json",
+      "source_blob": "a4c1a59fffec9c30160787a7bec584e228fb9f35",
+      "source_file_sha256": "876ddbf43f1fe09d67bf341f9a6cdd9f7ba39271a2fd2cc876a8423142cf4eae",
+      "selection": "result = p10_summary[\"quickstart\"]",
+      "canonicalization": "P12-CJ-1",
+      "canonical_bytes": 874,
+      "canonical_sha256": "75c18fadb57dd93914a8f99996857af22c2da8c82c504582b9eaa412c1f00c1b",
+      "anchor_platform": "darwin",
+      "anchor_historical_status": "passed",
+      "purpose": "immutable_platform_scoped_identity_only"
+    },
+    "p10_remote_distribution": {
+      "source_commit": "4bef5629d450c6bb3940f606fc90194e008ee8fd",
+      "source_tree": "909b566b7ba9f7beb143cd0b29cf95fbd1178bbe",
+      "source_path": "artifacts/p10/summary.json",
+      "source_blob": "a4c1a59fffec9c30160787a7bec584e228fb9f35",
+      "source_file_sha256": "876ddbf43f1fe09d67bf341f9a6cdd9f7ba39271a2fd2cc876a8423142cf4eae",
+      "selection": "result = {\"distribution\":p10_summary[\"remote_distribution\"],\"quickstart\":p10_summary[\"remote_quickstart\"]}",
+      "canonicalization": "P12-CJ-1",
+      "canonical_bytes": 2538,
+      "canonical_sha256": "4383d540c4cd95f62db32aaadc1dfdf8e027eb0bd81b9909c4a0dda9a3d06c78",
+      "anchor_platform": "darwin",
+      "anchor_historical_status": "passed",
+      "purpose": "immutable_platform_scoped_identity_only"
+    }
+  },
+  "rejected_attempts": {
+    "v1": {
+      "branch": "codex/p12-public-pilot-continuity-rebaseline",
+      "commit": "8cd9aefe5422fd60cd6bd2724ad993528e3cd4a3",
+      "tree": "557a74e9174247483362bbbd15cd265113775d12",
+      "sole_parent": "c1562ea5201394d8a278f4b644daf4029cbb5bd4",
+      "acceptance_blob": "26562d795980ec8d6d9ea36ff3fcc718b41c09e8",
+      "remote_branch": "absent_at_rejection",
+      "implementation_count": 0,
+      "publication_count": 0
+    },
+    "v2": {
+      "branch": "codex/p12-public-pilot-continuity-rebaseline-v2",
+      "acceptance_commit": "3639fa08ca44820bb922e0644095c9fb9c24d3e6",
+      "acceptance_tree": "71c411660e0f7ff26e8ad1451acaa0ea26fa384b",
+      "acceptance_blob": "50453e154cf642bc7b90644660e1d956b04f966a",
+      "acceptance_sha256": "be3ad1967a98c67ae34ad7c22c35a9ec1f637a780c930ae4e8349f126e64800b",
+      "final_commit": "8e08c3891dc8f761ada096c3f829ef31d3fbfd7c",
+      "final_tree": "01ee7b08cc870a626698ac9a3fc46ec92bf0f4e0",
+      "pull_request": {
+        "number": 14,
+        "state": "CLOSED",
+        "base_ref": "main",
+        "base_sha": "c1562ea5201394d8a278f4b644daf4029cbb5bd4",
+        "head_ref": "codex/p12-public-pilot-continuity-rebaseline-v2",
+        "head_sha": "8e08c3891dc8f761ada096c3f829ef31d3fbfd7c",
+        "merged_at": null,
+        "merge_commit": null,
+        "auto_merge_request": null
+      },
+      "rejection": "rejected_linux_historical_replay_contract_infeasible",
+      "commit_chain": [
+        {"commit": "3639fa08ca44820bb922e0644095c9fb9c24d3e6", "parent": "c1562ea5201394d8a278f4b644daf4029cbb5bd4", "tree": "71c411660e0f7ff26e8ad1451acaa0ea26fa384b"},
+        {"commit": "eb4dbc7e1cd1c1a1671f58441bb3e49d08e77a5e", "parent": "3639fa08ca44820bb922e0644095c9fb9c24d3e6", "tree": "42c05dea50cfe45b92a055c835e63045ec88a082"},
+        {"commit": "5d0818ab9671dc023afd5ad23b6b0995e79ef68a", "parent": "eb4dbc7e1cd1c1a1671f58441bb3e49d08e77a5e", "tree": "99e0fd7a60df0584661d8e9162bf9dde1d0abf22"},
+        {"commit": "b255d79df2b435ba754b7afe450d0a45559ea72a", "parent": "5d0818ab9671dc023afd5ad23b6b0995e79ef68a", "tree": "d4517e99bb155353704726d8a11e22e935dfe7dc"},
+        {"commit": "fc145550b750c172899bc1497ff5fede387c07dc", "parent": "b255d79df2b435ba754b7afe450d0a45559ea72a", "tree": "0d4ec3cba2040d640e3adb8880c98a4525fa2207"},
+        {"commit": "098ba1399f7146258027674d5d312966fbdfe037", "parent": "fc145550b750c172899bc1497ff5fede387c07dc", "tree": "f0f65517dea5b3292c6f3f87c8c10b90295487e8"},
+        {"commit": "5722067571b70911c38b50ead23d198dcfbd4f20", "parent": "098ba1399f7146258027674d5d312966fbdfe037", "tree": "f66d1a7fada6db1a883c830f91ac6222983fa6c8"},
+        {"commit": "8e08c3891dc8f761ada096c3f829ef31d3fbfd7c", "parent": "5722067571b70911c38b50ead23d198dcfbd4f20", "tree": "01ee7b08cc870a626698ac9a3fc46ec92bf0f4e0"}
+      ],
+      "failed_runs": [
+        {
+          "run_id": 34542709145,
+          "event": "pull_request",
+          "workflow": "CI",
+          "head": "fc145550b750c172899bc1497ff5fede387c07dc",
+          "current_attempt": 1,
+          "attempts": [
+            {"attempt": 1, "status": "completed", "conclusion": "failure"}
+          ]
+        },
+        {
+          "run_id": 34564478590,
+          "event": "pull_request",
+          "workflow": "CI",
+          "head": "8e08c3891dc8f761ada096c3f829ef31d3fbfd7c",
+          "current_attempt": 2,
+          "attempts": [
+            {"attempt": 1, "status": "completed", "conclusion": "failure", "created_at": "2026-09-11T05:03:14Z", "completed_at": "2026-09-11T05:06:34Z"},
+            {"attempt": 2, "status": "completed", "conclusion": "failure", "created_at": "2026-09-11T05:12:52Z", "completed_at": "2026-09-11T05:16:00Z"}
+          ]
+        }
+      ],
+      "retention_days": 90,
+      "earliest_normal_expiry": "2026-12-10T05:03:14Z",
+      "safe_failure_boundary": "accepted_p8_actual_compose_pre_start_restore",
+      "summary_count": 0,
+      "publication_count": 0
+    },
+    "v3": {
+      "classification": "superseded_acceptance_only",
+      "branch": "codex/p12-public-pilot-continuity-rebaseline-v3",
+      "commit": "e31bc733cbdd333648f2ce1c52ac9fe1fad83179",
+      "tree": "1cdce2a41f84ee4243d04be781ad187eb5f5fab9",
+      "sole_parent": "c1562ea5201394d8a278f4b644daf4029cbb5bd4",
+      "acceptance_blob": "40c93a2aa8930c71e14fefac2053a10ed137af58",
+      "acceptance_sha256": "6afddd55f4f8458c94dcd56b781e47fef66a06d954d4246aa3855b4daf2e0e3c",
+      "acceptance_line_count": 3488,
+      "acceptance_byte_count": 232313,
+      "remote_branch": "absent",
+      "pull_request": "absent",
+      "implementation_count": 0,
+      "publication_count": 0
+    }
+  },
+  "stage10_failure_diagnostics": {
+    "d1_python312_lock_probe": {
+      "classification": "material_failed_experiment",
+      "diagnostic_python": "3.12.14",
+      "platform": {
+        "os": "Darwin",
+        "architecture": "arm64"
+      },
+      "p8_commit": "0bb80ab187932fbad42fbf665b8310987609a1f5",
+      "p8_tree": "311eb777c3d17a9a3722a16c394b9913c283b416",
+      "python_lock": {
+        "path": "requirements/p8.lock",
+        "blob": "819980980ba87d1b7166af4b4b0da53ca4e4ac63",
+        "sha256": "5afb5bc2f6bf2cfdc77d0457b92255f822d89cd3cd754ebb876741d7ee6430d0"
+      },
+      "npm_lock": {
+        "path": "studio/package-lock.json",
+        "blob": "ec0730513988e98adaf2d935885859ba1b58f7b9"
+      },
+      "failure_step": "hash_locked_pip_dependency_install",
+      "package": "librt==0.15.0",
+      "selected_wheel": "librt-0.15.0-cp312-cp312-macosx_11_0_arm64.whl",
+      "lock_allowed_sha256": "234d8d394721fa0d786af15ebf1f3fb7f3ed82fd1cd0cde45c2f247b5d4281d2",
+      "observed_wheel_sha256": "71599e011ac880e8e45d46047d714871894c7d4ab6f25626f8d4f89da21f368d",
+      "unittest_leaf_executed": false,
+      "consequence": "Python 3.12 hypothesis was not evaluated because the accepted lock does not support the selected macOS arm64 wheel",
+      "accepted_lock_modified_or_relaxed": false,
+      "stage10_retry": false,
+      "raw_logs_retained": false,
+      "summary_count": 0,
+      "evidence_count": 0,
+      "publication_count": 0,
+      "remote_mutation_count": 0
+    },
+    "d2_python313_npm_residue_reproduction": {
+      "classification": "material_failed_experiment",
+      "formal_gate": "p12-portable-history",
+      "leaf_gate": "p8_python_unittest",
+      "p8_commit": "0bb80ab187932fbad42fbf665b8310987609a1f5",
+      "p8_tree": "311eb777c3d17a9a3722a16c394b9913c283b416",
+      "runner": {
+        "path": "scripts/run_p8_unittest_suite.py",
+        "blob": "35d0ef6a88025ef5bc10925009e044c6a84025c8"
+      },
+      "python_lock": {
+        "path": "requirements/p8.lock",
+        "blob": "819980980ba87d1b7166af4b4b0da53ca4e4ac63",
+        "sha256": "5afb5bc2f6bf2cfdc77d0457b92255f822d89cd3cd754ebb876741d7ee6430d0"
+      },
+      "npm_lock": {
+        "path": "studio/package-lock.json",
+        "blob": "ec0730513988e98adaf2d935885859ba1b58f7b9"
+      },
+      "platform": {
+        "os": "Darwin",
+        "architecture": "arm64"
+      },
+      "diagnostic_python": "3.13.5",
+      "python_setup": "hash_locked",
+      "npm_setup": "exact_locked",
+      "counts": {
+        "tests": 308,
+        "failures": 3,
+        "errors": 6,
+        "skips": 0
+      },
+      "exit_status": 1,
+      "failure_ids": [
+        "tests.p0.test_planning_contract.PlanningContractTests.test_comment_capable_files_have_spdx_headers",
+        "tests.p0.test_public_boundary.PublicBoundaryTests.test_current_project_is_clean_with_zero_exceptions",
+        "tests.p1.test_repository_scaffold.RepositoryScaffoldTests.test_comment_capable_p1_files_have_spdx_headers"
+      ],
+      "error_ids": [
+        "tests.architecture.test_p2_boundaries.P2BoundaryTests.test_current_repository_and_provenance_gates_pass",
+        "tests.p4.test_evidence_gate.P4RepositoryGateTests.test_real_hotfix_tree_is_an_accepted_p4_descendant",
+        "tests.p5.test_builder.P5RepositoryGateTests.test_real_hotfix_tree_is_an_accepted_p5_descendant",
+        "tests.p6.test_repository.P6RepositoryGateTests.test_exact_root_and_real_development_tree_pass",
+        "tests.p7.test_repository.P7RepositoryGateTests.test_exact_root_and_real_development_tree_pass",
+        "tests.p8.test_repository.P8RepositoryTests.test_real_tree_has_fixed_base_acceptance_history_and_required_files"
+      ],
+      "result": "exact_reproduction",
+      "root_cause": "npm setup residue was visible to Python, repository and public-boundary checks",
+      "stage10_retry": false,
+      "raw_logs_retained": false,
+      "summary_count": 0,
+      "evidence_count": 0,
+      "publication_count": 0,
+      "remote_mutation_count": 0
+    }
+  },
+  "stage12_failure_diagnostics": {
+    "d4_ci_umask_inheritance": {
+      "classification": "material_diagnostic_result",
+      "run_id": 34758522278,
+      "attempt": 1,
+      "event": "pull_request",
+      "pull_request_number": 15,
+      "head_sha": "ec4cbbc3df05557e33c1eca137731c548e23cdff",
+      "base_sha": "c1562ea5201394d8a278f4b644daf4029cbb5bd4",
+      "workflow": {
+        "name": "CI",
+        "path": ".github/workflows/ci.yml"
+      },
+      "repository": "jeremyliu1220/digital-colleagues",
+      "current_job": {
+        "job_database_id": 103727050919,
+        "envelope_sha256": "f264b6b43ecc1d6d57b86dd5a5c0bedae1d308228e346fefb85addb59c49619b",
+        "result": {
+          "tests": 136,
+          "failures": 3,
+          "errors": 3,
+          "skips": 0,
+          "status": "failed"
+        }
+      },
+      "portable_job": {
+        "job_database_id": 103727050828,
+        "envelope_sha256": "1fa4a24c855894556713784aa05ce85994cb191485030c9e6935df0aa4bf696a",
+        "result": {
+          "tests": 0,
+          "failures": 1,
+          "errors": 1,
+          "skips": 0,
+          "status": "failed"
+        }
+      },
+      "root_cause": "confirmed_workflow_umask_inheritance",
+      "transport_conclusion": "scoped_implementation_correction_compatible",
+      "raw_logs_retained": false,
+      "stage12_passed": false,
+      "stage13_executed": false,
+      "rerun_count": 0,
+      "cancel_count": 0,
+      "summary_count": 0,
+      "evidence_count": 0,
+      "publication_count": 0,
+      "remote_mutation_count": 0
+    }
+  },
+  "portable_historical_inventory": {
+    "path": "docs/p12/portable-historical-inventory.json",
+    "object_order": [
+      "P8",
+      "P9",
+      "P10",
+      "P11",
+      "P11R"
+    ],
+    "setup_count": 5,
+    "included_acceptance_gate_count": 124,
+    "evidence_anchor_count": 17,
+    "excluded_acceptance_gate_count": 5,
+    "total_item_count": 151,
+    "accepted_aggregate_acceptance_gate_count": 129,
+    "gate_entrypoint_null_count": 19,
+    "gate_entrypoint_non_null_count": 110,
+    "inventory_entrypoint_null_count": 41,
+    "historical_python_test_count": 616,
+    "accepted_minus_included": [
+      "p8_compose_runtime",
+      "p8_golden_path",
+      "p10_compose_runtime",
+      "p10_quickstart",
+      "p10_remote_distribution"
+    ],
+    "excluded_gate_ids": [
+      "p8_compose_runtime",
+      "p8_golden_path",
+      "p10_compose_runtime",
+      "p10_quickstart",
+      "p10_remote_distribution"
+    ],
+    "excluded_gate_result": "not_run_platform_excluded",
+    "ubuntu_historical_execution_status": {
+      "p8_compose_runtime": "not_proven",
+      "p8_golden_path": "not_proven",
+      "p10_compose_runtime": "not_proven",
+      "p10_quickstart": "not_proven",
+      "p10_remote_distribution": "not_proven"
+    },
+    "linux_public_pilot_readiness": "blocked",
+    "embedded_darwin_anchor_ids": [
+      "p8_compose_runtime",
+      "p8_golden_path",
+      "p10_compose_runtime",
+      "p10_quickstart",
+      "p10_remote_distribution"
+    ],
+    "per_object_checkout_venv_npm_isolation": true,
+    "recursive_historical_aggregates_forbidden": true,
+    "object_deadline_seconds": {
+      "P8": 2700,
+      "P9": 900,
+      "P10": 3000,
+      "P11": 1800,
+      "P11R": 1500
+    },
+    "sequential_executor_deadline_seconds": 9900
+  },
+  "migration_protection": {
+    "immutable_files": [
+      {
+        "path": "migrations/manifest.json",
+        "blob": "bfd142486041029bfcc1106ef6ffd4aeb125ed36",
+        "sha256": "3ce53dd7d4e0e7cbc0e9cf4731d6001af8bab57861acfe55184e6f6ab685cc10"
+      },
+      {
+        "path": "migrations/001_initial.sql",
+        "blob": "c8758dd18f9dea402e368f93e4942a9da65edb60",
+        "sha256": "9a9a9c031bd27072333ee30603bcd6c7e2f33f60e7920f3a69ff251836093c02"
+      },
+      {
+        "path": "migrations/002_runtime_indexes.sql",
+        "blob": "505485460ce443e80ef2177e2a07aab1218e022a",
+        "sha256": "b0728e3e910e0f0921271b2121308518945968874a667c340d9dc007cbfea11f"
+      },
+      {
+        "path": "migrations/003_timer_triggers.sql",
+        "blob": "0ff7035e489fda052c6d82c401e5db3b06e8203a",
+        "sha256": "98325116ff022277aee6ee9038083a3866e912c907d08afeb0da4c48f97d7e98"
+      },
+      {
+        "path": "migrations/004_local_authentication.sql",
+        "blob": "edc24adb566568b397b30c88c610cd309f7666bb",
+        "sha256": "dfe550129f32128eadc685cb54b70feed276ceb3274dbcbd76e214053d77e58b"
+      },
+      {
+        "path": "migrations/005_evaluation_observations.sql",
+        "blob": "42612d8c47967707fb33b772bf414872f35b5ecc",
+        "sha256": "6649985cf92d9efd378b8b69447357193fdb98eead7d3d23f9bbec1db02b2a61"
+      },
+      {
+        "path": "migrations/006_revisioned_colleague_builder.sql",
+        "blob": "581e3ba9a75c15002c7bc513b69ea9a920771892",
+        "sha256": "7909da4b0b3eb514222f1fd1068c19eb6e8b98d466a786b76c20ae7999e26bcd"
+      },
+      {
+        "path": "migrations/007_governance_hardening.sql",
+        "blob": "feb7b658c8e356bf0e717ce69e5896a7c6b00c34",
+        "sha256": "ba572b74ffe7d16ed09ffd58791d7bb23b875806996ec897b2e73c82a593cf9c"
+      },
+      {
+        "path": "migrations/008_agent_packages_and_deployments.sql",
+        "blob": "a20386ab196e1ab826a0c9a9770999b0e41cb8cf",
+        "sha256": "e7c8b61c54393933e5e4fda06da4a06b11b2b2c1e38bec3163853e41136b0253"
+      }
+    ],
+    "future_owners": {
+      "009": "P13",
+      "010": "P14",
+      "011": "P15",
+      "012": "P16",
+      "013": "P17",
+      "014": "P18",
+      "015": "No owner"
+    }
+  },
+  "p10_protected_publication": {
+    "receipt": {
+      "path": "provenance/p10-migration-receipt.json",
+      "blob": "07565307a35902206ee7c80af66b2a02ab876b83"
+    },
+    "subjects": [
+      "ghcr.io/jeremyliu1220/digital-colleagues-runtime",
+      "ghcr.io/jeremyliu1220/digital-colleagues-studio"
+    ],
+    "sets": {
+      "superseded": {
+        "source_commit": "05e73ea23ac650edfae59fa409a770fdf967af3a",
+        "source_tag": "sha-05e73ea23ac650edfae59fa409a770fdf967af3a",
+        "runtime_digest": "sha256:41567ba87a088944cf9a2c17b9b0f4359554c66b2ec1f6d52db46067e1ab9092",
+        "studio_digest": "sha256:b7dd4c2b35922ec31a9b38c15316283706a9aab0ffab2101a18f7bf106165f2e",
+        "lifecycle": "superseded_contract_noncompliant_source"
+      },
+      "active": {
+        "source_commit": "62b226064d2597a4ca6a67f9f2c20a79a815732b",
+        "source_tag": "sha-62b226064d2597a4ca6a67f9f2c20a79a815732b",
+        "runtime_digest": "sha256:a5bb41bdb85bf7b5a75dc79967e26943c098b024b64fdd345f5b4c6f4688991d",
+        "studio_digest": "sha256:7791d80d9fa464bbd1574601deba5a30ca6d980dab8c8275c24c117fae81e4c9",
+        "lifecycle": "passed"
+      }
+    },
+    "runs": {
+      "34202520699": {
+        "head": "05e73ea23ac650edfae59fa409a770fdf967af3a",
+        "conclusion": "success"
+      },
+      "34203006909": {
+        "head": "05e73ea23ac650edfae59fa409a770fdf967af3a",
+        "conclusion": "failure"
+      },
+      "34204280131": {
+        "head": "ddc04021f94ca888235c53f96ed64218de8c3e67",
+        "conclusion": "failure"
+      },
+      "34204837101": {
+        "head": "ae714c128f844466c76811986c0605e39fce12cc",
+        "conclusion": "failure"
+      },
+      "34205272328": {
+        "head": "76b278feedbb79b9a4c0d023e328911096fe57ae",
+        "conclusion": "failure"
+      },
+      "34206039435": {
+        "head": "a003d540093df9a08437c47e9c8ff16970e5e645",
+        "conclusion": "success"
+      },
+      "34235760264": {
+        "head": "62b226064d2597a4ca6a67f9f2c20a79a815732b",
+        "conclusion": "success"
+      },
+      "34236719816": {
+        "head": "d9fd27670a36f699bf299f6154afce180bea64cc",
+        "conclusion": "failure"
+      },
+      "34237810474": {
+        "head": "cc4acd3bda3f4d2bdfee9392c7d0f85f90c07688",
+        "conclusion": "success"
+      }
+    },
+    "runtime_version_count": 14,
+    "studio_version_count": 14,
+    "inventory_identity": "docs/p12/acceptance.md#exact-p12-start-ghcr-inventory-oracle",
+    "inventory_sha256": "b58cce2af1e3b672114b050ffd6cb55e9625cbcb8fb54c0a863ea00ebb617f3c",
+    "overwrite_retag_republish_delete_forbidden": true
+  },
+  "evidence_preflight": {
+    "github_authentication": "read_only_required",
+    "read_packages": "manifest_lookup_required",
+    "ci_result_transport": "two_exact_canonical_log_envelopes",
+    "receipt_lifecycle": "one_use_pending_consumption",
+    "python_declarations": "pyproject.toml",
+    "python_locked_toolchain_and_transitives": "requirements/p8.lock",
+    "installed_version_api": "importlib.metadata.version",
+    "normalized_comparison": "packaging.version.Version",
+    "tls_primary": "system_default",
+    "tls_certificate_failure_fallback": "locked_certifi_only",
+    "repository_evidence_write": false
+  },
+  "change_counts": {
+    "product_runtime_source": 0,
+    "studio_product_behavior": 0,
+    "database_schema": 0,
+    "migration": 0,
+    "dependency_or_lock": 0,
+    "distribution": 0,
+    "evidence": 0
+  },
+  "privacy": {
+    "local_absolute_paths": false,
+    "credentials": false,
+    "private_identifiers": false,
+    "personal_data": false,
+    "live_receipts": false,
+    "private_provider_data": false
+  },
+  "publication": {
+    "remote_mutation": false,
+    "secrets": false,
+    "oidc": false,
+    "write_permissions": false,
+    "artifact_upload": false,
+    "tags": false,
+    "releases": false,
+    "packages_or_images": false,
+    "signatures_or_attestations": false
+  }
+}
