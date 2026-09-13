@@ -298,6 +298,120 @@ REJECTED_ATTEMPTS: dict[str, dict[str, Any]] = {
     },
 }
 
+STAGE10_FAILURE_DIAGNOSTICS: dict[str, dict[str, Any]] = {
+    "d1_python312_lock_probe": {
+        "classification": "material_failed_experiment",
+        "diagnostic_python": "3.12.14",
+        "platform": {"os": "Darwin", "architecture": "arm64"},
+        "p8_commit": PORTABLE_OBJECTS["P8"]["commit"],
+        "p8_tree": PORTABLE_OBJECTS["P8"]["tree"],
+        "python_lock": {
+            "path": "requirements/p8.lock",
+            "blob": "819980980ba87d1b7166af4b4b0da53ca4e4ac63",
+            "sha256": "5afb5bc2f6bf2cfdc77d0457b92255f822d89cd3cd754ebb876741d7ee6430d0",
+        },
+        "npm_lock": {
+            "path": "studio/package-lock.json",
+            "blob": "ec0730513988e98adaf2d935885859ba1b58f7b9",
+        },
+        "failure_step": "hash_locked_pip_dependency_install",
+        "package": "librt==0.15.0",
+        "selected_wheel": "librt-0.15.0-cp312-cp312-macosx_11_0_arm64.whl",
+        "lock_allowed_sha256": ("234d8d394721fa0d786af15ebf1f3fb7f3ed82fd1cd0cde45c2f247b5d4281d2"),
+        "observed_wheel_sha256": (
+            "71599e011ac880e8e45d46047d714871894c7d4ab6f25626f8d4f89da21f368d"
+        ),
+        "unittest_leaf_executed": False,
+        "consequence": (
+            "Python 3.12 hypothesis was not evaluated because the accepted lock does not "
+            "support the selected macOS arm64 wheel"
+        ),
+        "accepted_lock_modified_or_relaxed": False,
+        "stage10_retry": False,
+        "raw_logs_retained": False,
+        "summary_count": 0,
+        "evidence_count": 0,
+        "publication_count": 0,
+        "remote_mutation_count": 0,
+    },
+    "d2_python313_npm_residue_reproduction": {
+        "classification": "material_failed_experiment",
+        "formal_gate": "p12-portable-history",
+        "leaf_gate": "p8_python_unittest",
+        "p8_commit": PORTABLE_OBJECTS["P8"]["commit"],
+        "p8_tree": PORTABLE_OBJECTS["P8"]["tree"],
+        "runner": {
+            "path": "scripts/run_p8_unittest_suite.py",
+            "blob": "35d0ef6a88025ef5bc10925009e044c6a84025c8",
+        },
+        "python_lock": {
+            "path": "requirements/p8.lock",
+            "blob": "819980980ba87d1b7166af4b4b0da53ca4e4ac63",
+            "sha256": "5afb5bc2f6bf2cfdc77d0457b92255f822d89cd3cd754ebb876741d7ee6430d0",
+        },
+        "npm_lock": {
+            "path": "studio/package-lock.json",
+            "blob": "ec0730513988e98adaf2d935885859ba1b58f7b9",
+        },
+        "platform": {"os": "Darwin", "architecture": "arm64"},
+        "diagnostic_python": "3.13.5",
+        "python_setup": "hash_locked",
+        "npm_setup": "exact_locked",
+        "counts": {"tests": 308, "failures": 3, "errors": 6, "skips": 0},
+        "exit_status": 1,
+        "failure_ids": [
+            (
+                "tests.p0.test_planning_contract.PlanningContractTests."
+                "test_comment_capable_files_have_spdx_headers"
+            ),
+            (
+                "tests.p0.test_public_boundary.PublicBoundaryTests."
+                "test_current_project_is_clean_with_zero_exceptions"
+            ),
+            (
+                "tests.p1.test_repository_scaffold.RepositoryScaffoldTests."
+                "test_comment_capable_p1_files_have_spdx_headers"
+            ),
+        ],
+        "error_ids": [
+            (
+                "tests.architecture.test_p2_boundaries.P2BoundaryTests."
+                "test_current_repository_and_provenance_gates_pass"
+            ),
+            (
+                "tests.p4.test_evidence_gate.P4RepositoryGateTests."
+                "test_real_hotfix_tree_is_an_accepted_p4_descendant"
+            ),
+            (
+                "tests.p5.test_builder.P5RepositoryGateTests."
+                "test_real_hotfix_tree_is_an_accepted_p5_descendant"
+            ),
+            (
+                "tests.p6.test_repository.P6RepositoryGateTests."
+                "test_exact_root_and_real_development_tree_pass"
+            ),
+            (
+                "tests.p7.test_repository.P7RepositoryGateTests."
+                "test_exact_root_and_real_development_tree_pass"
+            ),
+            (
+                "tests.p8.test_repository.P8RepositoryTests."
+                "test_real_tree_has_fixed_base_acceptance_history_and_required_files"
+            ),
+        ],
+        "result": "exact_reproduction",
+        "root_cause": (
+            "npm setup residue was visible to Python, repository and public-boundary checks"
+        ),
+        "stage10_retry": False,
+        "raw_logs_retained": False,
+        "summary_count": 0,
+        "evidence_count": 0,
+        "publication_count": 0,
+        "remote_mutation_count": 0,
+    },
+}
+
 P10_RUNS: dict[str, tuple[str, str]] = {
     "34202520699": ("05e73ea23ac650edfae59fa409a770fdf967af3a", "success"),
     "34203006909": ("05e73ea23ac650edfae59fa409a770fdf967af3a", "failure"),
@@ -533,6 +647,7 @@ def check_provenance(root: Path) -> dict[str, object]:
         "historical_anchors",
         "darwin_evidence_anchors",
         "rejected_attempts",
+        "stage10_failure_diagnostics",
         "portable_historical_inventory",
         "migration_protection",
         "p10_protected_publication",
@@ -595,6 +710,8 @@ def check_provenance(root: Path) -> dict[str, object]:
         raise P12GateError("P12 accepted P8/P10 Darwin anchor identity drifted")
     if not _exact_json(receipt.get("rejected_attempts"), REJECTED_ATTEMPTS):
         raise P12GateError("P12 rejected/superseded v1/v2/v3 history drifted")
+    if not _exact_json(receipt.get("stage10_failure_diagnostics"), STAGE10_FAILURE_DIAGNOSTICS):
+        raise P12GateError("P12 Stage 10 failure diagnostics are not exact")
     inventory = _dict(receipt.get("portable_historical_inventory"), "portable inventory")
     if not _exact_json(
         inventory,

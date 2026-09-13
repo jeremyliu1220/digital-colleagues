@@ -27,6 +27,7 @@ import urllib.error
 import urllib.request
 from collections.abc import Iterator
 from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, TextIO
@@ -1226,6 +1227,533 @@ def _remove_object_directory(path: Path, *, deadline: float) -> None:
     )
 
 
+NPM_GATE_BLOCKS: dict[str, tuple[str, ...]] = {
+    "P8": (
+        "p8_studio_eslint",
+        "p8_studio_prettier",
+        "p8_studio_typescript",
+        "p8_studio_vitest",
+        "p8_studio_vite_build",
+    ),
+    "P9": (),
+    "P10": (
+        "p10_studio_eslint",
+        "p10_studio_prettier",
+        "p10_studio_typescript",
+        "p10_studio_vitest",
+        "p10_studio_vite_build",
+    ),
+    "P11": (
+        "p11_studio_eslint",
+        "p11_studio_prettier",
+        "p11_studio_typescript",
+        "p11_studio_vitest",
+        "p11_studio_vite_build",
+    ),
+    "P11R": (
+        "p11r_studio_eslint",
+        "p11r_studio_prettier",
+        "p11r_studio_typescript",
+        "p11r_studio_vitest",
+        "p11r_studio_vite_build",
+    ),
+}
+NPM_GENERATED_DIRECTORIES = ("node_modules", "dist", ".vite", "coverage")
+
+
+def _safe_checkout_relative(value: str) -> str:
+    candidate = Path(value.rstrip("/"))
+    if (
+        not value
+        or candidate.is_absolute()
+        or not candidate.parts
+        or any(part in {"", ".", ".."} for part in candidate.parts)
+    ):
+        raise P12GateError("P12 historical checkout contains an unsafe path")
+    return candidate.as_posix()
+
+
+def _npm_gate_block(
+    object_name: str,
+    object_items: list[dict[str, Any]],
+    *,
+    npm_workspace_count: object,
+) -> tuple[str, ...]:
+    expected = NPM_GATE_BLOCKS.get(object_name)
+    if expected is None:
+        raise P12GateError("P12 historical npm object identity is invalid")
+    actual = tuple(
+        str(item.get("gate_id"))
+        for item in object_items
+        if item.get("command_kind") == "npm_script"
+    )
+    indices = [
+        index for index, item in enumerate(object_items) if item.get("command_kind") == "npm_script"
+    ]
+    expected_count = 0 if object_name == "P9" else 1
+    if (
+        type(npm_workspace_count) is not int
+        or npm_workspace_count != expected_count
+        or actual != expected
+        or (indices and indices != list(range(indices[0], indices[-1] + 1)))
+    ):
+        raise P12GateError("P12 historical npm gate block is not exact and contiguous")
+    return actual
+
+
+def _checkout_status_paths(checkout: Path, *, deadline: float) -> tuple[str, ...]:
+    raw = _historical_process(
+        [
+            "git",
+            "status",
+            "--porcelain=v1",
+            "-z",
+            "--untracked-files=all",
+            "--ignored=matching",
+        ],
+        cwd=checkout,
+        environment=None,
+        deadline=deadline,
+        limit=120,
+        label="historical checkout status",
+    )
+    paths: list[str] = []
+    for record in raw.split(b"\0"):
+        if not record:
+            continue
+        if len(record) < 4 or record[2:3] != b" " or record[:2] not in {b"??", b"!!"}:
+            raise P12GateError("P12 historical tracked checkout state drifted")
+        try:
+            path = _safe_checkout_relative(record[3:].decode("utf-8"))
+        except UnicodeError as exc:
+            raise P12GateError("P12 historical checkout path is not UTF-8") from exc
+        paths.append(path)
+    if len(paths) != len(set(paths)) or len({path.casefold() for path in paths}) != len(paths):
+        raise P12GateError("P12 historical checkout status contains an alias")
+    return tuple(sorted(paths, key=lambda value: value.encode("utf-8")))
+
+
+def _tracked_checkout_identity(checkout: Path, *, deadline: float) -> tuple[str, str]:
+    raw = _historical_process(
+        ["git", "ls-files", "--stage", "-z"],
+        cwd=checkout,
+        environment=None,
+        deadline=deadline,
+        limit=120,
+        label="historical tracked checkout identity",
+    )
+    digest = hashlib.sha256()
+    paths: list[str] = []
+    for record in raw.split(b"\0"):
+        if not record:
+            continue
+        try:
+            header, encoded_path = record.split(b"\t", 1)
+            encoded_mode, _, encoded_stage = header.split(b" ", 2)
+            path = _safe_checkout_relative(encoded_path.decode("utf-8"))
+            mode = encoded_mode.decode("ascii")
+            stage = encoded_stage.decode("ascii")
+        except (ValueError, UnicodeError) as exc:
+            raise P12GateError("P12 historical tracked checkout identity is malformed") from exc
+        if stage != "0" or mode not in {"100644", "100755", "120000"}:
+            raise P12GateError("P12 historical tracked checkout mode is unsupported")
+        target = checkout.joinpath(*Path(path).parts)
+        try:
+            metadata = os.lstat(target)
+            if mode == "120000":
+                if not stat.S_ISLNK(metadata.st_mode):
+                    raise P12GateError("P12 historical tracked symlink identity drifted")
+                content = os.fsencode(os.readlink(target))
+                kind = b"symlink"
+            else:
+                if not stat.S_ISREG(metadata.st_mode) or target.is_symlink():
+                    raise P12GateError("P12 historical tracked file identity drifted")
+                content = target.read_bytes()
+                kind = b"regular"
+        except OSError as exc:
+            raise P12GateError("P12 historical tracked checkout is unreadable") from exc
+        digest.update(encoded_path)
+        digest.update(b"\0")
+        digest.update(encoded_mode)
+        digest.update(b"\0")
+        digest.update(str(stat.S_IMODE(metadata.st_mode)).encode("ascii"))
+        digest.update(b"\0")
+        digest.update(kind)
+        digest.update(b"\0")
+        digest.update(hashlib.sha256(content).digest())
+        digest.update(b"\n")
+        paths.append(path)
+        if time.monotonic() >= deadline:
+            raise HistoricalTimeout("P12 historical tracked checkout inspection timed out")
+    if len(paths) != len(set(paths)) or len({path.casefold() for path in paths}) != len(paths):
+        raise P12GateError("P12 historical tracked checkout contains an alias")
+    return hashlib.sha256(raw).hexdigest(), digest.hexdigest()
+
+
+def _checkout_metadata(
+    checkout: Path,
+    *,
+    deadline: float,
+    opaque_roots: tuple[str, ...] = (),
+) -> dict[str, tuple[str, int]]:
+    opaque_parts = {Path(value).parts for value in opaque_roots}
+    result: dict[str, tuple[str, int]] = {}
+    casefolded: set[str] = set()
+    pending: list[tuple[Path, tuple[str, ...]]] = [(checkout, ())]
+    while pending:
+        directory, prefix = pending.pop()
+        try:
+            entries = sorted(os.scandir(directory), key=lambda item: os.fsencode(item.name))
+        except OSError as exc:
+            raise P12GateError("P12 historical checkout metadata is unreadable") from exc
+        for entry in entries:
+            parts = (*prefix, entry.name)
+            if parts == (".git",):
+                continue
+            path = _safe_checkout_relative(Path(*parts).as_posix())
+            folded = path.casefold()
+            if folded in casefolded:
+                raise P12GateError("P12 historical checkout metadata contains a case alias")
+            casefolded.add(folded)
+            try:
+                metadata = entry.stat(follow_symlinks=False)
+            except OSError as exc:
+                raise P12GateError("P12 historical checkout metadata is unreadable") from exc
+            if stat.S_ISLNK(metadata.st_mode):
+                kind = "symlink"
+            elif stat.S_ISDIR(metadata.st_mode):
+                kind = "directory"
+            elif stat.S_ISREG(metadata.st_mode):
+                kind = "regular"
+            else:
+                raise P12GateError("P12 historical checkout contains a special file")
+            result[path] = (kind, stat.S_IMODE(metadata.st_mode))
+            if kind == "directory" and parts not in opaque_parts:
+                pending.append((Path(entry.path), parts))
+        if time.monotonic() >= deadline:
+            raise HistoricalTimeout("P12 historical checkout metadata inspection timed out")
+    return result
+
+
+@dataclass(frozen=True)
+class _HistoricalCheckoutGuard:
+    checkout: Path
+    head: str
+    index_digest: str
+    tracked_digest: str
+    metadata: dict[str, tuple[str, int]]
+
+    @classmethod
+    def capture(cls, checkout: Path, *, deadline: float) -> _HistoricalCheckoutGuard:
+        status = _checkout_status_paths(checkout, deadline=deadline)
+        if status:
+            raise P12GateError("P12 historical checkout was not clean before npm setup")
+        head = (
+            _historical_process(
+                ["git", "rev-parse", "HEAD"],
+                cwd=checkout,
+                environment=None,
+                deadline=deadline,
+                limit=60,
+                label="historical checkout HEAD identity",
+            )
+            .decode("ascii")
+            .strip()
+        )
+        index_digest, tracked_digest = _tracked_checkout_identity(checkout, deadline=deadline)
+        metadata = _checkout_metadata(checkout, deadline=deadline)
+        for generated in NPM_GENERATED_DIRECTORIES:
+            path = f"studio/{generated}"
+            if path in metadata:
+                raise P12GateError("P12 historical checkout contains pre-existing npm residue")
+        return cls(checkout, head, index_digest, tracked_digest, metadata)
+
+    def _assert_tracked(self, *, deadline: float) -> None:
+        head = (
+            _historical_process(
+                ["git", "rev-parse", "HEAD"],
+                cwd=self.checkout,
+                environment=None,
+                deadline=deadline,
+                limit=60,
+                label="historical checkout HEAD identity",
+            )
+            .decode("ascii")
+            .strip()
+        )
+        index_digest, tracked_digest = _tracked_checkout_identity(self.checkout, deadline=deadline)
+        if (
+            head != self.head
+            or index_digest != self.index_digest
+            or tracked_digest != self.tracked_digest
+        ):
+            raise P12GateError("P12 historical tracked bytes, mode, or index drifted")
+
+    def assert_clean(self, *, deadline: float) -> None:
+        self._assert_tracked(deadline=deadline)
+        if _checkout_metadata(self.checkout, deadline=deadline) != self.metadata:
+            raise P12GateError("P12 historical checkout metadata residue remains")
+        if _checkout_status_paths(self.checkout, deadline=deadline):
+            raise P12GateError("P12 historical checkout residue remains")
+
+    def generated_tsbuildinfo(self, *, deadline: float) -> tuple[Path, ...]:
+        dynamic_roots = tuple(f"studio/{value}" for value in NPM_GENERATED_DIRECTORIES)
+        current = _checkout_metadata(
+            self.checkout,
+            deadline=deadline,
+            opaque_roots=dynamic_roots,
+        )
+        generated: list[Path] = []
+        filtered: dict[str, tuple[str, int]] = {}
+        for path, identity in current.items():
+            parts = Path(path).parts
+            if any(parts[: len(Path(root).parts)] == Path(root).parts for root in dynamic_roots):
+                continue
+            if (
+                path not in self.metadata
+                and parts
+                and parts[0] == "studio"
+                and path.endswith(".tsbuildinfo")
+            ):
+                if identity[0] != "regular":
+                    raise P12GateError("P12 historical generated tsbuildinfo is unsafe")
+                generated.append(self.checkout.joinpath(*parts))
+                continue
+            filtered[path] = identity
+        if filtered != self.metadata:
+            raise P12GateError("P12 historical npm command changed unapproved checkout state")
+        return tuple(sorted(generated, key=lambda value: os.fsencode(value.as_posix())))
+
+    def assert_npm_residue(
+        self,
+        *,
+        deadline: float,
+        installed_only: bool,
+    ) -> tuple[Path, ...]:
+        self._assert_tracked(deadline=deadline)
+        generated = self.generated_tsbuildinfo(deadline=deadline)
+        allowed_roots = (
+            ("studio/node_modules",)
+            if installed_only
+            else tuple(f"studio/{value}" for value in NPM_GENERATED_DIRECTORIES)
+        )
+        for path in _checkout_status_paths(self.checkout, deadline=deadline):
+            parts = Path(path).parts
+            in_allowed_root = any(
+                parts[: len(Path(root).parts)] == Path(root).parts for root in allowed_roots
+            )
+            if not in_allowed_root and self.checkout.joinpath(*parts) not in generated:
+                raise P12GateError("P12 historical npm command left unexpected residue")
+        if installed_only and generated:
+            raise P12GateError("P12 historical npm setup left unexpected residue")
+        return generated
+
+
+def _device_id(path: Path) -> int:
+    return os.stat(path, follow_symlinks=False).st_dev
+
+
+def _validate_plain_directory(path: Path, *, mode: int | None = None) -> None:
+    try:
+        metadata = os.lstat(path)
+    except OSError as exc:
+        raise P12GateError("P12 historical npm directory is unavailable") from exc
+    if path.is_symlink() or not stat.S_ISDIR(metadata.st_mode):
+        raise P12GateError("P12 historical npm directory is not physical")
+    if mode is not None and stat.S_IMODE(metadata.st_mode) != mode:
+        raise P12GateError("P12 historical npm holding directory mode drifted")
+
+
+def _validate_no_symlink_tree(path: Path) -> None:
+    _validate_plain_directory(path)
+    pending = [path]
+    while pending:
+        directory = pending.pop()
+        try:
+            entries = list(os.scandir(directory))
+        except OSError as exc:
+            raise P12GateError("P12 historical generated directory is unreadable") from exc
+        for entry in entries:
+            try:
+                metadata = entry.stat(follow_symlinks=False)
+            except OSError as exc:
+                raise P12GateError("P12 historical generated path is unreadable") from exc
+            if stat.S_ISLNK(metadata.st_mode):
+                raise P12GateError("P12 historical generated directory contains a symlink")
+            if stat.S_ISDIR(metadata.st_mode):
+                pending.append(Path(entry.path))
+            elif not stat.S_ISREG(metadata.st_mode):
+                raise P12GateError("P12 historical generated directory contains a special file")
+
+
+def _remove_generated_directory(path: Path, *, allow_internal_symlinks: bool) -> None:
+    _validate_plain_directory(path)
+    if not allow_internal_symlinks:
+        _validate_no_symlink_tree(path)
+    try:
+        shutil.rmtree(path)
+    except OSError as exc:
+        raise P12GateError("P12 historical generated directory cleanup failed") from exc
+
+
+class _HistoricalNpmWorkspace:
+    def __init__(
+        self,
+        *,
+        object_directory: Path,
+        guard: _HistoricalCheckoutGuard,
+        npm_gate_ids: tuple[str, ...],
+    ) -> None:
+        if not npm_gate_ids:
+            raise P12GateError("P12 historical npm lifecycle lacks a gate block")
+        self.guard = guard
+        self.workspace = guard.checkout / "studio"
+        self.holding_root = object_directory / "npm-holding"
+        self.payload = self.holding_root / "node_modules"
+        self.npm_gate_ids = npm_gate_ids
+        self.phase = "installed_in_checkout"
+        _validate_plain_directory(self.workspace)
+        try:
+            object_root = object_directory.resolve(strict=True)
+            checkout_root = guard.checkout.resolve(strict=True)
+            workspace_root = self.workspace.resolve(strict=True)
+        except OSError as exc:
+            raise P12GateError("P12 historical npm workspace identity is invalid") from exc
+        if workspace_root != checkout_root / "studio" or object_root == checkout_root:
+            raise P12GateError("P12 historical npm workspace escaped its exact checkout")
+        try:
+            self.holding_root.mkdir(mode=0o700)
+        except OSError as exc:
+            raise P12GateError("P12 historical npm holding directory creation failed") from exc
+        _validate_plain_directory(self.holding_root, mode=0o700)
+        if self.holding_root.parent.resolve(strict=True) != object_root:
+            raise P12GateError("P12 historical npm holding directory escaped its object")
+        if _device_id(self.holding_root) != _device_id(guard.checkout):
+            raise P12GateError("P12 historical npm holding directory is cross-filesystem")
+        self._assert_holding_layout(payload_expected=False)
+        self._assert_endpoint_pair(source_expected=True)
+
+    def _assert_holding_layout(self, *, payload_expected: bool) -> None:
+        _validate_plain_directory(self.holding_root, mode=0o700)
+        try:
+            entries = list(os.scandir(self.holding_root))
+        except OSError as exc:
+            raise P12GateError("P12 historical npm holding directory is unreadable") from exc
+        names = {entry.name for entry in entries}
+        expected = {"node_modules"} if payload_expected else set()
+        if names != expected or names & {"package.json", "package-lock.json"}:
+            raise P12GateError("P12 historical npm holding directory layout drifted")
+        if payload_expected:
+            _validate_plain_directory(self.payload)
+
+    def _assert_endpoint_pair(self, *, source_expected: bool) -> None:
+        source_exists = self.workspace.joinpath("node_modules").exists()
+        destination_exists = self.payload.exists()
+        if source_exists == destination_exists or source_exists != source_expected:
+            raise P12GateError("P12 historical npm payload endpoint state is invalid")
+        target = self.workspace / "node_modules" if source_expected else self.payload
+        _validate_plain_directory(target)
+
+    def park(self, *, deadline: float) -> None:
+        if self.phase != "installed_in_checkout":
+            raise P12GateError("P12 historical npm lifecycle phase is invalid")
+        self.guard.assert_npm_residue(deadline=deadline, installed_only=True)
+        self._assert_holding_layout(payload_expected=False)
+        self._assert_endpoint_pair(source_expected=True)
+        os.replace(self.workspace / "node_modules", self.payload)
+        self.phase = "parked"
+        self._assert_endpoint_pair(source_expected=False)
+        self._assert_holding_layout(payload_expected=True)
+        self.guard.assert_clean(deadline=deadline)
+
+    def activate(self, gate_id: str, *, deadline: float) -> None:
+        if self.phase != "parked" or gate_id != self.npm_gate_ids[0]:
+            raise P12GateError("P12 historical npm activation phase is invalid")
+        self.guard.assert_clean(deadline=deadline)
+        self._assert_holding_layout(payload_expected=True)
+        self._assert_endpoint_pair(source_expected=False)
+        if _device_id(self.holding_root) != _device_id(self.guard.checkout):
+            raise P12GateError("P12 historical npm activation became cross-filesystem")
+        os.replace(self.payload, self.workspace / "node_modules")
+        self.phase = "active_for_npm_block"
+        self._assert_endpoint_pair(source_expected=True)
+        self._assert_holding_layout(payload_expected=False)
+        self.guard.assert_npm_residue(deadline=deadline, installed_only=False)
+
+    def command_cwd(self, gate_id: str) -> Path:
+        if self.phase != "active_for_npm_block" or gate_id not in self.npm_gate_ids:
+            raise P12GateError("P12 historical npm command phase is invalid")
+        if self.workspace == self.holding_root or self.workspace == self.payload:
+            raise P12GateError("P12 historical npm command cannot use the holding directory")
+        return self.workspace
+
+    def assert_active(self, *, deadline: float) -> None:
+        if self.phase != "active_for_npm_block":
+            raise P12GateError("P12 historical npm lifecycle phase is invalid")
+        self._assert_endpoint_pair(source_expected=True)
+        self._assert_holding_layout(payload_expected=False)
+        self.guard.assert_npm_residue(deadline=deadline, installed_only=False)
+
+    def retire(self, *, deadline: float) -> None:
+        self.assert_active(deadline=deadline)
+        generated = self.guard.generated_tsbuildinfo(deadline=deadline)
+        os.replace(self.workspace / "node_modules", self.payload)
+        self.phase = "retiring"
+        self._assert_endpoint_pair(source_expected=False)
+        self._assert_holding_layout(payload_expected=True)
+        _remove_generated_directory(self.payload, allow_internal_symlinks=True)
+        for name in NPM_GENERATED_DIRECTORIES[1:]:
+            target = self.workspace / name
+            if target.exists() or target.is_symlink():
+                _remove_generated_directory(target, allow_internal_symlinks=False)
+        for target in generated:
+            try:
+                metadata = os.lstat(target)
+            except OSError as exc:
+                raise P12GateError("P12 historical generated tsbuildinfo is unavailable") from exc
+            if target.is_symlink() or not stat.S_ISREG(metadata.st_mode):
+                raise P12GateError("P12 historical generated tsbuildinfo is unsafe")
+            target.unlink()
+        self.phase = "retired"
+        self._assert_holding_layout(payload_expected=False)
+        self.guard.assert_clean(deadline=deadline)
+
+    def before_leaf(self, item: dict[str, Any], *, deadline: float) -> Path:
+        gate_id = str(item.get("gate_id"))
+        if item.get("command_kind") == "npm_script":
+            if gate_id == self.npm_gate_ids[0]:
+                self.activate(gate_id, deadline=deadline)
+            elif self.phase != "active_for_npm_block" or gate_id not in self.npm_gate_ids:
+                raise P12GateError("P12 historical npm gate block is discontinuous")
+            return self.command_cwd(gate_id)
+        if self.phase == "active_for_npm_block":
+            raise P12GateError("P12 historical npm gate block is discontinuous")
+        self.guard.assert_clean(deadline=deadline)
+        return self.guard.checkout
+
+    def after_leaf(self, item: dict[str, Any], status: int, *, deadline: float) -> None:
+        gate_id = str(item.get("gate_id"))
+        if item.get("command_kind") != "npm_script":
+            self.guard.assert_clean(deadline=deadline)
+            return
+        if status != 0 or gate_id == self.npm_gate_ids[-1]:
+            self.retire(deadline=deadline)
+        else:
+            self.assert_active(deadline=deadline)
+
+    def assert_object_end(self, *, failed: bool, deadline: float) -> None:
+        if self.phase == "active_for_npm_block":
+            raise P12GateError("P12 historical npm block ended without retirement")
+        if not failed and self.phase != "retired":
+            raise P12GateError("P12 historical npm block did not execute exactly once")
+        if self.phase == "parked":
+            self._assert_endpoint_pair(source_expected=False)
+            self._assert_holding_layout(payload_expected=True)
+        elif self.phase == "retired":
+            self._assert_holding_layout(payload_expected=False)
+        self.guard.assert_clean(deadline=deadline)
+
+
 def _verify_historical_entrypoint(
     checkout: Path,
     item: dict[str, Any],
@@ -1487,7 +2015,14 @@ def _historical_setup(
     object_items: list[dict[str, Any]],
     *,
     deadline: float,
-) -> tuple[Path, Path, dict[str, str], Path | None, str]:
+) -> tuple[
+    Path,
+    Path,
+    dict[str, str],
+    _HistoricalCheckoutGuard,
+    _HistoricalNpmWorkspace | None,
+    str,
+]:
     object_name = str(setup["object"]).lower()
     checkout = object_directory / "checkout"
     environment_path = object_directory / "python-environment"
@@ -1590,6 +2125,11 @@ def _historical_setup(
         or resources.get("object_timeout_seconds") != OBJECT_TIMEOUTS[str(setup["object"])]
     ):
         raise P12GateError("P12 historical setup resource model drifted")
+    npm_gate_ids = _npm_gate_block(
+        str(setup["object"]),
+        object_items,
+        npm_workspace_count=resources.get("npm_workspace_count"),
+    )
     lock_ids = resources.get("lock_anchor_ids")
     if not isinstance(lock_ids, list) or any(not isinstance(value, str) for value in lock_ids):
         raise P12GateError("P12 historical setup lock-anchor binding is invalid")
@@ -1675,9 +2215,9 @@ def _historical_setup(
         limit=OPERATION_TIMEOUTS["venv_install"],
         label=f"{object_name} hash-locked Python installation",
     )
-    npm_workspace: Path | None = None
-    npm_required = resources.get("npm_workspace_count") == 1
-    if object_name != "p9" and npm_required:
+    guard = _HistoricalCheckoutGuard.capture(checkout, deadline=work_deadline)
+    npm_lifecycle: _HistoricalNpmWorkspace | None = None
+    if npm_gate_ids:
         npm_workspace = checkout / "studio"
         npm_deadline = _operation_deadline(
             work_deadline,
@@ -1712,7 +2252,15 @@ def _historical_setup(
             )
         if status != 0:
             raise P12GateError(f"P12 historical {object_name} npm setup failed")
-    return checkout, python, environment, npm_workspace, project
+        npm_lifecycle = _HistoricalNpmWorkspace(
+            object_directory=object_directory,
+            guard=guard,
+            npm_gate_ids=npm_gate_ids,
+        )
+        npm_lifecycle.park(deadline=npm_deadline)
+    else:
+        guard.assert_clean(deadline=work_deadline)
+    return checkout, python, environment, guard, npm_lifecycle, project
 
 
 HISTORICAL_RESULT_MAX_BYTES = 1_048_576
@@ -2017,6 +2565,8 @@ def run_portable_history(root: Path, temporary: Path) -> dict[str, Any]:
         object_directory = temporary / object_name.lower()
         project = ""
         failed = False
+        guard: _HistoricalCheckoutGuard | None = None
+        npm_lifecycle: _HistoricalNpmWorkspace | None = None
         object_result_start = len(results)
         docker_before = _docker_snapshot(
             deadline=deadline,
@@ -2026,8 +2576,19 @@ def run_portable_history(root: Path, temporary: Path) -> dict[str, Any]:
         try:
             setup_started = _utc_now()
             try:
-                checkout, python, environment, npm_workspace, project = _historical_setup(
-                    root, object_directory, object_items[0], object_items, deadline=deadline
+                (
+                    checkout,
+                    python,
+                    environment,
+                    guard,
+                    npm_lifecycle,
+                    project,
+                ) = _historical_setup(
+                    root,
+                    object_directory,
+                    object_items[0],
+                    object_items,
+                    deadline=deadline,
                 )
             except HistoricalResidueError:
                 raise
@@ -2085,6 +2646,10 @@ def run_portable_history(root: Path, temporary: Path) -> dict[str, Any]:
                         )
                         continue
                     if item_type == "excluded_acceptance_gate":
+                        if npm_lifecycle is not None:
+                            npm_lifecycle.before_leaf(item, deadline=deadline)
+                        elif guard is not None:
+                            guard.assert_clean(deadline=deadline)
                         record(
                             item,
                             "not_run_platform_excluded",
@@ -2096,19 +2661,43 @@ def run_portable_history(root: Path, temporary: Path) -> dict[str, Any]:
                         status = 124
                         failure_category = "object_timeout"
                         structured = None
+                        if (
+                            npm_lifecycle is not None
+                            and npm_lifecycle.phase == "active_for_npm_block"
+                        ):
+                            npm_lifecycle.retire(deadline=deadline)
                     else:
+                        status = 2
+                        leaf_entered = False
                         try:
-                            status, _, structured = _execute_history_item(
-                                item,
-                                checkout=checkout,
-                                python=python,
-                                environment=environment,
-                                npm_workspace=npm_workspace,
-                                output_directory=object_directory / "output",
-                                predecessor_result=predecessor_result,
-                                inventory_digest=inventory_digest,
-                                deadline=deadline,
-                            )
+                            if npm_lifecycle is not None:
+                                npm_workspace = npm_lifecycle.before_leaf(item, deadline=deadline)
+                            else:
+                                if guard is None:
+                                    raise P12GateError(
+                                        "P12 historical checkout guard is unavailable"
+                                    )
+                                guard.assert_clean(deadline=deadline)
+                                npm_workspace = None
+                            leaf_entered = True
+                            try:
+                                status, _, structured = _execute_history_item(
+                                    item,
+                                    checkout=checkout,
+                                    python=python,
+                                    environment=environment,
+                                    npm_workspace=npm_workspace,
+                                    output_directory=object_directory / "output",
+                                    predecessor_result=predecessor_result,
+                                    inventory_digest=inventory_digest,
+                                    deadline=deadline,
+                                )
+                            finally:
+                                if leaf_entered:
+                                    if npm_lifecycle is not None:
+                                        npm_lifecycle.after_leaf(item, status, deadline=deadline)
+                                    elif guard is not None:
+                                        guard.assert_clean(deadline=deadline)
                             failure_category = "leaf_timeout" if status == 124 else "leaf_nonzero"
                         except HistoricalResidueError:
                             raise
@@ -2169,6 +2758,12 @@ def run_portable_history(root: Path, temporary: Path) -> dict[str, Any]:
                         raise P12GateError(
                             "P12 historical passed unittest has no structured result"
                         )
+                if guard is None:
+                    raise P12GateError("P12 historical checkout guard is unavailable")
+                if npm_lifecycle is not None:
+                    npm_lifecycle.assert_object_end(failed=failed, deadline=deadline)
+                else:
+                    guard.assert_clean(deadline=deadline)
         finally:
             cleanup_error: BaseException | None = None
             if project:

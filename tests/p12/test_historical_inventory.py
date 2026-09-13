@@ -46,13 +46,18 @@ from scripts.check_p12_historical_inventory import (
 from scripts.check_p12_repository import P12GateError
 from scripts.run_p12_toolchain import (
     HISTORICAL_RESULT_MAX_BYTES,
+    NPM_GATE_BLOCKS,
     HistoricalTimeout,
     _bounded_result_bytes,
     _historical_process,
+    _HistoricalCheckoutGuard,
+    _HistoricalNpmWorkspace,
     _leaf_process,
+    _npm_gate_block,
     _operation_deadline,
     _remaining_timeout,
     _run_status,
+    _safe_checkout_relative,
     _structured_leaf_result,
     _structured_result_path,
     _verify_anchor,
@@ -109,6 +114,75 @@ def _passing_object_result(object_name: str) -> dict[str, object]:
         inventory_digest=_inventory_digest(),
         ordered_item_results=results,
     )
+
+
+def _synthetic_checkout(temporary: Path) -> tuple[Path, Path]:
+    object_directory = temporary / "object"
+    checkout = object_directory / "checkout"
+    studio = checkout / "studio"
+    studio.mkdir(parents=True)
+    (checkout / ".gitignore").write_text(
+        "node_modules/\ndist/\n.vite/\ncoverage/\n*.tsbuildinfo\n",
+        encoding="utf-8",
+    )
+    (checkout / "tracked.py").write_text("VALUE = 1\n", encoding="utf-8")
+    (studio / "package.json").write_text('{"scripts":{}}\n', encoding="utf-8")
+    (studio / "package-lock.json").write_text(
+        '{"lockfileVersion":3,"packages":{}}\n', encoding="utf-8"
+    )
+    subprocess.run(
+        ["git", "init", "--quiet"],
+        cwd=checkout,
+        check=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    subprocess.run(
+        ["git", "add", "--all"],
+        cwd=checkout,
+        check=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=P12 Test",
+            "-c",
+            "user.email=" + "@".join(("p12", "example.invalid")),
+            "commit",
+            "--quiet",
+            "-m",
+            "fixture",
+        ],
+        cwd=checkout,
+        check=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    return object_directory, checkout
+
+
+def _synthetic_installed_lifecycle(
+    temporary: Path,
+) -> tuple[_HistoricalCheckoutGuard, _HistoricalNpmWorkspace, float]:
+    object_directory, checkout = _synthetic_checkout(temporary)
+    deadline = time.monotonic() + 30
+    guard = _HistoricalCheckoutGuard.capture(checkout, deadline=deadline)
+    node_modules = checkout / "studio" / "node_modules"
+    package = node_modules / "package"
+    binary = node_modules / ".bin"
+    package.mkdir(parents=True)
+    binary.mkdir()
+    (package / "tool").write_text("synthetic\n", encoding="utf-8")
+    (binary / "tool").symlink_to(Path("..") / "package" / "tool")
+    lifecycle = _HistoricalNpmWorkspace(
+        object_directory=object_directory,
+        guard=guard,
+        npm_gate_ids=NPM_GATE_BLOCKS["P8"],
+    )
+    return guard, lifecycle, deadline
 
 
 class HistoricalInventoryTests(unittest.TestCase):
@@ -187,7 +261,41 @@ class HistoricalInventoryTests(unittest.TestCase):
             self.assertEqual(resources["checkout_timeout_seconds"], 120)
             self.assertEqual(resources["venv_install_timeout_seconds"], 600)
             self.assertEqual(resources["npm_install_timeout_seconds"], 600)
+            object_items = [
+                candidate
+                for candidate in CANONICAL_INVENTORY
+                if candidate["object"] == item["object"]
+            ]
+            self.assertEqual(
+                _npm_gate_block(
+                    str(item["object"]),
+                    object_items,
+                    npm_workspace_count=resources["npm_workspace_count"],
+                ),
+                NPM_GATE_BLOCKS[str(item["object"])],
+            )
         self.assertEqual(OPERATION_TIMEOUTS["executor"], 9900)
+        self.assertEqual(
+            sum(len(gate_ids) for gate_ids in NPM_GATE_BLOCKS.values()),
+            20,
+        )
+        p8_items = [item for item in _copy() if item["object"] == "P8"]
+        for mutation in ("missing", "second", "discontinuous"):
+            with self.subTest(npm_block_mutation=mutation):
+                malformed = deepcopy(p8_items)
+                if mutation == "missing":
+                    _item(malformed, "p8_studio_typescript")["command_kind"] = "python_script"
+                elif mutation == "second":
+                    _item(malformed, "p8_repository")["command_kind"] = "npm_script"
+                else:
+                    boundary = next(
+                        index
+                        for index, candidate in enumerate(malformed)
+                        if candidate["gate_id"] == "p8_studio_typescript"
+                    )
+                    malformed.insert(boundary, deepcopy(_item(malformed, "p8_repository")))
+                with self.assertRaises(P12GateError):
+                    _npm_gate_block("P8", malformed, npm_workspace_count=1)
         for object_name in OBJECT_ORDER:
             with self.subTest(object_result=object_name):
                 result = _passing_object_result(object_name)
@@ -284,6 +392,16 @@ class HistoricalInventoryTests(unittest.TestCase):
         _item(items, "p10_repository")["command_kind"] = "in_process_import"
         with self.assertRaises(HistoricalInventoryError):
             validate_inventory(items, require_literal=False)
+        with TemporaryDirectory() as value:
+            _, lifecycle, deadline = _synthetic_installed_lifecycle(Path(value))
+            lifecycle.park(deadline=deadline)
+            with self.assertRaises(P12GateError):
+                lifecycle.command_cwd("p8_studio_eslint")
+            lifecycle.activate("p8_studio_eslint", deadline=deadline)
+            command_cwd = lifecycle.command_cwd("p8_studio_eslint")
+            self.assertTrue(os.path.samefile(command_cwd, lifecycle.guard.checkout / "studio"))
+            self.assertFalse(os.path.samefile(command_cwd, lifecycle.holding_root))
+            lifecycle.retire(deadline=deadline)
 
     def test_current_tree_module_shadowing_is_rejected(self) -> None:
         item = next(value for value in CANONICAL_INVENTORY if value["gate_id"] == "p8_repository")
@@ -344,6 +462,19 @@ class HistoricalInventoryTests(unittest.TestCase):
                 expected_object="P10",
                 expected_inventory_digest=_inventory_digest(),
             )
+        npm_gate_ids = [
+            str(item["gate_id"])
+            for item in CANONICAL_INVENTORY
+            if item["command_kind"] == "npm_script"
+        ]
+        npm_results = [result for result in results if str(result["gate_id"]) in set(npm_gate_ids)]
+        self.assertEqual(len(npm_gate_ids), 20)
+        self.assertEqual(len(set(npm_gate_ids)), 20)
+        self.assertEqual([str(result["gate_id"]) for result in npm_results], npm_gate_ids)
+        self.assertFalse(
+            {"installed_in_checkout", "parked", "active_for_npm_block", "retired"}
+            & {str(result["gate_id"]) for result in results}
+        )
 
     def test_recursive_aggregate_is_rejected(self) -> None:
         items = _copy()
@@ -386,6 +517,35 @@ class HistoricalInventoryTests(unittest.TestCase):
         _item(items, "p8_setup")["resources"]["cleanup_before_next_object"] = False
         with self.assertRaises(HistoricalInventoryError):
             validate_inventory(items, require_literal=False)
+        with TemporaryDirectory() as value:
+            guard, lifecycle, deadline = _synthetic_installed_lifecycle(Path(value))
+            lifecycle.park(deadline=deadline)
+            guard.assert_clean(deadline=deadline)
+            self.assertEqual(lifecycle.phase, "parked")
+            lifecycle.activate("p8_studio_eslint", deadline=deadline)
+            workspace = lifecycle.command_cwd("p8_studio_eslint")
+            for directory in ("dist", ".vite", "coverage"):
+                generated = workspace / directory
+                generated.mkdir()
+                (generated / "result.txt").write_text("generated\n", encoding="utf-8")
+            (workspace / "tsconfig.tsbuildinfo").write_text("generated\n", encoding="utf-8")
+            for gate_id in NPM_GATE_BLOCKS["P8"][:-1]:
+                lifecycle.after_leaf(
+                    {"gate_id": gate_id, "command_kind": "npm_script"},
+                    0,
+                    deadline=deadline,
+                )
+            lifecycle.after_leaf(
+                {
+                    "gate_id": NPM_GATE_BLOCKS["P8"][-1],
+                    "command_kind": "npm_script",
+                },
+                0,
+                deadline=deadline,
+            )
+            self.assertEqual(lifecycle.phase, "retired")
+            guard.assert_clean(deadline=deadline)
+            lifecycle.assert_object_end(failed=False, deadline=deadline)
 
     def test_timeout_values_are_exact(self) -> None:
         items = _copy()
@@ -656,6 +816,82 @@ class HistoricalInventoryTests(unittest.TestCase):
                 expected_object="P11",
                 expected_inventory_digest=_inventory_digest(),
             )
+        with self.assertRaises(P12GateError):
+            _safe_checkout_relative("../escape")
+
+        for failure in (
+            "tracked_mutation",
+            "mode_drift",
+            "unexpected_residue",
+            "top_level_symlink",
+            "cross_filesystem",
+            "illegal_phase",
+            "cleanup_failure",
+        ):
+            with self.subTest(npm_lifecycle_failure=failure), TemporaryDirectory() as value:
+                temporary = Path(value)
+                if failure == "top_level_symlink":
+                    object_directory, checkout = _synthetic_checkout(temporary)
+                    deadline = time.monotonic() + 30
+                    guard = _HistoricalCheckoutGuard.capture(checkout, deadline=deadline)
+                    target = temporary / "external-node-modules"
+                    target.mkdir()
+                    (checkout / "studio" / "node_modules").symlink_to(target)
+                    with self.assertRaises(P12GateError):
+                        _HistoricalNpmWorkspace(
+                            object_directory=object_directory,
+                            guard=guard,
+                            npm_gate_ids=NPM_GATE_BLOCKS["P8"],
+                        )
+                    continue
+
+                if failure == "cross_filesystem":
+                    object_directory, checkout = _synthetic_checkout(temporary)
+                    deadline = time.monotonic() + 30
+                    guard = _HistoricalCheckoutGuard.capture(checkout, deadline=deadline)
+                    (checkout / "studio" / "node_modules").mkdir()
+                    with (
+                        mock.patch(
+                            "scripts.run_p12_toolchain._device_id",
+                            side_effect=(1, 2),
+                        ),
+                        self.assertRaises(P12GateError),
+                    ):
+                        _HistoricalNpmWorkspace(
+                            object_directory=object_directory,
+                            guard=guard,
+                            npm_gate_ids=NPM_GATE_BLOCKS["P8"],
+                        )
+                    continue
+
+                guard, lifecycle, deadline = _synthetic_installed_lifecycle(temporary)
+                lifecycle.park(deadline=deadline)
+                if failure == "illegal_phase":
+                    lifecycle.activate("p8_studio_eslint", deadline=deadline)
+                    with self.assertRaises(P12GateError):
+                        lifecycle.activate("p8_studio_eslint", deadline=deadline)
+                    continue
+                lifecycle.activate("p8_studio_eslint", deadline=deadline)
+                if failure == "tracked_mutation":
+                    (guard.checkout / "tracked.py").write_text("VALUE = 2\n", encoding="utf-8")
+                elif failure == "mode_drift":
+                    (guard.checkout / "tracked.py").chmod(0o755)
+                elif failure == "unexpected_residue":
+                    (lifecycle.workspace / "unexpected.txt").write_text(
+                        "unexpected\n", encoding="utf-8"
+                    )
+                elif failure == "cleanup_failure":
+                    with (
+                        mock.patch(
+                            "scripts.run_p12_toolchain._remove_generated_directory",
+                            side_effect=P12GateError("synthetic cleanup failure"),
+                        ),
+                        self.assertRaises(P12GateError),
+                    ):
+                        lifecycle.retire(deadline=deadline)
+                    continue
+                with self.assertRaises(P12GateError):
+                    lifecycle.retire(deadline=deadline)
 
 
 if __name__ == "__main__":
