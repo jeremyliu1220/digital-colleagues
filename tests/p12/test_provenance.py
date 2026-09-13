@@ -16,6 +16,7 @@ from scripts.check_p12_provenance import (
     P10_SETS,
     P10_SUBJECTS,
     REJECTED_ATTEMPTS,
+    STAGE12_FAILURE_DIAGNOSTICS,
     check_provenance,
 )
 from scripts.check_p12_repository import P12GateError
@@ -89,6 +90,87 @@ class ProvenanceTests(unittest.TestCase):
             "accepted_p8_actual_compose_pre_start_restore",
         )
         self.assertEqual(REJECTED_ATTEMPTS["v3"]["classification"], "superseded_acceptance_only")
+        d4 = STAGE12_FAILURE_DIAGNOSTICS["d4_ci_umask_inheritance"]
+        self.assertEqual(d4["run_id"], 34758522278)
+        self.assertEqual(d4["head_sha"], "ec4cbbc3df05557e33c1eca137731c548e23cdff")
+        self.assertEqual(d4["current_job"]["job_database_id"], 103727050919)
+        self.assertEqual(d4["portable_job"]["job_database_id"], 103727050828)
+        self.assertFalse(d4["raw_logs_retained"])
+        self.assertFalse(d4["stage12_passed"])
+        self.assertFalse(d4["stage13_executed"])
+
+        def remove_stage12_diagnostics(value: dict[str, Any]) -> None:
+            del value["stage12_failure_diagnostics"]
+
+        def remove_transport_conclusion(value: dict[str, Any]) -> None:
+            del value["stage12_failure_diagnostics"]["d4_ci_umask_inheritance"][
+                "transport_conclusion"
+            ]
+
+        def replace_diagnostic(
+            path: tuple[str, ...], replacement: object
+        ) -> Callable[[dict[str, Any]], None]:
+            def mutate(value: dict[str, Any]) -> None:
+                target: Any = value["stage12_failure_diagnostics"]["d4_ci_umask_inheritance"]
+                for key in path[:-1]:
+                    target = target[key]
+                target[path[-1]] = replacement
+
+            return mutate
+
+        mutations: tuple[tuple[str, Callable[[dict[str, Any]], None]], ...] = (
+            (
+                "missing_record",
+                remove_stage12_diagnostics,
+            ),
+            (
+                "missing_nested_key",
+                remove_transport_conclusion,
+            ),
+            (
+                "current_digest",
+                replace_diagnostic(("current_job", "envelope_sha256"), "0" * 64),
+            ),
+            (
+                "portable_digest",
+                replace_diagnostic(("portable_job", "envelope_sha256"), "0" * 64),
+            ),
+            (
+                "run_id",
+                replace_diagnostic(("run_id",), 34758522279),
+            ),
+            (
+                "current_job",
+                replace_diagnostic(("current_job", "job_database_id"), 103727050920),
+            ),
+            (
+                "portable_job",
+                replace_diagnostic(("portable_job", "job_database_id"), 103727050829),
+            ),
+            (
+                "raw_log_retention",
+                replace_diagnostic(("raw_logs_retained",), True),
+            ),
+            (
+                "success_classification",
+                replace_diagnostic(("classification",), "material_success_result"),
+            ),
+            (
+                "stage12_success",
+                replace_diagnostic(("stage12_passed",), True),
+            ),
+            (
+                "current_success",
+                replace_diagnostic(("current_job", "result", "status"), "passed"),
+            ),
+            (
+                "portable_success",
+                replace_diagnostic(("portable_job", "result", "status"), "passed"),
+            ),
+        )
+        for case, mutate in mutations:
+            with self.subTest(stage12_diagnostic=case):
+                self._mutated_receipt(mutate)
 
     def test_blueprint_source_identity_is_exact(self) -> None:
         self.assertEqual(BLUEPRINT_SOURCE["line_count"], 1183)

@@ -9,6 +9,7 @@ import io
 import json
 import os
 import ssl
+import subprocess
 import unittest
 import urllib.error
 from datetime import UTC, datetime, timedelta
@@ -51,6 +52,7 @@ from scripts.run_p12_toolchain import (
     _emit,
     _load_gate_result,
     _safe,
+    _stream_job_envelope,
     _write_safe_projection,
     ca_fallback_allowed,
     current_p11_test_ids,
@@ -881,6 +883,53 @@ class EvidenceGateTests(unittest.TestCase):
             with self.assertRaises(P12GateError):
                 _emit({"status": "replaced"}, str(symlink_output))
             self.assertEqual(target.read_bytes(), b"sentinel")
+        with (
+            self.subTest(job_log_transport="exact_argv_and_direct_pipe"),
+            TemporaryDirectory() as value,
+        ):
+            working = Path(value)
+            destination = working / "envelope-987.json"
+            destination.write_bytes(canonical_json({"status": "passed"}))
+            destination.chmod(0o600)
+            gh_stdout = io.BytesIO()
+            gh_process = mock.Mock(stdout=gh_stdout)
+            gh_process.wait.return_value = 0
+            parser_process = mock.Mock()
+            parser_process.wait.return_value = 0
+            with mock.patch(
+                "scripts.run_p12_toolchain.subprocess.Popen",
+                side_effect=(gh_process, parser_process),
+            ) as popen:
+                streamed = _stream_job_envelope(
+                    ROOT,
+                    working,
+                    run_id=self.RUN_ID,
+                    attempt=self.RUN_ATTEMPT,
+                    job={"id": 987},
+                    job_id="current-ci",
+                    job_name="Current P12 governance non-publishing verification",
+                    head_sha=self.HEAD,
+                )
+            self.assertEqual(streamed, {"status": "passed"})
+            self.assertFalse(destination.exists())
+            self.assertEqual(popen.call_count, 2)
+            gh_call, parser_call = popen.call_args_list
+            self.assertEqual(
+                gh_call.args[0],
+                [
+                    "gh",
+                    "api",
+                    "--allow-escape-sequences",
+                    "/repos/jeremyliu1220/digital-colleagues/actions/jobs/987/logs",
+                ],
+            )
+            self.assertEqual(
+                [argument for argument in gh_call.args[0] if argument.startswith("--")],
+                ["--allow-escape-sequences"],
+            )
+            self.assertEqual(gh_call.kwargs["stdout"], subprocess.PIPE)
+            self.assertIs(parser_call.kwargs["stdin"], gh_stdout)
+            self.assertEqual(parser_call.args[0][3:5], ["--scope", "extract-ci-envelope"])
         jobs = [
             {
                 "envelope_sha256": character * 64,
@@ -933,10 +982,21 @@ class EvidenceGateTests(unittest.TestCase):
     def test_forged_marker_fails_closed(self) -> None:
         line, _ = encode_ci_envelope(self._envelope("current-ci"))
         forged_digest = line[:-1] + ("0" if line[-1] != "0" else "1")
-        with self.assertRaises(P12GateError):
-            decode_ci_envelope_line(forged_digest.encode("ascii"))
-        with self.assertRaises(P12GateError):
-            decode_ci_envelope_line(b"\x1b[32m" + line.encode("ascii"))
+        cases = {
+            "forged_digest": forged_digest.encode("ascii"),
+            "ansi_prefixed": b"\x1b[32m" + line.encode("ascii"),
+        }
+        for name, marker in cases.items():
+            with self.subTest(marker=name), self.assertRaises(P12GateError):
+                extract_ci_envelope(
+                    io.BytesIO(marker + b"\n"),
+                    run_id=self.RUN_ID,
+                    attempt=self.RUN_ATTEMPT,
+                    job_database_id=987,
+                    expected_job_id="current-ci",
+                    expected_job_name="Current P12 governance non-publishing verification",
+                    head_sha=self.HEAD,
+                )
 
     def test_duplicate_envelope_fails_closed(self) -> None:
         envelope = self._envelope("current-ci")
@@ -1095,6 +1155,44 @@ class EvidenceGateTests(unittest.TestCase):
                     expected_job_name="Current P12 governance non-publishing verification",
                     head_sha=self.HEAD,
                 )
+
+        for name, gh_status, parser_status in (
+            ("transport", 1, 0),
+            ("parser", 0, 1),
+        ):
+            with self.subTest(stream_failure=name), TemporaryDirectory() as value:
+                working = Path(value)
+                destination = working / "envelope-987.json"
+                destination.write_bytes(canonical_json({"status": "passed"}))
+                destination.chmod(0o600)
+                gh_stdout = io.BytesIO()
+                gh_process = mock.Mock(stdout=gh_stdout)
+                gh_process.wait.return_value = gh_status
+                parser_process = mock.Mock()
+                parser_process.wait.return_value = parser_status
+                with (
+                    mock.patch(
+                        "scripts.run_p12_toolchain.subprocess.Popen",
+                        side_effect=(gh_process, parser_process),
+                    ) as popen,
+                    self.assertRaisesRegex(
+                        P12GateError,
+                        "P12 CI job-log transport or envelope extraction failed",
+                    ),
+                ):
+                    _stream_job_envelope(
+                        ROOT,
+                        working,
+                        run_id=self.RUN_ID,
+                        attempt=self.RUN_ATTEMPT,
+                        job={"id": 987},
+                        job_id="current-ci",
+                        job_name="Current P12 governance non-publishing verification",
+                        head_sha=self.HEAD,
+                    )
+                self.assertEqual(popen.call_count, 2)
+                self.assertIs(popen.call_args_list[1].kwargs["stdin"], gh_stdout)
+                self.assertTrue(destination.exists())
 
         with TemporaryDirectory() as value:
             directory = Path(value) / "private"

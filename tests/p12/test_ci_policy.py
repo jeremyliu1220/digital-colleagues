@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import stat
+import subprocess
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -62,11 +64,46 @@ class CiPolicyTests(unittest.TestCase):
         self.assertIn(f"name: {CURRENT_JOB_NAME}\n", EXPECTED_WORKFLOW)
         self.assertIn(f"name: {PORTABLE_JOB_NAME}\n", EXPECTED_WORKFLOW)
         self.assertIn(f"name: {MAIN_COMPOSE_JOB_NAME}\n", EXPECTED_WORKFLOW)
+        workflow_lines = EXPECTED_WORKFLOW.splitlines()
+        self.assertEqual(workflow_lines.count("          umask 077"), 2)
+        self.assertEqual(workflow_lines.count("          umask 022"), 2)
+        self.assertEqual(workflow_lines.count("            umask 022"), 2)
         with TemporaryDirectory() as value:
             commented = EXPECTED_WORKFLOW.replace(
                 "name: CI\n", "name: CI  # structural comments are not policy\n", 1
             )
             self.assertEqual(check_ci_policy(self._root(value, commented))["status"], "passed")
+        with TemporaryDirectory() as value:
+            probe_root = Path(value)
+            subprocess.run(
+                [
+                    "bash",
+                    "-c",
+                    """set -eu
+umask 077
+gate_dir="$1/private-gate"
+install -d -m 0700 "${gate_dir}"
+export P12_JSON_OUTPUT="${gate_dir}/gate.json"
+install -m 0600 /dev/null "${P12_JSON_OUTPUT}"
+umask 022
+(
+  umask 022
+  : > "$1/historical-working.lock"
+)
+""",
+                    "p12-umask-probe",
+                    str(probe_root),
+                ],
+                check=True,
+            )
+            self.assertEqual(stat.S_IMODE((probe_root / "private-gate").stat().st_mode), 0o700)
+            self.assertEqual(
+                stat.S_IMODE((probe_root / "private-gate/gate.json").stat().st_mode), 0o600
+            )
+            self.assertEqual(
+                stat.S_IMODE((probe_root / "historical-working.lock").stat().st_mode),
+                0o644,
+            )
 
     def test_pull_request_target_is_rejected(self) -> None:
         self._rejects("  pull_request:\n", "  pull_request_target:\n")
@@ -296,6 +333,56 @@ class CiPolicyTests(unittest.TestCase):
         for before, after in lifecycle_mutations.items():
             with self.subTest(lifecycle=before):
                 self._rejects(before, after)
+        formal_gates = {
+            "current": "make p12-current-ci",
+            "portable": (
+                "timeout --foreground --signal=TERM --kill-after=30s 9900s "
+                "make p12-portable-history"
+            ),
+        }
+        for job, gate in formal_gates.items():
+            block = (
+                "          umask 022\n"
+                "          (\n"
+                "            umask 022\n"
+                f"            {gate}\n"
+                "          )\n"
+                "          gate_status=$?\n"
+            )
+            mutations = {
+                "formal_inherits_077": (f"          {gate}\n          gate_status=$?\n"),
+                "inner_077": block.replace("            umask 022\n", "            umask 077\n", 1),
+                "missing_inner_022": block.replace("            umask 022\n", "", 1),
+                "missing_subshell": (
+                    f"          umask 022\n          {gate}\n          gate_status=$?\n"
+                ),
+                "outer_python_inherits_077": block.replace("          umask 022\n", "", 1),
+                "forged_gate_status": block.replace("gate_status=$?", "gate_status=0", 1),
+            }
+            for case, mutated in mutations.items():
+                with self.subTest(job=job, formal_gate=case):
+                    self._rejects(block, mutated)
+
+        for job, stem in (("current", "current"), ("portable", "history")):
+            private_block = (
+                f'          gate_dir="${{RUNNER_TEMP}}/p12-{stem}-'
+                '${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"\n'
+                '          install -d -m 0700 "${gate_dir}"\n'
+                '          export P12_JSON_OUTPUT="${gate_dir}/gate.json"\n'
+                '          install -m 0600 /dev/null "${P12_JSON_OUTPUT}"\n'
+            )
+            for mode, mutated in (
+                (
+                    "directory_0755",
+                    private_block.replace("install -d -m 0700", "install -d -m 0755", 1),
+                ),
+                (
+                    "result_0644",
+                    private_block.replace("install -m 0600", "install -m 0644", 1),
+                ),
+            ):
+                with self.subTest(job=job, private_mode=mode):
+                    self._rejects(private_block, mutated)
         emitter = (
             "python3 -B scripts/run_p12_toolchain.py --scope emit-ci-envelope "
             '--job-kind portable_history --gate-result "${P12_JSON_OUTPUT}" '

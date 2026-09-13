@@ -52,7 +52,11 @@ jobs:
           install -d -m 0700 "${gate_dir}"
           export P12_JSON_OUTPUT="${gate_dir}/gate.json"
           install -m 0600 /dev/null "${P12_JSON_OUTPUT}"
-          make p12-current-ci
+          umask 022
+          (
+            umask 022
+            make p12-current-ci
+          )
           gate_status=$?
           envelope_line="$(python3 -B scripts/run_p12_toolchain.py --scope emit-ci-envelope --job-kind current_governance --gate-result "${P12_JSON_OUTPUT}" --gate-exit-status "${gate_status}")"
           envelope_status=$?
@@ -103,7 +107,11 @@ jobs:
           install -d -m 0700 "${gate_dir}"
           export P12_JSON_OUTPUT="${gate_dir}/gate.json"
           install -m 0600 /dev/null "${P12_JSON_OUTPUT}"
-          timeout --foreground --signal=TERM --kill-after=30s 9900s make p12-portable-history
+          umask 022
+          (
+            umask 022
+            timeout --foreground --signal=TERM --kill-after=30s 9900s make p12-portable-history
+          )
           gate_status=$?
           envelope_line="$(python3 -B scripts/run_p12_toolchain.py --scope emit-ci-envelope --job-kind portable_history --gate-result "${P12_JSON_OUTPUT}" --gate-exit-status "${gate_status}")"
           envelope_status=$?

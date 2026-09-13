@@ -4050,7 +4050,12 @@ def _stream_job_envelope(
     database_id = _positive_int(job.get("id"), "REST job database ID")
     destination = working / f"envelope-{database_id}.json"
     gh_process = subprocess.Popen(
-        ["gh", "api", f"/repos/{REPOSITORY}/actions/jobs/{database_id}/logs"],
+        [
+            "gh",
+            "api",
+            "--allow-escape-sequences",
+            f"/repos/{REPOSITORY}/actions/jobs/{database_id}/logs",
+        ],
         cwd=root,
         stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,

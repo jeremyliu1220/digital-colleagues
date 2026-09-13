@@ -357,6 +357,55 @@
       "remote_mutation_count": 0
     }
   },
+  "stage12_failure_diagnostics": {
+    "d4_ci_umask_inheritance": {
+      "classification": "material_diagnostic_result",
+      "run_id": 34758522278,
+      "attempt": 1,
+      "event": "pull_request",
+      "pull_request_number": 15,
+      "head_sha": "ec4cbbc3df05557e33c1eca137731c548e23cdff",
+      "base_sha": "c1562ea5201394d8a278f4b644daf4029cbb5bd4",
+      "workflow": {
+        "name": "CI",
+        "path": ".github/workflows/ci.yml"
+      },
+      "repository": "jeremyliu1220/digital-colleagues",
+      "current_job": {
+        "job_database_id": 103727050919,
+        "envelope_sha256": "f264b6b43ecc1d6d57b86dd5a5c0bedae1d308228e346fefb85addb59c49619b",
+        "result": {
+          "tests": 136,
+          "failures": 3,
+          "errors": 3,
+          "skips": 0,
+          "status": "failed"
+        }
+      },
+      "portable_job": {
+        "job_database_id": 103727050828,
+        "envelope_sha256": "1fa4a24c855894556713784aa05ce85994cb191485030c9e6935df0aa4bf696a",
+        "result": {
+          "tests": 0,
+          "failures": 1,
+          "errors": 1,
+          "skips": 0,
+          "status": "failed"
+        }
+      },
+      "root_cause": "confirmed_workflow_umask_inheritance",
+      "transport_conclusion": "scoped_implementation_correction_compatible",
+      "raw_logs_retained": false,
+      "stage12_passed": false,
+      "stage13_executed": false,
+      "rerun_count": 0,
+      "cancel_count": 0,
+      "summary_count": 0,
+      "evidence_count": 0,
+      "publication_count": 0,
+      "remote_mutation_count": 0
+    }
+  },
   "portable_historical_inventory": {
     "path": "docs/p12/portable-historical-inventory.json",
     "object_order": [

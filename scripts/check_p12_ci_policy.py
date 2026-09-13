@@ -82,6 +82,28 @@ if EXPECTED_WORKFLOW.count(_EMITTER_TAIL_BEFORE_CLEANUP) != 2:
 EXPECTED_WORKFLOW = EXPECTED_WORKFLOW.replace(
     _EMITTER_TAIL_BEFORE_CLEANUP, _EMITTER_TAIL_AFTER_CLEANUP
 )
+_FORMAL_GATE_REPLACEMENTS = {
+    "          make p12-current-ci\n": (
+        "          umask 022\n"
+        "          (\n"
+        "            umask 022\n"
+        "            make p12-current-ci\n"
+        "          )\n"
+    ),
+    "          timeout --foreground --signal=TERM --kill-after=30s 9900s "
+    "make p12-portable-history\n": (
+        "          umask 022\n"
+        "          (\n"
+        "            umask 022\n"
+        "            timeout --foreground --signal=TERM --kill-after=30s 9900s "
+        "make p12-portable-history\n"
+        "          )\n"
+    ),
+}
+for _inherited_gate, _isolated_gate in _FORMAL_GATE_REPLACEMENTS.items():
+    if EXPECTED_WORKFLOW.count(_inherited_gate) != 1:
+        raise RuntimeError("P12 canonical formal-gate scaffold drifted")
+    EXPECTED_WORKFLOW = EXPECTED_WORKFLOW.replace(_inherited_gate, _isolated_gate, 1)
 
 EXPECTED_ACTIONS = Counter(
     {
@@ -369,7 +391,11 @@ def _gate_commands(job_kind: str) -> tuple[str, ...]:
         'install -d -m 0700 "${gate_dir}"',
         'export P12_JSON_OUTPUT="${gate_dir}/gate.json"',
         'install -m 0600 /dev/null "${P12_JSON_OUTPUT}"',
-        gate,
+        "umask 022",
+        "(",
+        "  umask 022",
+        f"  {gate}",
+        ")",
         "gate_status=$?",
         'envelope_line="$(python3 -B scripts/run_p12_toolchain.py --scope emit-ci-envelope '
         f'--job-kind {job_kind} --gate-result "${{P12_JSON_OUTPUT}}" '

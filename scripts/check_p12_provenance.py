@@ -412,6 +412,53 @@ STAGE10_FAILURE_DIAGNOSTICS: dict[str, dict[str, Any]] = {
     },
 }
 
+STAGE12_FAILURE_DIAGNOSTICS: dict[str, dict[str, Any]] = {
+    "d4_ci_umask_inheritance": {
+        "classification": "material_diagnostic_result",
+        "run_id": 34758522278,
+        "attempt": 1,
+        "event": "pull_request",
+        "pull_request_number": 15,
+        "head_sha": "ec4cbbc3df05557e33c1eca137731c548e23cdff",
+        "base_sha": BASE_COMMIT,
+        "workflow": {"name": "CI", "path": ".github/workflows/ci.yml"},
+        "repository": "jeremyliu1220/digital-colleagues",
+        "current_job": {
+            "job_database_id": 103727050919,
+            "envelope_sha256": ("f264b6b43ecc1d6d57b86dd5a5c0bedae1d308228e346fefb85addb59c49619b"),
+            "result": {
+                "tests": 136,
+                "failures": 3,
+                "errors": 3,
+                "skips": 0,
+                "status": "failed",
+            },
+        },
+        "portable_job": {
+            "job_database_id": 103727050828,
+            "envelope_sha256": ("1fa4a24c855894556713784aa05ce85994cb191485030c9e6935df0aa4bf696a"),
+            "result": {
+                "tests": 0,
+                "failures": 1,
+                "errors": 1,
+                "skips": 0,
+                "status": "failed",
+            },
+        },
+        "root_cause": "confirmed_workflow_umask_inheritance",
+        "transport_conclusion": "scoped_implementation_correction_compatible",
+        "raw_logs_retained": False,
+        "stage12_passed": False,
+        "stage13_executed": False,
+        "rerun_count": 0,
+        "cancel_count": 0,
+        "summary_count": 0,
+        "evidence_count": 0,
+        "publication_count": 0,
+        "remote_mutation_count": 0,
+    },
+}
+
 P10_RUNS: dict[str, tuple[str, str]] = {
     "34202520699": ("05e73ea23ac650edfae59fa409a770fdf967af3a", "success"),
     "34203006909": ("05e73ea23ac650edfae59fa409a770fdf967af3a", "failure"),
@@ -648,6 +695,7 @@ def check_provenance(root: Path) -> dict[str, object]:
         "darwin_evidence_anchors",
         "rejected_attempts",
         "stage10_failure_diagnostics",
+        "stage12_failure_diagnostics",
         "portable_historical_inventory",
         "migration_protection",
         "p10_protected_publication",
@@ -712,6 +760,8 @@ def check_provenance(root: Path) -> dict[str, object]:
         raise P12GateError("P12 rejected/superseded v1/v2/v3 history drifted")
     if not _exact_json(receipt.get("stage10_failure_diagnostics"), STAGE10_FAILURE_DIAGNOSTICS):
         raise P12GateError("P12 Stage 10 failure diagnostics are not exact")
+    if not _exact_json(receipt.get("stage12_failure_diagnostics"), STAGE12_FAILURE_DIAGNOSTICS):
+        raise P12GateError("P12 Stage 12 failure diagnostics are not exact")
     inventory = _dict(receipt.get("portable_historical_inventory"), "portable inventory")
     if not _exact_json(
         inventory,
