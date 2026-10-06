@@ -30,7 +30,7 @@ dc = "digital_colleagues.cli:main"
 [project.optional-dependencies]
 dev = [
   "httpx==0.28.1",
-  "mypy==2.3.1",
+  "mypy==2.4.0",
   "ruff==0.16.4",
 ]
 
